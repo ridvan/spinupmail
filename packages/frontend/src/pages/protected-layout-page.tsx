@@ -1,0 +1,75 @@
+import * as React from "react";
+import { Outlet, useMatches, useNavigate, type UIMatch } from "react-router";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ModeToggle } from "@/components/mode-toggle";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+
+type RouteHandle = {
+  title?: string;
+};
+
+const resolvePageTitle = (matches: UIMatch[]) => {
+  for (const match of [...matches].reverse()) {
+    const handle = match.handle as RouteHandle | undefined;
+    if (handle?.title) {
+      return handle.title;
+    }
+  }
+
+  return "Workspace";
+};
+
+export const ProtectedLayoutPage = () => {
+  const navigate = useNavigate();
+  const matches = useMatches();
+  const { user, signOut } = useAuth();
+
+  const [signOutError, setSignOutError] = React.useState<string | null>(null);
+
+  const pageTitle = resolvePageTitle(matches);
+
+  const handleSignOut = async () => {
+    setSignOutError(null);
+
+    try {
+      await signOut();
+      await navigate("/login", { replace: true });
+    } catch (error) {
+      setSignOutError((error as Error).message);
+    }
+  };
+
+  return (
+    <SidebarProvider>
+      <AppSidebar onSignOut={handleSignOut} user={user} />
+      <SidebarInset>
+        <header className="sticky top-0 z-20 border-b border-border/65 bg-sidebar">
+          <div className="flex h-16 items-center justify-between px-4 md:px-6">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger />
+              <div>
+                <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                  Spinupmail
+                </p>
+                <p className="text-sm font-medium">{pageTitle}</p>
+              </div>
+            </div>
+            <ModeToggle />
+          </div>
+        </header>
+
+        <div className="flex-1 px-4 py-6 md:px-6 lg:px-8">
+          {signOutError ? (
+            <p className="mb-4 text-sm text-destructive">{signOutError}</p>
+          ) : null}
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+};
