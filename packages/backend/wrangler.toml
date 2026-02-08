@@ -27,6 +27,7 @@ name = "EMAIL"
 
 [vars]
 EMAIL_DOMAIN = "spinupmail.com"
+EMAIL_DOMAINS = "spinupmail.com,spinuptest.com"
 EMAIL_MAX_BYTES = "524288"
 
 # To protect the database id, kv id, we ignore this

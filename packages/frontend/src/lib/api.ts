@@ -62,11 +62,20 @@ export type EmailMessage = {
   receivedAtMs: number | null;
 };
 
+export type DomainConfig = {
+  items: string[];
+  default: string | null;
+};
+
 export const listEmailAddresses = async () => {
   const data = await apiFetch<{ items: EmailAddress[] }>(
     "/api/email-addresses"
   );
   return data.items;
+};
+
+export const listDomains = async () => {
+  return apiFetch<DomainConfig>("/api/domains");
 };
 
 export const createEmailAddress = async (payload: {

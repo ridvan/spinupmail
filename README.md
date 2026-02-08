@@ -56,7 +56,8 @@ Edit `packages/backend/wrangler.toml` with:
 
 - `[[d1_databases]].database_id`
 - `[[kv_namespaces]].id`
-- `[vars].EMAIL_DOMAIN` (your domain)
+- `[vars].EMAIL_DOMAIN` (single domain fallback)
+- `[vars].EMAIL_DOMAINS` (comma-separated list, recommended)
 - Optional: `[vars].EMAIL_MAX_BYTES`, `[vars].EMAIL_FORWARD_TO`
 
 ## 3. Better Auth Secrets
@@ -95,6 +96,42 @@ pnpm -C packages/backend deploy
    - Address: `*@your-domain.com`
    - Action: **Send to Worker**
    - Worker: `spinupmail` (or your deployed Worker name)
+
+If you use multiple domains, repeat the routing rule for each domain you add to
+`EMAIL_DOMAINS`.
+
+## Multiple Domains
+
+To support multiple inbound domains, configure them in the Worker and add Email
+Routing rules for each domain.
+
+### 1) Worker config
+
+In `packages/backend/wrangler.toml`:
+
+```
+[vars]
+EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
+```
+
+`EMAIL_DOMAIN` is still supported as a fallback, but `EMAIL_DOMAINS` is the
+recommended source of truth.
+
+### 2) Email Routing rules
+
+For **each domain** listed in `EMAIL_DOMAINS`:
+
+1. Enable Email Routing for that domain in Cloudflare.
+2. Add a destination address (verify it once per domain).
+3. Create a routing rule:
+   - Address: `*@that-domain.com`
+   - Action: **Send to Worker**
+   - Worker: your deployed Worker name.
+
+### 3) UI behavior
+
+When multiple domains are configured, the UI shows a **domain selector** during
+address creation. If only one domain is configured, it is used automatically.
 
 ## 7. Deploy the Frontend (Cloudflare Pages)
 

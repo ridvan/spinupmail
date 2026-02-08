@@ -28,5 +28,6 @@ name = "EMAIL"
 
 [vars]
 EMAIL_DOMAIN = "example.com"
+EMAIL_DOMAINS = "example.com,example-test.com"
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"

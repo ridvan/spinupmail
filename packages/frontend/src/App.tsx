@@ -16,6 +16,7 @@ import {
   createEmailAddress,
   type EmailAddress,
   type EmailMessage,
+  listDomains,
   listEmailAddresses,
   listEmails,
 } from "@/lib/api";
@@ -114,6 +115,8 @@ export function App() {
   const [newLocalPart, setNewLocalPart] = React.useState("");
   const [newTag, setNewTag] = React.useState("");
   const [newTtl, setNewTtl] = React.useState("");
+  const [newDomain, setNewDomain] = React.useState<string | null>(null);
+  const [availableDomains, setAvailableDomains] = React.useState<string[]>([]);
   const [createError, setCreateError] = React.useState<string | null>(null);
 
   const [apiKeys, setApiKeys] = React.useState<ApiKeyRow[]>([]);
@@ -145,6 +148,18 @@ export function App() {
       setAddressesLoading(false);
     }
   }, [selectedAddressId]);
+
+  const loadDomains = React.useCallback(async () => {
+    try {
+      const data = await listDomains();
+      const items = data.items ?? [];
+      setAvailableDomains(items);
+      setNewDomain(data.default ?? items[0] ?? null);
+    } catch {
+      setAvailableDomains([]);
+      setNewDomain(null);
+    }
+  }, []);
 
   const loadEmails = React.useCallback(async (addressId: string | null) => {
     if (!addressId) {
@@ -180,7 +195,8 @@ export function App() {
     if (!session) return;
     void loadAddresses();
     void loadApiKeys();
-  }, [session, loadAddresses, loadApiKeys]);
+    void loadDomains();
+  }, [session, loadAddresses, loadApiKeys, loadDomains]);
 
   React.useEffect(() => {
     if (!session) return;
@@ -235,6 +251,7 @@ export function App() {
         tag: newTag || undefined,
         ttlMinutes:
           ttlMinutes && !Number.isNaN(ttlMinutes) ? ttlMinutes : undefined,
+        domain: newDomain || undefined,
       });
       setNewLocalPart("");
       setNewTag("");
@@ -349,6 +366,36 @@ export function App() {
                           placeholder="60"
                         />
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="domain">Domain</Label>
+                      {availableDomains.length <= 1 ? (
+                        <Input
+                          id="domain"
+                          value={availableDomains[0] ?? ""}
+                          disabled
+                        />
+                      ) : (
+                        <select
+                          id="domain"
+                          value={newDomain ?? ""}
+                          onChange={event =>
+                            setNewDomain(event.target.value || null)
+                          }
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          {availableDomains.map(domain => (
+                            <option key={domain} value={domain}>
+                              {domain}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {availableDomains.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          No domains configured.
+                        </p>
+                      ) : null}
                     </div>
                     {createError ? (
                       <p className="text-sm text-destructive">{createError}</p>

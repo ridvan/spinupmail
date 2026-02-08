@@ -40,6 +40,17 @@ const getAllowedOrigins = (env: CloudflareBindings) => {
   if (configured && configured.length > 0) return configured;
   return ["http://localhost:5173", "http://127.0.0.1:5173"];
 };
+const getAllowedDomains = (env: CloudflareBindings) => {
+  const rawList =
+    env.EMAIL_DOMAINS?.split(",")
+      .map(domain => domain.trim().toLowerCase())
+      .filter(Boolean) ?? [];
+  const fallbackDomain = env.EMAIL_DOMAIN?.trim().toLowerCase();
+  const fallback = fallbackDomain ? [fallbackDomain] : [];
+  const combined = [...rawList, ...fallback];
+  const unique = Array.from(new Set(combined));
+  return unique;
+};
 
 const normalizeAddress = (address: string) => address.trim().toLowerCase();
 
@@ -262,10 +273,20 @@ app.all("/api/auth/*", async c => {
   return auth.handler(c.req.raw);
 });
 
+app.use("/api/domains", requireAuth);
 app.use("/api/email-addresses", requireAuth);
 app.use("/api/email-addresses/*", requireAuth);
 app.use("/api/emails", requireAuth);
 app.use("/api/emails/*", requireAuth);
+
+app.get("/api/domains", async c => {
+  const allowed = getAllowedDomains(c.env);
+  if (allowed.length === 0) {
+    c.status(500);
+    return c.json({ error: "No email domains configured" });
+  }
+  return c.json({ items: allowed, default: allowed[0] ?? null });
+});
 
 app.get("/api/email-addresses", async c => {
   const session = c.get("session");
@@ -321,19 +342,24 @@ app.post("/api/email-addresses", async c => {
 
   const session = c.get("session");
   const body = await readJsonBody<CreateBody>(c);
-  const domainFromEnv = c.env.EMAIL_DOMAIN?.trim().toLowerCase();
+  const allowedDomains = getAllowedDomains(c.env);
   const domainFromBody =
     typeof body.domain === "string" && body.domain.trim().length > 0
       ? body.domain.trim().toLowerCase()
       : undefined;
-  const domain = domainFromBody ?? domainFromEnv;
+  const domain = domainFromBody ?? allowedDomains[0];
 
-  if (!domain) {
+  if (!domain || allowedDomains.length === 0) {
     c.status(400);
     return c.json({ error: "EMAIL_DOMAIN is not configured" });
   }
 
-  if (domainFromBody && domainFromEnv && domainFromBody !== domainFromEnv) {
+  if (domain.includes("@")) {
+    c.status(400);
+    return c.json({ error: "domain is invalid" });
+  }
+
+  if (!allowedDomains.includes(domain)) {
     c.status(400);
     return c.json({ error: "domain is not allowed" });
   }

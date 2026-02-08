@@ -18,7 +18,7 @@
   "dependencies": {
     "@cloudflare/workers-types": "4.20260207.0",
     "better-auth": "^1.2.8",
-    "better-auth-cloudflare": "latest",
+    "better-auth-cloudflare": "^0.2.9",
     "drizzle-orm": "^0.44.5",
     "hono": "^4.7.11",
     "postal-mime": "^2.7.3",
