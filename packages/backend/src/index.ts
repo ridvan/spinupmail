@@ -83,17 +83,71 @@ const clampNumber = (
   return Math.min(max, Math.max(min, parsed));
 };
 
+const getUnknownProperty = (value: unknown, key: string): unknown => {
+  if (typeof value !== "object" || !value) return undefined;
+  const record = value as Record<string, unknown>;
+  return record[key];
+};
+
+const getAuthFailureResponse = (
+  error: unknown
+): { status: 401 | 403; error: string } | null => {
+  const body = getUnknownProperty(error, "body");
+  const statusRaw =
+    getUnknownProperty(error, "status") ??
+    getUnknownProperty(error, "statusCode") ??
+    getUnknownProperty(body, "status") ??
+    getUnknownProperty(body, "statusCode");
+  const status =
+    typeof statusRaw === "number" && Number.isInteger(statusRaw)
+      ? statusRaw
+      : undefined;
+  const messageRaw =
+    getUnknownProperty(error, "message") ?? getUnknownProperty(body, "message");
+  const codeRaw =
+    getUnknownProperty(error, "code") ?? getUnknownProperty(body, "code");
+  const message = typeof messageRaw === "string" ? messageRaw : undefined;
+  const code = typeof codeRaw === "string" ? codeRaw : undefined;
+  const normalized = `${code ?? ""} ${message ?? ""}`.trim();
+
+  const isRevokedApiKey =
+    /revok/i.test(normalized) && /api[\s-_]?key/i.test(normalized);
+  if (isRevokedApiKey) {
+    return { status: 401, error: "api key revoked" };
+  }
+
+  const isAuthFailure =
+    status === 401 ||
+    status === 403 ||
+    /unauthori[sz]ed|forbidden|invalid api[\s-_]?key|invalid token|session/i.test(
+      normalized
+    );
+
+  if (!isAuthFailure) return null;
+  if (status === 403) return { status: 403, error: "forbidden" };
+  return { status: 401, error: "unauthorized" };
+};
+
 const requireAuth: MiddlewareHandler = async (c, next) => {
   const auth = c.get("auth");
-  const session = await auth.api.getSession({
-    headers: c.req.raw.headers,
-  });
-  if (!session?.session || !session?.user) {
-    c.status(401);
-    return c.json({ error: "unauthorized" });
+  try {
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+    if (!session?.session || !session?.user) {
+      c.status(401);
+      return c.json({ error: "unauthorized" });
+    }
+    c.set("session", session as AuthSession);
+    await next();
+  } catch (error) {
+    const authFailure = getAuthFailureResponse(error);
+    if (authFailure) {
+      c.status(authFailure.status);
+      return c.json({ error: authFailure.error });
+    }
+    throw error;
   }
-  c.set("session", session as AuthSession);
-  await next();
 };
 
 const readJsonBody = async <T>(c: Parameters<MiddlewareHandler>[0]) => {
