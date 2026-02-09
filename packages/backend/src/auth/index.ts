@@ -53,13 +53,18 @@ const verifyPasswordWithNodeCrypto = async ({
   hash: string;
   password: string;
 }) => {
-  const [salt, key] = hash.split(":");
-  if (!salt || !key) return false;
+  try {
+    const [salt, key] = hash.split(":");
+    if (!salt || !key) return false;
+    if (!/^[a-f0-9]+$/i.test(key) || key.length % 2 !== 0) return false;
 
-  const expected = Buffer.from(key, "hex");
-  const actual = await scryptHash(password, salt);
-  if (expected.length !== actual.length) return false;
-  return timingSafeEqual(expected, actual);
+    const expected = Buffer.from(key, "hex");
+    const actual = await scryptHash(password, salt);
+    if (expected.length !== actual.length) return false;
+    return timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
 };
 
 // Single auth configuration that handles both CLI and runtime scenarios
