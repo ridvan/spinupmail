@@ -51,7 +51,7 @@ importers:
         specifier: 4.20260207.0
         version: 4.20260207.0
       better-auth:
-        specifier: ^1.2.8
+        specifier: ^1.4.18
         version: 1.4.18(drizzle-kit@0.31.8)(drizzle-orm@0.44.7(@cloudflare/workers-types@4.20260207.0)(kysely@0.28.11))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       better-auth-cloudflare:
         specifier: ^0.2.9

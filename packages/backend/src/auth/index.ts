@@ -3,6 +3,7 @@ import type {
   IncomingRequestCfProperties,
 } from "@cloudflare/workers-types";
 import { betterAuth } from "better-auth";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -10,12 +11,63 @@ import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../db";
 import type { CloudflareBindings } from "../env";
 
+const PASSWORD_SALT_BYTES = 16;
+const PASSWORD_DERIVED_KEY_BYTES = 64;
+const SCRYPT_COST = 16384;
+const SCRYPT_BLOCK_SIZE = 16;
+const SCRYPT_PARALLELIZATION = 1;
+const SCRYPT_MAX_MEMORY = 128 * SCRYPT_COST * SCRYPT_BLOCK_SIZE * 2;
+
+const scryptHash = (password: string, salt: string) =>
+  new Promise<Buffer>((resolve, reject) => {
+    scrypt(
+      password.normalize("NFKC"),
+      salt,
+      PASSWORD_DERIVED_KEY_BYTES,
+      {
+        cost: SCRYPT_COST,
+        blockSize: SCRYPT_BLOCK_SIZE,
+        parallelization: SCRYPT_PARALLELIZATION,
+        maxmem: SCRYPT_MAX_MEMORY,
+      },
+      (error, derivedKey) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(derivedKey as Buffer);
+      }
+    );
+  });
+
+const hashPasswordWithNodeCrypto = async (password: string) => {
+  const salt = randomBytes(PASSWORD_SALT_BYTES).toString("hex");
+  const derivedKey = await scryptHash(password, salt);
+  return `${salt}:${derivedKey.toString("hex")}`;
+};
+
+const verifyPasswordWithNodeCrypto = async ({
+  hash,
+  password,
+}: {
+  hash: string;
+  password: string;
+}) => {
+  const [salt, key] = hash.split(":");
+  if (!salt || !key) return false;
+
+  const expected = Buffer.from(key, "hex");
+  const actual = await scryptHash(password, salt);
+  if (expected.length !== actual.length) return false;
+  return timingSafeEqual(expected, actual);
+};
+
 // Single auth configuration that handles both CLI and runtime scenarios
 function createAuth(
   env?: CloudflareBindings,
   cf?: IncomingRequestCfProperties
 ) {
-  const db = env ? drizzle(env.SUM_DB, { schema, logger: true }) : undefined;
+  const db = env ? drizzle(env.SUM_DB, { schema }) : undefined;
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
@@ -34,7 +86,7 @@ function createAuth(
                 db,
                 options: {
                   usePlural: true,
-                  debugLogs: true,
+                  debugLogs: false,
                 },
               }
             : undefined,
@@ -47,6 +99,10 @@ function createAuth(
             : ["http://localhost:5173", "http://127.0.0.1:5173"],
         emailAndPassword: {
           enabled: true,
+          password: {
+            hash: hashPasswordWithNodeCrypto,
+            verify: verifyPasswordWithNodeCrypto,
+          },
         },
         plugins: [
           apiKey({
@@ -67,7 +123,7 @@ function createAuth(
           database: drizzleAdapter({} as D1Database, {
             provider: "sqlite",
             usePlural: true,
-            debugLogs: true,
+            debugLogs: false,
           }),
         }),
   });
