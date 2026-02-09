@@ -5,8 +5,10 @@ type ApiError = {
   details?: string;
 };
 
+const getApiUrl = (path: string) => `${API_BASE}${path}`;
+
 const apiFetch = async <T>(path: string, init?: RequestInit) => {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(getApiUrl(path), {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -29,6 +31,36 @@ const apiFetch = async <T>(path: string, init?: RequestInit) => {
   return (await response.json()) as T;
 };
 
+const readErrorMessage = async (response: Response) => {
+  let message = response.statusText || "Request failed";
+  try {
+    const payload = (await response.json()) as ApiError;
+    message = payload.error || payload.details || message;
+  } catch {
+    const text = await response.text();
+    if (text) message = text;
+  }
+  return message;
+};
+
+const parseFilenameFromDisposition = (headerValue: string | null) => {
+  if (!headerValue) return null;
+
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const fallbackMatch = headerValue.match(/filename="([^"]+)"/i);
+  if (fallbackMatch?.[1]) return fallbackMatch[1];
+
+  return null;
+};
+
 export type EmailAddress = {
   id: string;
   address: string;
@@ -42,6 +74,16 @@ export type EmailAddress = {
   expiresAtMs: number | null;
   lastReceivedAt: string | null;
   lastReceivedAtMs: number | null;
+};
+
+export type EmailAttachment = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  disposition: string | null;
+  contentId: string | null;
+  downloadPath: string;
 };
 
 export type EmailMessage = {
@@ -58,6 +100,7 @@ export type EmailMessage = {
   raw?: string | null;
   rawSize?: number | null;
   rawTruncated: boolean;
+  attachments: EmailAttachment[];
   receivedAt: string | null;
   receivedAtMs: number | null;
 };
@@ -113,4 +156,43 @@ export const listEmails = async (options: {
 
 export const getEmail = async (emailId: string) => {
   return apiFetch<EmailMessage>(`/api/emails/${emailId}`);
+};
+
+export const downloadEmailAttachment = async (params: {
+  emailId: string;
+  attachmentId: string;
+  fallbackFilename?: string;
+}) => {
+  const response = await fetch(
+    getApiUrl(
+      `/api/emails/${params.emailId}/attachments/${params.attachmentId}`
+    ),
+    {
+      credentials: "include",
+      method: "GET",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const blob = await response.blob();
+  const filename =
+    parseFilenameFromDisposition(response.headers.get("Content-Disposition")) ||
+    params.fallbackFilename ||
+    "attachment";
+
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 100);
 };

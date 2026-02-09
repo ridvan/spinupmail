@@ -23,6 +23,12 @@ migrations_dir = "drizzle"
 binding = "SUM_KV"
 id = "YOUR_KV_NAMESPACE_ID"
 
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "YOUR_R2_BUCKET_NAME"
+# Optional for local/preview
+preview_bucket_name = "YOUR_R2_PREVIEW_BUCKET_NAME"
+
 [[send_email]]
 name = "EMAIL"
 
@@ -31,3 +37,4 @@ EMAIL_DOMAIN = "example.com"
 EMAIL_DOMAINS = "example.com,example-test.com"
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"
+EMAIL_ATTACHMENT_MAX_BYTES = "10485760"

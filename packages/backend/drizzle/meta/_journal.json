@@ -36,6 +36,13 @@
       "when": 1770497687093,
       "tag": "0004_yellow_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1770669483747,
+      "tag": "0005_parched_captain_cross",
+      "breakpoints": true
     }
   ]
 }

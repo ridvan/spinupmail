@@ -1,8 +1,13 @@
-import type { D1Database, KVNamespace } from "@cloudflare/workers-types";
+import type {
+  D1Database,
+  KVNamespace,
+  R2Bucket,
+} from "@cloudflare/workers-types";
 
 export interface CloudflareBindings {
   SUM_DB: D1Database;
   SUM_KV: KVNamespace;
+  R2_BUCKET?: R2Bucket;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_BASE_URL: string;
   CORS_ORIGIN?: string;
@@ -10,6 +15,7 @@ export interface CloudflareBindings {
   EMAIL_DOMAIN?: string;
   EMAIL_FORWARD_TO?: string;
   EMAIL_MAX_BYTES?: string;
+  EMAIL_ATTACHMENT_MAX_BYTES?: string;
 }
 
 declare global {

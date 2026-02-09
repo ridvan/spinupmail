@@ -10,6 +10,7 @@ frontend.
 - Create unlimited email addresses tied to a user account
 - Receive emails via Cloudflare Email Routing and store them in D1
 - Browse emails in the UI
+- Store inbound mail attachments in Cloudflare R2 and download them in UI/API
 - Generate API keys for automation (e.g., test suites)
 
 ## Prerequisites
@@ -20,7 +21,7 @@ frontend.
 
 ## Repo Layout
 
-- `packages/backend` — Cloudflare Worker (Hono + Better Auth + D1 + KV)
+- `packages/backend` — Cloudflare Worker (Hono + Better Auth + D1 + KV + R2)
 - `packages/frontend` — React + shadcn UI (Vite)
 
 ## 1. Install Dependencies
@@ -45,6 +46,15 @@ pnpm exec wrangler d1 create SUM_DB
 pnpm exec wrangler kv namespace create SUM_KV
 ```
 
+### R2 Bucket (Attachments)
+
+Create buckets for attachment storage:
+
+```bash
+pnpm exec wrangler r2 bucket create spinupmail-attachments
+pnpm exec wrangler r2 bucket create spinupmail-attachments-preview
+```
+
 Copy the example config and update IDs:
 
 ```bash
@@ -56,9 +66,11 @@ Edit `packages/backend/wrangler.toml` with:
 
 - `[[d1_databases]].database_id`
 - `[[kv_namespaces]].id`
+- `[[r2_buckets]].bucket_name` (e.g. `spinupmail-attachments`)
+- `[[r2_buckets]].preview_bucket_name` (e.g. `spinupmail-attachments-preview`)
 - `[vars].EMAIL_DOMAIN` (single domain fallback)
 - `[vars].EMAIL_DOMAINS` (comma-separated list, recommended)
-- Optional: `[vars].EMAIL_MAX_BYTES`, `[vars].EMAIL_FORWARD_TO`
+- Optional: `[vars].EMAIL_MAX_BYTES`, `[vars].EMAIL_FORWARD_TO`, `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
 
 ## 3. Better Auth Secrets
 
@@ -185,6 +197,33 @@ curl "https://your-domain.com/api/email-addresses" \
 curl "https://your-domain.com/api/emails?address=john-123@your-domain.com" \
   -H "X-API-Key: <your_api_key>"
 ```
+
+Download an email attachment:
+
+```bash
+curl -L "https://your-domain.com/api/emails/<email_id>/attachments/<attachment_id>" \
+  -H "X-API-Key: <your_api_key>" \
+  --output attachment.bin
+```
+
+## Attachment Process
+
+Attachment handling is part of the inbound email pipeline:
+
+1. Email is received by the Worker through Cloudflare Email Routing.
+2. MIME content is parsed with `postal-mime` (including attachments).
+3. Each attachment is validated and uploaded to the `R2_BUCKET` binding under:
+   - `email-attachments/<userId>/<addressId>/<emailId>/<attachmentId>-<filename>`
+4. Metadata is saved in D1 table `email_attachments` with ownership links (`user_id`, `address_id`, `email_id`).
+5. `/api/emails` and `/api/emails/:id` include attachment metadata for UI/API consumers.
+6. Downloads are served through authenticated endpoint:
+   - `GET /api/emails/:id/attachments/:attachmentId`
+   - Access is restricted to the owning user (session cookie or API key).
+
+Limits:
+
+- `EMAIL_MAX_BYTES`: max raw email bytes stored in D1 (default `524288`).
+- `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2 (default `10485760`).
 
 ## Local Development
 

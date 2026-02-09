@@ -22,6 +22,10 @@ migrations_dir = "drizzle"
 binding = "SUM_KV"
 id = "442502dbafb4409999092c94e7784fad"
 
+[[r2_buckets]]
+bucket_name = "spinupmail-attachments"
+binding = "spinupmail_attachments"
+
 [[send_email]]
 name = "EMAIL"
 

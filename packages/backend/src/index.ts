@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { drizzle } from "drizzle-orm/d1";
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import sanitizeHtml from "sanitize-html";
-import PostalMime from "postal-mime";
+import PostalMime, { type Attachment as PostalAttachment } from "postal-mime";
 import { createAuth } from "./auth";
-import { emailAddresses, emails, schema } from "./db";
+import { emailAddresses, emailAttachments, emails, schema } from "./db";
 import type {
   ExecutionContext,
   ForwardableEmailMessage,
@@ -31,6 +31,17 @@ const app = new Hono<{ Bindings: CloudflareBindings; Variables: Variables }>();
 const EMAIL_LIST_LIMIT_DEFAULT = 20;
 const EMAIL_LIST_LIMIT_MAX = 100;
 const EMAIL_MAX_BYTES_DEFAULT = 512 * 1024;
+const EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
+const EMAIL_ATTACHMENT_NAME_FALLBACK = "attachment";
+
+type ParsedEmailAttachment = {
+  filename: string;
+  contentType: string;
+  size: number;
+  bytes: Uint8Array;
+  disposition: "attachment" | "inline" | null;
+  contentId: string | null;
+};
 
 const getDb = (env: CloudflareBindings) => drizzle(env.SUM_DB, { schema });
 const getAllowedOrigins = (env: CloudflareBindings) => {
@@ -69,6 +80,13 @@ const parseOptionalTimestamp = (value: string | null) => {
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return undefined;
   return new Date(parsed);
+};
+
+const parsePositiveNumber = (value: string | null | undefined) => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
 };
 
 const clampNumber = (
@@ -215,6 +233,63 @@ const readRawWithLimit = async (
   };
 };
 
+const sanitizeFilename = (value: string | null | undefined) => {
+  const filename = (value ?? "").trim();
+  if (!filename) return EMAIL_ATTACHMENT_NAME_FALLBACK;
+  const sanitized = filename
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return sanitized.slice(0, 255) || EMAIL_ATTACHMENT_NAME_FALLBACK;
+};
+
+const attachmentContentToBytes = (
+  content: PostalAttachment["content"],
+  encoding: PostalAttachment["encoding"]
+) => {
+  if (typeof content === "string") {
+    if (encoding === "base64") {
+      const normalized = content.replace(/\s+/g, "");
+      const decoded = atob(normalized);
+      const bytes = new Uint8Array(decoded.length);
+      for (let i = 0; i < decoded.length; i += 1) {
+        bytes[i] = decoded.charCodeAt(i);
+      }
+      return bytes;
+    }
+    return new TextEncoder().encode(content);
+  }
+
+  return new Uint8Array(content);
+};
+
+const escapeContentDispositionFilename = (value: string) =>
+  value.replace(/["\\\r\n]/g, "_");
+
+const buildContentDisposition = (filename: string) => {
+  const encoded = encodeURIComponent(filename);
+  const fallback = escapeContentDispositionFilename(filename);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+};
+
+const toAttachmentResponse = (attachment: {
+  id: string;
+  emailId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  disposition: string | null;
+  contentId: string | null;
+}) => ({
+  id: attachment.id,
+  filename: attachment.filename,
+  contentType: attachment.contentType,
+  size: attachment.size,
+  disposition: attachment.disposition,
+  contentId: attachment.contentId,
+  downloadPath: `/api/emails/${attachment.emailId}/attachments/${attachment.id}`,
+});
+
 const sanitizeEmailHtml = (html: string) =>
   sanitizeHtml(html, {
     allowedTags: [
@@ -276,7 +351,7 @@ const sanitizeEmailHtml = (html: string) =>
 
 const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
   try {
-    const parser = new PostalMime();
+    const parser = new PostalMime({ attachmentEncoding: "arraybuffer" });
     const parsed = await parser.parse(rawBytes);
     const html =
       typeof parsed.html === "string" && parsed.html.trim().length > 0
@@ -286,10 +361,130 @@ const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
       typeof parsed.text === "string" && parsed.text.trim().length > 0
         ? parsed.text
         : undefined;
+    const attachments = (parsed.attachments ?? [])
+      .map((attachment): ParsedEmailAttachment | null => {
+        try {
+          const contentType =
+            typeof attachment.mimeType === "string" &&
+            attachment.mimeType.trim().length > 0
+              ? attachment.mimeType.trim()
+              : "application/octet-stream";
+          const filename = sanitizeFilename(attachment.filename);
+          const bytes = attachmentContentToBytes(
+            attachment.content,
+            attachment.encoding
+          );
+          const size = bytes.byteLength;
+          if (size === 0) return null;
 
-    return { html, text };
+          return {
+            filename,
+            contentType,
+            size,
+            bytes,
+            disposition: attachment.disposition,
+            contentId: attachment.contentId ?? null,
+          };
+        } catch (error) {
+          console.warn(
+            "[email] Failed to decode attachment from MIME payload",
+            {
+              filename: attachment.filename,
+              error,
+            }
+          );
+          return null;
+        }
+      })
+      .filter((attachment): attachment is ParsedEmailAttachment =>
+        Boolean(attachment)
+      );
+
+    return { html, text, attachments };
   } catch {
-    return {};
+    return { attachments: [] as ParsedEmailAttachment[] };
+  }
+};
+
+const persistAttachments = async ({
+  attachments,
+  env,
+  db,
+  emailId,
+  addressId,
+  userId,
+}: {
+  attachments: ParsedEmailAttachment[];
+  env: CloudflareBindings;
+  db: ReturnType<typeof getDb>;
+  emailId: string;
+  addressId: string;
+  userId: string;
+}) => {
+  if (attachments.length === 0) return;
+  if (!env.R2_BUCKET) {
+    console.warn(
+      `[email] R2_BUCKET not configured. Skipping ${attachments.length} attachment(s) for email ${emailId}.`
+    );
+    return;
+  }
+
+  const maxAttachmentBytes =
+    parsePositiveNumber(env.EMAIL_ATTACHMENT_MAX_BYTES) ??
+    EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT;
+
+  for (const attachment of attachments) {
+    if (attachment.size > maxAttachmentBytes) {
+      console.warn(
+        `[email] Skipping attachment ${attachment.filename} (${attachment.size} bytes) because it exceeds limit ${maxAttachmentBytes}.`
+      );
+      continue;
+    }
+
+    const attachmentId = crypto.randomUUID();
+    const filename = sanitizeFilename(attachment.filename);
+    const r2Key = `email-attachments/${userId}/${addressId}/${emailId}/${attachmentId}-${filename}`;
+
+    let uploaded = false;
+    try {
+      await env.R2_BUCKET.put(r2Key, attachment.bytes, {
+        httpMetadata: {
+          contentType: attachment.contentType,
+        },
+      });
+      uploaded = true;
+
+      await db
+        .insert(emailAttachments)
+        .values({
+          id: attachmentId,
+          emailId,
+          addressId,
+          userId,
+          filename,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          r2Key,
+          disposition: attachment.disposition,
+          contentId: attachment.contentId,
+        })
+        .run();
+    } catch (error) {
+      if (uploaded) {
+        try {
+          await env.R2_BUCKET.delete(r2Key);
+        } catch (cleanupError) {
+          console.error(
+            `[email] Failed to clean up attachment ${attachmentId} after failure`,
+            cleanupError
+          );
+        }
+      }
+      console.error(
+        `[email] Failed to persist attachment ${attachment.filename} for email ${emailId}`,
+        error
+      );
+    }
   }
 };
 
@@ -304,7 +499,7 @@ app.use(
     },
     allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     allowMethods: ["POST", "GET", "OPTIONS", "DELETE"],
-    exposeHeaders: ["Content-Length"],
+    exposeHeaders: ["Content-Length", "Content-Disposition", "Content-Type"],
     maxAge: 600,
     credentials: true,
   })
@@ -565,6 +760,39 @@ app.get("/api/emails", async c => {
     .orderBy(order === "asc" ? asc(emails.receivedAt) : desc(emails.receivedAt))
     .limit(limit);
 
+  const emailIds = rows.map(row => row.id);
+  const attachmentRows =
+    emailIds.length > 0
+      ? await db
+          .select({
+            id: emailAttachments.id,
+            emailId: emailAttachments.emailId,
+            filename: emailAttachments.filename,
+            contentType: emailAttachments.contentType,
+            size: emailAttachments.size,
+            disposition: emailAttachments.disposition,
+            contentId: emailAttachments.contentId,
+          })
+          .from(emailAttachments)
+          .where(
+            and(
+              eq(emailAttachments.userId, session.user.id),
+              inArray(emailAttachments.emailId, emailIds)
+            )
+          )
+          .orderBy(asc(emailAttachments.createdAt))
+      : [];
+
+  const attachmentsByEmail = new Map<
+    string,
+    Array<ReturnType<typeof toAttachmentResponse>>
+  >();
+  for (const attachment of attachmentRows) {
+    const existing = attachmentsByEmail.get(attachment.emailId) ?? [];
+    existing.push(toAttachmentResponse(attachment));
+    attachmentsByEmail.set(attachment.emailId, existing);
+  }
+
   const items = rows.map(row => {
     let parsedHeaders: unknown = [];
     if (row.headers) {
@@ -587,6 +815,7 @@ app.get("/api/emails", async c => {
       text: row.bodyText,
       rawSize: row.rawSize,
       rawTruncated: row.rawTruncated,
+      attachments: attachmentsByEmail.get(row.id) ?? [],
       receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
       receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
     };
@@ -634,6 +863,25 @@ app.get("/api/emails/:id", async c => {
     return c.json({ error: "email not found" });
   }
 
+  const attachmentRows = await db
+    .select({
+      id: emailAttachments.id,
+      emailId: emailAttachments.emailId,
+      filename: emailAttachments.filename,
+      contentType: emailAttachments.contentType,
+      size: emailAttachments.size,
+      disposition: emailAttachments.disposition,
+      contentId: emailAttachments.contentId,
+    })
+    .from(emailAttachments)
+    .where(
+      and(
+        eq(emailAttachments.emailId, row.id),
+        eq(emailAttachments.userId, session.user.id)
+      )
+    )
+    .orderBy(asc(emailAttachments.createdAt));
+
   let parsedHeaders: unknown = [];
   if (row.headers) {
     try {
@@ -656,11 +904,60 @@ app.get("/api/emails/:id", async c => {
     text: row.bodyText,
     rawSize: row.rawSize,
     rawTruncated: row.rawTruncated,
+    attachments: attachmentRows.map(attachment =>
+      toAttachmentResponse(attachment)
+    ),
     receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
     receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
   };
 
   return c.json(includeRaw ? { ...base, raw: row.raw } : base);
+});
+
+app.get("/api/emails/:id/attachments/:attachmentId", async c => {
+  const session = c.get("session");
+  if (!c.env.R2_BUCKET) {
+    c.status(503);
+    return c.json({ error: "Attachment storage is not configured" });
+  }
+
+  const emailId = c.req.param("id");
+  const attachmentId = c.req.param("attachmentId");
+  const db = getDb(c.env);
+
+  const attachmentRow = await db
+    .select()
+    .from(emailAttachments)
+    .where(
+      and(
+        eq(emailAttachments.id, attachmentId),
+        eq(emailAttachments.emailId, emailId),
+        eq(emailAttachments.userId, session.user.id)
+      )
+    )
+    .get();
+
+  if (!attachmentRow) {
+    c.status(404);
+    return c.json({ error: "attachment not found" });
+  }
+
+  const object = await c.env.R2_BUCKET.get(attachmentRow.r2Key);
+  if (!object?.body) {
+    c.status(404);
+    return c.json({ error: "attachment content not found" });
+  }
+
+  return new Response(object.body as unknown as BodyInit, {
+    headers: {
+      "Content-Type": attachmentRow.contentType || "application/octet-stream",
+      "Content-Disposition": buildContentDisposition(
+        sanitizeFilename(attachmentRow.filename)
+      ),
+      "Content-Length": String(attachmentRow.size),
+      "Cache-Control": "private, max-age=0, must-revalidate",
+    },
+  });
 });
 
 // Home page with anonymous login
@@ -692,7 +989,11 @@ const handleIncomingEmail = async (
   }
 
   const addressRow = await db
-    .select({ id: emailAddresses.id, expiresAt: emailAddresses.expiresAt })
+    .select({
+      id: emailAddresses.id,
+      userId: emailAddresses.userId,
+      expiresAt: emailAddresses.expiresAt,
+    })
     .from(emailAddresses)
     .where(eq(emailAddresses.address, recipient))
     .get();
@@ -710,27 +1011,25 @@ const handleIncomingEmail = async (
     return;
   }
 
-  const maxBytesRaw = Number(env.EMAIL_MAX_BYTES);
   const maxBytes =
-    Number.isFinite(maxBytesRaw) && maxBytesRaw > 0
-      ? maxBytesRaw
-      : EMAIL_MAX_BYTES_DEFAULT;
+    parsePositiveNumber(env.EMAIL_MAX_BYTES) ?? EMAIL_MAX_BYTES_DEFAULT;
   const { raw, rawBytes, truncated } = await readRawWithLimit(
     message.raw,
     maxBytes
   );
-  const { html, text } = await extractBodiesFromRaw(rawBytes);
+  const { html, text, attachments } = await extractBodiesFromRaw(rawBytes);
   const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
 
   const headersPairs = [...message.headers];
   const headersJson =
     headersPairs.length > 0 ? JSON.stringify(headersPairs) : undefined;
   const receivedAt = new Date();
+  const emailId = crypto.randomUUID();
 
   await db
     .insert(emails)
     .values({
-      id: crypto.randomUUID(),
+      id: emailId,
       addressId: addressRow.id,
       messageId: message.headers.get("message-id") ?? undefined,
       from: message.from,
@@ -745,6 +1044,15 @@ const handleIncomingEmail = async (
       receivedAt,
     })
     .run();
+
+  await persistAttachments({
+    attachments,
+    env,
+    db,
+    emailId,
+    addressId: addressRow.id,
+    userId: addressRow.userId,
+  });
 
   ctx.waitUntil(
     db
