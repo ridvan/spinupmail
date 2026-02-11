@@ -100,6 +100,7 @@ export type EmailMessage = {
   raw?: string | null;
   rawSize?: number | null;
   rawTruncated: boolean;
+  rawDownloadPath?: string;
   attachments: EmailAttachment[];
   receivedAt: string | null;
   receivedAtMs: number | null;

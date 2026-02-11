@@ -70,7 +70,13 @@ Edit `packages/backend/wrangler.toml` with:
 - `[[r2_buckets]].preview_bucket_name` (e.g. `spinupmail-attachments-preview`)
 - `[vars].EMAIL_DOMAIN` (single domain fallback)
 - `[vars].EMAIL_DOMAINS` (comma-separated list, recommended)
-- Optional: `[vars].EMAIL_MAX_BYTES`, `[vars].EMAIL_FORWARD_TO`, `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
+- Optional:
+  - `[vars].EMAIL_MAX_BYTES`
+  - `[vars].EMAIL_FORWARD_TO`
+  - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
+  - `[vars].EMAIL_STORE_HEADERS_IN_DB`
+  - `[vars].EMAIL_STORE_RAW_IN_DB`
+  - `[vars].EMAIL_STORE_RAW_IN_R2`
 
 ## 3. Better Auth Secrets
 
@@ -219,11 +225,18 @@ Attachment handling is part of the inbound email pipeline:
 6. Downloads are served through authenticated endpoint:
    - `GET /api/emails/:id/attachments/:attachmentId`
    - Access is restricted to the owning user (session cookie or API key).
+7. Raw MIME is **not persisted in D1 by default**. Optional debug mode can store
+   raw MIME in private R2 and serve it through:
+   - `GET /api/emails/:id/raw`
+   - Access is restricted to the owning user (session cookie or API key).
 
 Limits:
 
-- `EMAIL_MAX_BYTES`: max raw email bytes stored in D1 (default `524288`).
+- `EMAIL_MAX_BYTES`: max raw email bytes read/parsed by Worker (default `524288`).
 - `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2 (default `10485760`).
+- `EMAIL_STORE_HEADERS_IN_DB`: persist full header JSON in D1 (`false` by default).
+- `EMAIL_STORE_RAW_IN_DB`: persist full raw MIME in D1 (`false` by default).
+- `EMAIL_STORE_RAW_IN_R2`: persist full raw MIME in private R2 (`false` by default).
 
 ## Local Development
 

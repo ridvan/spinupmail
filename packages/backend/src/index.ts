@@ -33,6 +33,7 @@ const EMAIL_LIST_LIMIT_MAX = 100;
 const EMAIL_MAX_BYTES_DEFAULT = 512 * 1024;
 const EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 const EMAIL_ATTACHMENT_NAME_FALLBACK = "attachment";
+const EMAIL_RAW_R2_CONTENT_TYPE = "message/rfc822";
 
 type ParsedEmailAttachment = {
   filename: string;
@@ -87,6 +88,17 @@ const parsePositiveNumber = (value: string | null | undefined) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
   return parsed;
+};
+
+const parseBooleanEnv = (
+  value: string | null | undefined,
+  fallback = false
+) => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
 };
 
 const clampNumber = (
@@ -270,6 +282,25 @@ const buildContentDisposition = (filename: string) => {
   const encoded = encodeURIComponent(filename);
   const fallback = escapeContentDispositionFilename(filename);
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+};
+
+const getRawEmailR2Key = ({
+  userId,
+  addressId,
+  emailId,
+}: {
+  userId: string;
+  addressId: string;
+  emailId: string;
+}) => `email-raw/${userId}/${addressId}/${emailId}.eml`;
+
+const getRawDownloadPath = (
+  env: CloudflareBindings,
+  row: { id: string; raw: string | null }
+) => {
+  const hasRawInDb = typeof row.raw === "string" && row.raw.length > 0;
+  const rawInR2Enabled = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_R2, false);
+  return hasRawInDb || rawInR2Enabled ? `/api/emails/${row.id}/raw` : undefined;
 };
 
 const toAttachmentResponse = (attachment: {
@@ -485,6 +516,44 @@ const persistAttachments = async ({
         error
       );
     }
+  }
+};
+
+const persistRawEmailToR2 = async ({
+  env,
+  rawBytes,
+  emailId,
+  addressId,
+  userId,
+}: {
+  env: CloudflareBindings;
+  rawBytes: Uint8Array;
+  emailId: string;
+  addressId: string;
+  userId: string;
+}) => {
+  const persistRawToR2 = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_R2, false);
+  if (!persistRawToR2) return;
+
+  if (!env.R2_BUCKET) {
+    console.warn(
+      `[email] EMAIL_STORE_RAW_IN_R2 is enabled but R2_BUCKET is missing. Skipping raw storage for email ${emailId}.`
+    );
+    return;
+  }
+
+  const rawKey = getRawEmailR2Key({ userId, addressId, emailId });
+  try {
+    await env.R2_BUCKET.put(rawKey, rawBytes, {
+      httpMetadata: {
+        contentType: EMAIL_RAW_R2_CONTENT_TYPE,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[email] Failed to persist raw MIME to R2 for email ${emailId}`,
+      error
+    );
   }
 };
 
@@ -803,6 +872,7 @@ app.get("/api/emails", async c => {
       }
     }
 
+    const rawDownloadPath = getRawDownloadPath(c.env, row);
     const base = {
       id: row.id,
       addressId: row.addressId,
@@ -815,6 +885,7 @@ app.get("/api/emails", async c => {
       text: row.bodyText,
       rawSize: row.rawSize,
       rawTruncated: row.rawTruncated,
+      ...(rawDownloadPath ? { rawDownloadPath } : {}),
       attachments: attachmentsByEmail.get(row.id) ?? [],
       receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
       receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
@@ -891,6 +962,7 @@ app.get("/api/emails/:id", async c => {
     }
   }
 
+  const rawDownloadPath = getRawDownloadPath(c.env, row);
   const base = {
     id: row.id,
     addressId: row.addressId,
@@ -904,6 +976,7 @@ app.get("/api/emails/:id", async c => {
     text: row.bodyText,
     rawSize: row.rawSize,
     rawTruncated: row.rawTruncated,
+    ...(rawDownloadPath ? { rawDownloadPath } : {}),
     attachments: attachmentRows.map(attachment =>
       toAttachmentResponse(attachment)
     ),
@@ -912,6 +985,73 @@ app.get("/api/emails/:id", async c => {
   };
 
   return c.json(includeRaw ? { ...base, raw: row.raw } : base);
+});
+
+app.get("/api/emails/:id/raw", async c => {
+  const session = c.get("session");
+  const emailId = c.req.param("id");
+  const db = getDb(c.env);
+
+  const row = await db
+    .select()
+    .from(emails)
+    .where(eq(emails.id, emailId))
+    .get();
+  if (!row) {
+    c.status(404);
+    return c.json({ error: "email not found" });
+  }
+
+  const addressRow = await db
+    .select({ id: emailAddresses.id, userId: emailAddresses.userId })
+    .from(emailAddresses)
+    .where(
+      and(
+        eq(emailAddresses.id, row.addressId),
+        eq(emailAddresses.userId, session.user.id)
+      )
+    )
+    .get();
+  if (!addressRow) {
+    c.status(404);
+    return c.json({ error: "email not found" });
+  }
+
+  if (row.raw && row.raw.length > 0) {
+    return new Response(row.raw, {
+      headers: {
+        "Content-Type": EMAIL_RAW_R2_CONTENT_TYPE,
+        "Content-Disposition": buildContentDisposition(`${row.id}.eml`),
+        "Content-Length": String(row.raw.length),
+        "Cache-Control": "private, max-age=0, must-revalidate",
+      },
+    });
+  }
+
+  if (!c.env.R2_BUCKET) {
+    c.status(404);
+    return c.json({ error: "raw source not available" });
+  }
+
+  const rawKey = getRawEmailR2Key({
+    userId: session.user.id,
+    addressId: addressRow.id,
+    emailId: row.id,
+  });
+  const object = await c.env.R2_BUCKET.get(rawKey);
+  if (!object?.body) {
+    c.status(404);
+    return c.json({ error: "raw source not available" });
+  }
+
+  return new Response(object.body as unknown as BodyInit, {
+    headers: {
+      "Content-Type":
+        object.httpMetadata?.contentType ?? EMAIL_RAW_R2_CONTENT_TYPE,
+      "Content-Disposition": buildContentDisposition(`${row.id}.eml`),
+      "Cache-Control": "private, max-age=0, must-revalidate",
+    },
+  });
 });
 
 app.get("/api/emails/:id/attachments/:attachmentId", async c => {
@@ -1019,8 +1159,13 @@ const handleIncomingEmail = async (
   );
   const { html, text, attachments } = await extractBodiesFromRaw(rawBytes);
   const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
+  const storeHeadersInDb = parseBooleanEnv(
+    env.EMAIL_STORE_HEADERS_IN_DB,
+    false
+  );
+  const storeRawInDb = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_DB, false);
 
-  const headersPairs = [...message.headers];
+  const headersPairs = storeHeadersInDb ? [...message.headers] : [];
   const headersJson =
     headersPairs.length > 0 ? JSON.stringify(headersPairs) : undefined;
   const receivedAt = new Date();
@@ -1038,12 +1183,20 @@ const handleIncomingEmail = async (
       headers: headersJson,
       bodyHtml: sanitizedHtml || undefined,
       bodyText: text || undefined,
-      raw,
+      raw: storeRawInDb ? raw : undefined,
       rawSize: message.rawSize,
       rawTruncated: truncated,
       receivedAt,
     })
     .run();
+
+  await persistRawEmailToR2({
+    env,
+    rawBytes,
+    emailId,
+    addressId: addressRow.id,
+    userId: addressRow.userId,
+  });
 
   await persistAttachments({
     attachments,

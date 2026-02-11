@@ -38,3 +38,8 @@ EMAIL_DOMAINS = "example.com,example-test.com"
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"
 EMAIL_ATTACHMENT_MAX_BYTES = "10485760"
+# Storage optimization flags (default false when unset)
+EMAIL_STORE_HEADERS_IN_DB = "false"
+EMAIL_STORE_RAW_IN_DB = "false"
+# Optional debug mode: store raw MIME in private R2 for authenticated retrieval
+EMAIL_STORE_RAW_IN_R2 = "false"
