@@ -15,6 +15,7 @@ export interface CloudflareBindings {
   EMAIL_DOMAIN?: string;
   EMAIL_FORWARD_TO?: string;
   EMAIL_MAX_BYTES?: string;
+  EMAIL_BODY_MAX_BYTES?: string;
   EMAIL_ATTACHMENT_MAX_BYTES?: string;
   EMAIL_STORE_HEADERS_IN_DB?: string;
   EMAIL_STORE_RAW_IN_DB?: string;

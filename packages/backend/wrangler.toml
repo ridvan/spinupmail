@@ -33,6 +33,7 @@ name = "EMAIL"
 EMAIL_DOMAIN = "spinupmail.com"
 EMAIL_DOMAINS = "spinupmail.com,spinuptest.com"
 EMAIL_MAX_BYTES = "10485760"
+EMAIL_BODY_MAX_BYTES = "524288"
 EMAIL_ATTACHMENT_MAX_BYTES = "10485760"
 
 # To protect the database id, kv id, we ignore this

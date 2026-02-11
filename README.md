@@ -72,6 +72,7 @@ Edit `packages/backend/wrangler.toml` with:
 - `[vars].EMAIL_DOMAINS` (comma-separated list, recommended)
 - Optional:
   - `[vars].EMAIL_MAX_BYTES`
+  - `[vars].EMAIL_BODY_MAX_BYTES`
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
   - `[vars].EMAIL_STORE_HEADERS_IN_DB`
@@ -233,6 +234,7 @@ Attachment handling is part of the inbound email pipeline:
 Limits:
 
 - `EMAIL_MAX_BYTES`: max raw email bytes read/parsed by Worker (default `524288`).
+- `EMAIL_BODY_MAX_BYTES`: max HTML/text bytes stored per email row in D1 (`524288` default). Oversized bodies are dropped to avoid DB write failures.
 - `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2 (default `10485760`).
 - `EMAIL_STORE_HEADERS_IN_DB`: persist full header JSON in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_DB`: persist full raw MIME in D1 (`false` by default).
