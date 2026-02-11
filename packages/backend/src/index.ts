@@ -314,6 +314,9 @@ const capTextForStorage = (
   return undefined;
 };
 
+const getUtf8ByteLength = (value: string) =>
+  new TextEncoder().encode(value).byteLength;
+
 const toAttachmentResponse = (attachment: {
   id: string;
   emailId: string;
@@ -1029,11 +1032,12 @@ app.get("/api/emails/:id/raw", async c => {
   }
 
   if (row.raw && row.raw.length > 0) {
+    const rawByteLength = getUtf8ByteLength(row.raw);
     return new Response(row.raw, {
       headers: {
         "Content-Type": EMAIL_RAW_R2_CONTENT_TYPE,
         "Content-Disposition": buildContentDisposition(`${row.id}.eml`),
-        "Content-Length": String(row.raw.length),
+        "Content-Length": String(rawByteLength),
         "Cache-Control": "private, max-age=0, must-revalidate",
       },
     });
