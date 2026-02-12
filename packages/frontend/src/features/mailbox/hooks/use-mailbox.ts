@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { listEmails } from "@/lib/api";
+import { getEmail, listEmails } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 export const useMailboxEmailsQuery = (addressId: string | null) => {
@@ -17,6 +17,18 @@ export const useMailboxEmailsQuery = (addressId: string | null) => {
       });
     },
     enabled: Boolean(addressId),
+    staleTime: 10_000,
+  });
+};
+
+export const useMailboxEmailDetailQuery = (emailId: string | null) => {
+  return useQuery({
+    queryKey: queryKeys.emailDetail(emailId),
+    queryFn: async () => {
+      if (!emailId) return null;
+      return getEmail(emailId);
+    },
+    enabled: Boolean(emailId),
     staleTime: 10_000,
   });
 };

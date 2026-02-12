@@ -86,7 +86,23 @@ export type EmailAttachment = {
   downloadPath: string;
 };
 
-export type EmailMessage = {
+export type EmailListItem = {
+  id: string;
+  addressId: string;
+  to: string;
+  from: string;
+  subject?: string | null;
+  messageId?: string | null;
+  rawSize?: number | null;
+  rawTruncated: boolean;
+  hasHtml: boolean;
+  hasText: boolean;
+  attachmentCount: number;
+  receivedAt: string | null;
+  receivedAtMs: number | null;
+};
+
+export type EmailDetail = {
   id: string;
   addressId: string;
   address?: string;
@@ -150,13 +166,19 @@ export const listEmails = async (options: {
   const data = await apiFetch<{
     address: string;
     addressId: string;
-    items: EmailMessage[];
+    items: EmailListItem[];
   }>(`/api/emails?${query.toString()}`);
   return data;
 };
 
-export const getEmail = async (emailId: string) => {
-  return apiFetch<EmailMessage>(`/api/emails/${emailId}`);
+export const getEmail = async (
+  emailId: string,
+  options?: { raw?: boolean }
+) => {
+  const query = new URLSearchParams();
+  if (options?.raw) query.set("raw", "1");
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return apiFetch<EmailDetail>(`/api/emails/${emailId}${suffix}`);
 };
 
 export const downloadEmailAttachment = async (params: {

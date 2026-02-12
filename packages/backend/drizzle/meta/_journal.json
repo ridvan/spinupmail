@@ -43,6 +43,13 @@
       "when": 1770669483747,
       "tag": "0005_parched_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1770934882290,
+      "tag": "0006_young_hairball",
+      "breakpoints": true
     }
   ]
 }

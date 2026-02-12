@@ -1,7 +1,10 @@
 import * as React from "react";
 import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { MailboxView } from "@/features/mailbox/components/mailbox-view";
-import { useMailboxEmailsQuery } from "@/features/mailbox/hooks/use-mailbox";
+import {
+  useMailboxEmailDetailQuery,
+  useMailboxEmailsQuery,
+} from "@/features/mailbox/hooks/use-mailbox";
 
 export const MailboxPage = () => {
   const addressesQuery = useAddressesQuery();
@@ -28,6 +31,7 @@ export const MailboxPage = () => {
   }, [addressesQuery.data, selectedAddressId]);
 
   const emailsQuery = useMailboxEmailsQuery(selectedAddressId);
+  const emailDetailQuery = useMailboxEmailDetailQuery(selectedEmailId);
 
   React.useEffect(() => {
     const emails = emailsQuery.data?.items ?? [];
@@ -62,11 +66,19 @@ export const MailboxPage = () => {
         <p className="text-sm text-destructive">{emailsQuery.error.message}</p>
       ) : null}
 
+      {emailDetailQuery.error ? (
+        <p className="text-sm text-destructive">
+          {emailDetailQuery.error.message}
+        </p>
+      ) : null}
+
       <MailboxView
         addresses={addressesQuery.data ?? []}
         addressesLoading={addressesQuery.isLoading}
         emails={emailsQuery.data?.items ?? []}
         emailsLoading={emailsQuery.isLoading}
+        previewEmail={emailDetailQuery.data ?? null}
+        previewEmailLoading={emailDetailQuery.isLoading}
         onSelectAddress={addressId => {
           setSelectedAddressId(addressId);
           setSelectedEmailId(null);

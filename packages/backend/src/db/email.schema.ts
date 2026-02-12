@@ -25,7 +25,7 @@ export const emailAddresses = sqliteTable(
   },
   table => [
     index("email_addresses_domain_idx").on(table.domain),
-    index("email_addresses_userId_idx").on(table.userId),
+    index("email_addresses_user_created_idx").on(table.userId, table.createdAt),
   ]
 );
 
@@ -53,8 +53,7 @@ export const emails = sqliteTable(
       .notNull(),
   },
   table => [
-    index("emails_addressId_idx").on(table.addressId),
-    index("emails_receivedAt_idx").on(table.receivedAt),
+    index("emails_address_received_idx").on(table.addressId, table.receivedAt),
   ]
 );
 
@@ -82,9 +81,11 @@ export const emailAttachments = sqliteTable(
       .notNull(),
   },
   table => [
-    index("email_attachments_emailId_idx").on(table.emailId),
-    index("email_attachments_addressId_idx").on(table.addressId),
-    index("email_attachments_userId_idx").on(table.userId),
+    index("email_attachments_user_email_created_idx").on(
+      table.userId,
+      table.emailId,
+      table.createdAt
+    ),
   ]
 );
 

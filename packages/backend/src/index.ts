@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { drizzle } from "drizzle-orm/d1";
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import sanitizeHtml from "sanitize-html";
 import PostalMime, { type Attachment as PostalAttachment } from "postal-mime";
 import { createAuth } from "./auth";
@@ -119,6 +119,22 @@ const getUnknownProperty = (value: unknown, key: string): unknown => {
   const record = value as Record<string, unknown>;
   return record[key];
 };
+
+const getErrorMessage = (error: unknown) => {
+  const messageRaw = getUnknownProperty(error, "message");
+  if (typeof messageRaw === "string") return messageRaw;
+
+  const cause = getUnknownProperty(error, "cause");
+  const causeMessage = getUnknownProperty(cause, "message");
+  if (typeof causeMessage === "string") return causeMessage;
+
+  return "";
+};
+
+const isAddressConflictError = (error: unknown) =>
+  /unique constraint failed:\s*email_addresses\.address/i.test(
+    getErrorMessage(error)
+  );
 
 const getAuthFailureResponse = (
   error: unknown
@@ -617,14 +633,26 @@ app.get("/api/domains", async c => {
     c.status(500);
     return c.json({ error: "No email domains configured" });
   }
-  return c.json({ items: allowed, default: allowed[0] ?? null });
+  return c.json({ items: allowed, default: allowed[0] ?? null }, 200, {
+    "Cache-Control": "private, max-age=300",
+  });
 });
 
 app.get("/api/email-addresses", async c => {
   const session = c.get("session");
   const db = getDb(c.env);
   const rows = await db
-    .select()
+    .select({
+      id: emailAddresses.id,
+      address: emailAddresses.address,
+      localPart: emailAddresses.localPart,
+      domain: emailAddresses.domain,
+      tag: emailAddresses.tag,
+      meta: emailAddresses.meta,
+      createdAt: emailAddresses.createdAt,
+      expiresAt: emailAddresses.expiresAt,
+      lastReceivedAt: emailAddresses.lastReceivedAt,
+    })
     .from(emailAddresses)
     .where(eq(emailAddresses.userId, session.user.id))
     .orderBy(desc(emailAddresses.createdAt));
@@ -659,7 +687,7 @@ app.get("/api/email-addresses", async c => {
     };
   });
 
-  return c.json({ items });
+  return c.json({ items }, 200, { "Cache-Control": "private, max-age=15" });
 });
 
 app.post("/api/email-addresses", async c => {
@@ -731,48 +759,54 @@ app.post("/api/email-addresses", async c => {
   }
 
   const db = getDb(c.env);
-  const existing = await db
-    .select({ id: emailAddresses.id })
-    .from(emailAddresses)
-    .where(eq(emailAddresses.address, address))
-    .get();
-  if (existing) {
+  const id = crypto.randomUUID();
+  try {
+    await db
+      .insert(emailAddresses)
+      .values({
+        id,
+        userId: session.user.id,
+        address,
+        localPart,
+        domain,
+        tag: typeof body.tag === "string" ? body.tag : undefined,
+        meta,
+        expiresAt,
+        autoCreated: false,
+      })
+      .run();
+  } catch (error) {
+    if (!isAddressConflictError(error)) throw error;
+
+    const existing = await db
+      .select({ id: emailAddresses.id })
+      .from(emailAddresses)
+      .where(eq(emailAddresses.address, address))
+      .get();
     c.status(409);
     return c.json({
       error: "address already exists",
       address,
-      id: existing.id,
+      ...(existing?.id ? { id: existing.id } : {}),
     });
   }
 
-  const id = crypto.randomUUID();
-  await db
-    .insert(emailAddresses)
-    .values({
+  return c.json(
+    {
       id,
-      userId: session.user.id,
       address,
       localPart,
       domain,
       tag: typeof body.tag === "string" ? body.tag : undefined,
-      meta,
-      expiresAt,
-      autoCreated: false,
-    })
-    .run();
-
-  return c.json({
-    id,
-    address,
-    localPart,
-    domain,
-    tag: typeof body.tag === "string" ? body.tag : undefined,
-    meta: body.meta ?? undefined,
-    createdAt: new Date(now).toISOString(),
-    createdAtMs: now,
-    expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
-    expiresAtMs,
-  });
+      meta: body.meta ?? undefined,
+      createdAt: new Date(now).toISOString(),
+      createdAtMs: now,
+      expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
+      expiresAtMs,
+    },
+    200,
+    { "Cache-Control": "private, max-age=15" }
+  );
 });
 
 app.get("/api/emails", async c => {
@@ -787,7 +821,6 @@ app.get("/api/emails", async c => {
     EMAIL_LIST_LIMIT_DEFAULT
   );
   const order = query.get("order") === "asc" ? "asc" : "desc";
-  const includeRaw = query.get("raw") !== "false" && query.get("raw") !== "0";
 
   if (!addressParam && !addressIdParam) {
     c.status(400);
@@ -797,7 +830,10 @@ app.get("/api/emails", async c => {
   const db = getDb(c.env);
   const addressRow = addressIdParam
     ? await db
-        .select()
+        .select({
+          id: emailAddresses.id,
+          address: emailAddresses.address,
+        })
         .from(emailAddresses)
         .where(
           and(
@@ -807,7 +843,10 @@ app.get("/api/emails", async c => {
         )
         .get()
     : await db
-        .select()
+        .select({
+          id: emailAddresses.id,
+          address: emailAddresses.address,
+        })
         .from(emailAddresses)
         .where(
           and(
@@ -837,24 +876,31 @@ app.get("/api/emails", async c => {
     conditions.length > 1 ? and(...conditions) : conditions[0];
 
   const rows = await db
-    .select()
+    .select({
+      id: emails.id,
+      addressId: emails.addressId,
+      to: emails.to,
+      from: emails.from,
+      subject: emails.subject,
+      messageId: emails.messageId,
+      rawSize: emails.rawSize,
+      rawTruncated: emails.rawTruncated,
+      receivedAt: emails.receivedAt,
+      hasHtml: sql<number>`case when ${emails.bodyHtml} is null then 0 else 1 end`,
+      hasText: sql<number>`case when ${emails.bodyText} is null then 0 else 1 end`,
+    })
     .from(emails)
     .where(whereClause)
     .orderBy(order === "asc" ? asc(emails.receivedAt) : desc(emails.receivedAt))
     .limit(limit);
 
   const emailIds = rows.map(row => row.id);
-  const attachmentRows =
+  const attachmentCountRows =
     emailIds.length > 0
       ? await db
           .select({
-            id: emailAttachments.id,
             emailId: emailAttachments.emailId,
-            filename: emailAttachments.filename,
-            contentType: emailAttachments.contentType,
-            size: emailAttachments.size,
-            disposition: emailAttachments.disposition,
-            contentId: emailAttachments.contentId,
+            count: sql<number>`count(*)`,
           })
           .from(emailAttachments)
           .where(
@@ -863,87 +909,78 @@ app.get("/api/emails", async c => {
               inArray(emailAttachments.emailId, emailIds)
             )
           )
-          .orderBy(asc(emailAttachments.createdAt))
+          .groupBy(emailAttachments.emailId)
       : [];
 
-  const attachmentsByEmail = new Map<
-    string,
-    Array<ReturnType<typeof toAttachmentResponse>>
-  >();
-  for (const attachment of attachmentRows) {
-    const existing = attachmentsByEmail.get(attachment.emailId) ?? [];
-    existing.push(toAttachmentResponse(attachment));
-    attachmentsByEmail.set(attachment.emailId, existing);
+  const attachmentCountByEmail = new Map<string, number>();
+  for (const row of attachmentCountRows) {
+    attachmentCountByEmail.set(row.emailId, Number(row.count) || 0);
   }
 
   const items = rows.map(row => {
-    let parsedHeaders: unknown = [];
-    if (row.headers) {
-      try {
-        parsedHeaders = JSON.parse(row.headers);
-      } catch {
-        parsedHeaders = [];
-      }
-    }
-
-    const rawDownloadPath = getRawDownloadPath(c.env, row);
-    const base = {
+    return {
       id: row.id,
       addressId: row.addressId,
       to: row.to,
       from: row.from,
       subject: row.subject,
       messageId: row.messageId,
-      headers: parsedHeaders,
-      html: row.bodyHtml,
-      text: row.bodyText,
       rawSize: row.rawSize,
       rawTruncated: row.rawTruncated,
-      ...(rawDownloadPath ? { rawDownloadPath } : {}),
-      attachments: attachmentsByEmail.get(row.id) ?? [],
+      hasHtml: Number(row.hasHtml) > 0,
+      hasText: Number(row.hasText) > 0,
+      attachmentCount: attachmentCountByEmail.get(row.id) ?? 0,
       receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
       receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
     };
-
-    return includeRaw ? { ...base, raw: row.raw } : base;
   });
 
-  return c.json({
-    address: addressRow.address,
-    addressId: addressRow.id,
-    items,
-  });
+  return c.json(
+    {
+      address: addressRow.address,
+      addressId: addressRow.id,
+      items,
+    },
+    200,
+    { "Cache-Control": "private, max-age=5" }
+  );
 });
 
 app.get("/api/emails/:id", async c => {
   const session = c.get("session");
   const emailId = c.req.param("id");
   const includeRaw =
-    c.req.query("raw") !== "false" && c.req.query("raw") !== "0";
+    c.req.query("raw") === "true" || c.req.query("raw") === "1";
   const db = getDb(c.env);
   const row = await db
-    .select()
+    .select({
+      id: emails.id,
+      addressId: emails.addressId,
+      address: emailAddresses.address,
+      to: emails.to,
+      from: emails.from,
+      subject: emails.subject,
+      messageId: emails.messageId,
+      headers: emails.headers,
+      bodyHtml: emails.bodyHtml,
+      bodyText: emails.bodyText,
+      raw: emails.raw,
+      rawSize: emails.rawSize,
+      rawTruncated: emails.rawTruncated,
+      receivedAt: emails.receivedAt,
+    })
     .from(emails)
+    .innerJoin(
+      emailAddresses,
+      and(
+        eq(emailAddresses.id, emails.addressId),
+        eq(emailAddresses.userId, session.user.id)
+      )
+    )
     .where(eq(emails.id, emailId))
     .get();
 
   if (!row) {
-    c.status(404);
-    return c.json({ error: "email not found" });
-  }
-
-  const addressRow = await db
-    .select()
-    .from(emailAddresses)
-    .where(
-      and(
-        eq(emailAddresses.id, row.addressId),
-        eq(emailAddresses.userId, session.user.id)
-      )
-    )
-    .get();
-
-  if (!addressRow) {
     c.status(404);
     return c.json({ error: "email not found" });
   }
@@ -980,7 +1017,7 @@ app.get("/api/emails/:id", async c => {
   const base = {
     id: row.id,
     addressId: row.addressId,
-    address: addressRow?.address,
+    address: row.address,
     to: row.to,
     from: row.from,
     subject: row.subject,
@@ -998,7 +1035,9 @@ app.get("/api/emails/:id", async c => {
     receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
   };
 
-  return c.json(includeRaw ? { ...base, raw: row.raw } : base);
+  return c.json(includeRaw ? { ...base, raw: row.raw } : base, 200, {
+    "Cache-Control": "private, max-age=5",
+  });
 });
 
 app.get("/api/emails/:id/raw", async c => {
@@ -1007,26 +1046,22 @@ app.get("/api/emails/:id/raw", async c => {
   const db = getDb(c.env);
 
   const row = await db
-    .select()
+    .select({
+      id: emails.id,
+      addressId: emails.addressId,
+      raw: emails.raw,
+    })
     .from(emails)
-    .where(eq(emails.id, emailId))
-    .get();
-  if (!row) {
-    c.status(404);
-    return c.json({ error: "email not found" });
-  }
-
-  const addressRow = await db
-    .select({ id: emailAddresses.id, userId: emailAddresses.userId })
-    .from(emailAddresses)
-    .where(
+    .innerJoin(
+      emailAddresses,
       and(
-        eq(emailAddresses.id, row.addressId),
+        eq(emailAddresses.id, emails.addressId),
         eq(emailAddresses.userId, session.user.id)
       )
     )
+    .where(eq(emails.id, emailId))
     .get();
-  if (!addressRow) {
+  if (!row) {
     c.status(404);
     return c.json({ error: "email not found" });
   }
@@ -1050,7 +1085,7 @@ app.get("/api/emails/:id/raw", async c => {
 
   const rawKey = getRawEmailR2Key({
     userId: session.user.id,
-    addressId: addressRow.id,
+    addressId: row.addressId,
     emailId: row.id,
   });
   const object = await c.env.R2_BUCKET.get(rawKey);

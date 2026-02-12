@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { EmailAddress, EmailMessage } from "@/lib/api";
+import type { EmailAddress, EmailDetail, EmailListItem } from "@/lib/api";
 import { EmailPreview } from "@/features/mailbox/components/email-preview";
 
 type MailboxViewProps = {
@@ -7,10 +7,12 @@ type MailboxViewProps = {
   addressesLoading: boolean;
   selectedAddressId: string | null;
   onSelectAddress: (addressId: string) => void;
-  emails: EmailMessage[];
+  emails: EmailListItem[];
   emailsLoading: boolean;
   selectedEmailId: string | null;
   onSelectEmail: (emailId: string) => void;
+  previewEmail: EmailDetail | null;
+  previewEmailLoading: boolean;
 };
 
 const formatDate = (value: string | null) => {
@@ -31,10 +33,9 @@ export const MailboxView = ({
   emailsLoading,
   selectedEmailId,
   onSelectEmail,
+  previewEmail,
+  previewEmailLoading,
 }: MailboxViewProps) => {
-  const selectedEmail =
-    emails.find(item => item.id === selectedEmailId) ?? null;
-
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr_1.8fr]">
       <Card className="border-border/70 bg-card/60 xl:col-span-1">
@@ -117,7 +118,7 @@ export const MailboxView = ({
           <CardTitle className="text-lg">Preview</CardTitle>
         </CardHeader>
         <CardContent>
-          <EmailPreview email={selectedEmail} />
+          <EmailPreview email={previewEmail} isLoading={previewEmailLoading} />
         </CardContent>
       </Card>
     </div>

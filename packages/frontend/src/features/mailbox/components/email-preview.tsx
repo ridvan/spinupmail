@@ -6,12 +6,13 @@ import { useTheme } from "@/components/theme-provider";
 import {
   downloadEmailAttachment,
   type EmailAttachment,
-  type EmailMessage,
+  type EmailDetail,
 } from "@/lib/api";
 import { buildEmailPreview } from "@/features/mailbox/utils/build-email-preview";
 
 type EmailPreviewProps = {
-  email: EmailMessage | null;
+  email: EmailDetail | null;
+  isLoading?: boolean;
 };
 
 const formatDate = (value: string | null) => {
@@ -29,7 +30,10 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export const EmailPreview = ({ email }: EmailPreviewProps) => {
+export const EmailPreview = ({
+  email,
+  isLoading = false,
+}: EmailPreviewProps) => {
   const { theme } = useTheme();
   const [downloadingAttachmentId, setDownloadingAttachmentId] = React.useState<
     string | null
@@ -44,6 +48,14 @@ export const EmailPreview = ({ email }: EmailPreviewProps) => {
         ? "dark"
         : "light"
       : theme;
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground">
+        Loading message preview...
+      </div>
+    );
+  }
 
   if (!email) {
     return (
@@ -106,11 +118,9 @@ export const EmailPreview = ({ email }: EmailPreviewProps) => {
           value={email.text}
         />
       ) : (
-        <Textarea
-          className="min-h-96 font-mono text-xs"
-          readOnly
-          value={email.raw ?? ""}
-        />
+        <div className="rounded-md border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+          No previewable body is available for this message.
+        </div>
       )}
 
       {email.raw ? (
