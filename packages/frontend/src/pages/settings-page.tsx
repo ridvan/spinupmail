@@ -8,14 +8,6 @@ export const SettingsPage = () => {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage account identity and API credentials used for mailbox
-          automation.
-        </p>
-      </section>
-
       <Card className="border-border/70 bg-card/60">
         <CardHeader>
           <CardTitle className="text-lg">User Profile</CardTitle>

@@ -181,17 +181,6 @@ export const OrganizationSettingsPage = () => {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Organization Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {canManage
-            ? "Manage your organization profile, members, and invitations."
-            : "View your organization profile and members. Admin/owner access is required to edit."}
-        </p>
-      </section>
-
       <Card className="border-border/70 bg-card/60">
         <CardHeader>
           <CardTitle className="text-lg">Organization Profile</CardTitle>

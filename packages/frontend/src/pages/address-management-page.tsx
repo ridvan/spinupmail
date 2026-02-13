@@ -11,16 +11,6 @@ export const AddressManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Address Management
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Create and monitor disposable inboxes that map cleanly to user flows
-          and campaigns.
-        </p>
-      </section>
-
       {domainsQuery.error ? (
         <p className="text-sm text-destructive">{domainsQuery.error.message}</p>
       ) : null}

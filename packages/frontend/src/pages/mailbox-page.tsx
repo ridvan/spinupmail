@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { MailboxView } from "@/features/mailbox/components/mailbox-view";
 import {
   useMailboxEmailDetailQuery,
@@ -10,15 +11,15 @@ import {
 export const MailboxPage = () => {
   const { activeOrganizationId } = useAuth();
   const addressesQuery = useAddressesQuery();
-  const [selectedAddressId, setSelectedAddressId] = React.useState<
+  const [selectedAddressId, setSelectedAddressId] = useLocalStorage<
     string | null
-  >(null);
+  >(`mailbox:address:${activeOrganizationId ?? "none"}`, null);
   const [selectedEmailId, setSelectedEmailId] = React.useState<string | null>(
     null
   );
 
+  // Reset email selection on org change (address is restored from localStorage)
   React.useEffect(() => {
-    setSelectedAddressId(null);
     setSelectedEmailId(null);
   }, [activeOrganizationId]);
 
@@ -47,7 +48,12 @@ export const MailboxPage = () => {
     if (!hasSelected) {
       setSelectedAddressId(currentAddresses[0]?.id ?? null);
     }
-  }, [currentAddresses, currentAddressIds, selectedAddressId]);
+  }, [
+    currentAddresses,
+    currentAddressIds,
+    selectedAddressId,
+    setSelectedAddressId,
+  ]);
 
   const emailsQuery = useMailboxEmailsQuery(resolvedSelectedAddressId);
   const currentEmails = React.useMemo(
@@ -58,36 +64,16 @@ export const MailboxPage = () => {
     () => new Set(currentEmails.map(email => email.id)),
     [currentEmails]
   );
-  const resolvedSelectedEmailId =
-    selectedEmailId && currentEmailIds.has(selectedEmailId)
-      ? selectedEmailId
-      : null;
+  const resolvedSelectedEmailId = React.useMemo(() => {
+    if (selectedEmailId && currentEmailIds.has(selectedEmailId)) {
+      return selectedEmailId;
+    }
+    return currentEmails[0]?.id ?? null;
+  }, [selectedEmailId, currentEmailIds, currentEmails]);
   const emailDetailQuery = useMailboxEmailDetailQuery(resolvedSelectedEmailId);
 
-  React.useEffect(() => {
-    if (currentEmails.length === 0) {
-      setSelectedEmailId(null);
-      return;
-    }
-
-    const hasSelected = Boolean(
-      selectedEmailId && currentEmailIds.has(selectedEmailId)
-    );
-    if (!hasSelected) {
-      setSelectedEmailId(currentEmails[0]?.id ?? null);
-    }
-  }, [currentEmails, currentEmailIds, selectedEmailId]);
-
   return (
-    <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Mailbox</h1>
-        <p className="text-sm text-muted-foreground">
-          Inspect incoming messages by address with safe HTML and raw source
-          previews.
-        </p>
-      </section>
-
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
       {addressesQuery.error ? (
         <p className="text-sm text-destructive">
           {addressesQuery.error.message}

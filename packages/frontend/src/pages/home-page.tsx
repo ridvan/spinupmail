@@ -26,13 +26,6 @@ export const HomePage = () => {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted-foreground">
-          Snapshot of inbox usage, activity cadence, and integration readiness.
-        </p>
-      </section>
-
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {stats.map(item => (
           <StatCard key={item.label} stat={item} />

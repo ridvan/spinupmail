@@ -21,6 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -113,13 +114,10 @@ export const OrganizationSwitcher = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" disabled>
-              <div className="bg-sidebar-primary/80 text-sidebar-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
-                <HugeiconsIcon icon={BookOpen02Icon} strokeWidth={2} />
-              </div>
-              <div className="grid flex-1 text-center leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-medium text-sidebar-foreground/75">
-                  Loading organization...
-                </span>
+              <Skeleton className="size-8 shrink-0 rounded-lg bg-sidebar-primary/50" />
+              <div className="grid flex-1 gap-1.5 leading-tight group-data-[collapsible=icon]:hidden">
+                <Skeleton className="h-4 w-32 bg-sidebar-foreground/20" />
+                <Skeleton className="h-3 w-24 bg-sidebar-foreground/15" />
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
