@@ -18,8 +18,7 @@ export const SignupPage = () => {
     () => safeNextPath(searchParams.get("next")),
     [searchParams]
   );
-  const postSignUpPath =
-    nextPath === "/" ? "/onboarding/organization" : nextPath;
+  const postSignUpPath = `/login?next=${encodeURIComponent(nextPath)}&verification=required`;
 
   const loginHref =
     nextPath === "/" ? "/login" : `/login?next=${encodeURIComponent(nextPath)}`;

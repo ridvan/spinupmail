@@ -18,6 +18,7 @@ export const LoginPage = () => {
     () => safeNextPath(searchParams.get("next")),
     [searchParams]
   );
+  const needsVerification = searchParams.get("verification") === "required";
 
   const signupHref =
     nextPath === "/"
@@ -33,7 +34,11 @@ export const LoginPage = () => {
       altCta="Create one"
       altHref={signupHref}
       altLabel="Need an account?"
-      subtitle="Access your inbox workspace with your email and password."
+      subtitle={
+        needsVerification
+          ? "Check your inbox for a verification email, then sign in."
+          : "Access your inbox workspace with your email and password."
+      }
       title="Sign in"
     >
       <SignInForm

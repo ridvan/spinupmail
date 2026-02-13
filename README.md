@@ -13,6 +13,7 @@ frontend.
 - Browse organization-scoped emails in the UI
 - Store inbound mail attachments in Cloudflare R2 and download them in UI/API
 - Generate API keys for automation (e.g., test suites)
+- Require verified email before account access (verification sent via Resend)
 
 ## Prerequisites
 
@@ -76,6 +77,7 @@ Edit `packages/backend/wrangler.toml` with:
   - `[vars].EMAIL_BODY_MAX_BYTES`
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
+  - `[vars].RESEND_FROM_EMAIL` (e.g. `Spinupmail <verify@your-domain.com>`)
   - `[vars].EMAIL_STORE_HEADERS_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_R2`
@@ -87,11 +89,14 @@ Set the secrets for the Worker:
 ```bash
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
+pnpm exec wrangler secret put RESEND_API_KEY
 ```
 
 Use the Worker URL or your API route URL:
 
 - `BETTER_AUTH_BASE_URL = https://<your-domain>/api/auth`
+- `RESEND_API_KEY = re_...`
+- `RESEND_FROM_EMAIL` should be configured in `wrangler.toml` `[vars]` with a verified sender/domain.
 
 ## 4. Database Migrations
 

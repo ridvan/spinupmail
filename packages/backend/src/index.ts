@@ -36,6 +36,9 @@ const EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 const EMAIL_ATTACHMENT_NAME_FALLBACK = "attachment";
 const EMAIL_BODY_MAX_BYTES_DEFAULT = 512 * 1024;
 const EMAIL_RAW_R2_CONTENT_TYPE = "message/rfc822";
+const AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS = 60;
+const AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS = 5 * 60;
+const AUTH_VERIFICATION_RESEND_IP_MAX_ATTEMPTS = 5;
 
 type ParsedEmailAttachment = {
   filename: string;
@@ -67,6 +70,32 @@ const getAllowedDomains = (env: CloudflareBindings) => {
 };
 
 const normalizeAddress = (address: string) => address.trim().toLowerCase();
+
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const hashForRateLimitKey = async (value: string) => {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const getClientIp = (request: Request) => {
+  const cfConnectingIp = request.headers.get("cf-connecting-ip");
+  if (cfConnectingIp && cfConnectingIp.trim().length > 0) {
+    return cfConnectingIp.trim();
+  }
+
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const first = forwardedFor.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  return "unknown";
+};
 
 const sanitizeLocalPart = (value: string) => {
   const cleaned = value
@@ -186,6 +215,18 @@ const requireAuth: MiddlewareHandler = async (c, next) => {
       c.status(401);
       return c.json({ error: "unauthorized" });
     }
+
+    if (
+      (
+        session.user as AuthSession["user"] & {
+          emailVerified?: boolean | null;
+        }
+      ).emailVerified !== true
+    ) {
+      c.status(403);
+      return c.json({ error: "email verification required" });
+    }
+
     c.set("session", session as AuthSession);
     await next();
   } catch (error) {
@@ -672,9 +713,95 @@ app.use("*", async (c, next) => {
     ("cf" in c.req.raw
       ? (c.req.raw as Request & { cf?: IncomingRequestCfProperties }).cf
       : undefined) ?? ({} as IncomingRequestCfProperties);
-  const auth = createAuth(c.env, cf);
+  const auth = createAuth(c.env, cf, c.executionCtx);
   c.set("auth", auth);
   await next();
+});
+
+app.post("/api/auth/resend-verification", async c => {
+  type ResendBody = {
+    email?: string;
+    callbackURL?: string;
+  };
+
+  const body = await readJsonBody<ResendBody>(c);
+  const emailRaw = typeof body.email === "string" ? body.email : "";
+  const email = normalizeAddress(emailRaw);
+  const callbackURL =
+    typeof body.callbackURL === "string" && body.callbackURL.trim().length > 0
+      ? body.callbackURL.trim()
+      : undefined;
+
+  if (!email || !isValidEmail(email)) {
+    c.status(400);
+    return c.json({ error: "valid email is required" });
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const ip = getClientIp(c.req.raw);
+  const windowSlot = Math.floor(
+    nowSeconds / AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS
+  );
+  const ipRateKey = `auth:verify-resend:ip:${ip}:slot:${windowSlot}`;
+  const ipCount = Number((await c.env.SUM_KV.get(ipRateKey)) ?? "0");
+
+  if (
+    Number.isFinite(ipCount) &&
+    ipCount >= AUTH_VERIFICATION_RESEND_IP_MAX_ATTEMPTS
+  ) {
+    const retryAfterSeconds = Math.max(
+      1,
+      AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS -
+        (nowSeconds % AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS)
+    );
+    c.status(429);
+    c.header("Retry-After", String(retryAfterSeconds));
+    return c.json({
+      error: "too many verification resend attempts",
+      retryAfterSeconds,
+    });
+  }
+
+  await c.env.SUM_KV.put(ipRateKey, String(ipCount + 1), {
+    expirationTtl: AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS + 30,
+  });
+
+  const emailHash = await hashForRateLimitKey(email);
+  const cooldownKey = `auth:verify-resend:email:${emailHash}`;
+  const cooldownUntil = Number((await c.env.SUM_KV.get(cooldownKey)) ?? "0");
+
+  if (Number.isFinite(cooldownUntil) && cooldownUntil > nowSeconds) {
+    const retryAfterSeconds = Math.max(1, cooldownUntil - nowSeconds);
+    c.status(429);
+    c.header("Retry-After", String(retryAfterSeconds));
+    return c.json({
+      error: "verification email recently sent",
+      retryAfterSeconds,
+    });
+  }
+
+  const nextAllowedAt = nowSeconds + AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS;
+  await c.env.SUM_KV.put(cooldownKey, String(nextAllowedAt), {
+    expirationTtl: AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS + 5,
+  });
+
+  const auth = c.get("auth");
+  try {
+    await auth.api.sendVerificationEmail({
+      body: {
+        email,
+        ...(callbackURL ? { callbackURL } : {}),
+      },
+      headers: c.req.raw.headers,
+    });
+  } catch (error) {
+    console.error("[auth] Failed to resend verification email", error);
+  }
+
+  return c.json({
+    status: true,
+    cooldownSeconds: AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS,
+  });
 });
 
 // Handle all auth routes

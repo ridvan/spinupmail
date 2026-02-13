@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  AuthMutationError,
+  useResendVerificationEmailMutation,
+  useSignInMutation,
+} from "@/features/auth/hooks/use-auth-mutations";
 import { toFieldErrors } from "@/features/form-utils/to-field-errors";
-import { useSignInMutation } from "@/features/auth/hooks/use-auth-mutations";
 
 type SignInFormProps = {
   onSuccess?: () => Promise<void> | void;
@@ -26,6 +31,13 @@ export const SignInForm = ({
   onTwoFactorRequired,
 }: SignInFormProps) => {
   const mutation = useSignInMutation();
+  const resendMutation = useResendVerificationEmailMutation();
+  const [resendFeedback, setResendFeedback] = React.useState<string | null>(
+    null
+  );
+  const [resendError, setResendError] = React.useState<string | null>(null);
+  const [cooldownUntil, setCooldownUntil] = React.useState<number | null>(null);
+  const [tick, setTick] = React.useState(() => Date.now());
 
   const form = useForm({
     defaultValues: {
@@ -44,6 +56,70 @@ export const SignInForm = ({
       await onSuccess?.();
     },
   });
+
+  React.useEffect(() => {
+    if (!cooldownUntil) return;
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      setTick(now);
+      if (now >= cooldownUntil) {
+        setCooldownUntil(null);
+      }
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [cooldownUntil]);
+
+  const cooldownSeconds = cooldownUntil
+    ? Math.max(0, Math.ceil((cooldownUntil - tick) / 1000))
+    : 0;
+
+  const isEmailNotVerifiedError =
+    (mutation.error instanceof AuthMutationError &&
+      mutation.error.code === "EMAIL_NOT_VERIFIED") ||
+    /email not verified/i.test(mutation.error?.message ?? "");
+
+  const handleResendVerification = async () => {
+    const email = form.state.values.email.trim();
+    if (!email) {
+      setResendFeedback(null);
+      setResendError("Enter your email first.");
+      return;
+    }
+
+    setResendFeedback(null);
+    setResendError(null);
+
+    try {
+      const result = await resendMutation.mutateAsync({ email });
+      const until = Date.now() + result.cooldownSeconds * 1000;
+      setCooldownUntil(until);
+      setTick(Date.now());
+      setResendFeedback("Verification email sent. Check your inbox.");
+    } catch (error) {
+      if (
+        error instanceof AuthMutationError &&
+        typeof error.retryAfterSeconds === "number" &&
+        error.retryAfterSeconds > 0
+      ) {
+        const until = Date.now() + error.retryAfterSeconds * 1000;
+        setCooldownUntil(until);
+        setTick(Date.now());
+        setResendError(
+          `Please wait ${error.retryAfterSeconds}s before trying again.`
+        );
+        return;
+      }
+
+      setResendError(
+        error instanceof Error
+          ? error.message
+          : "Unable to resend verification email."
+      );
+    }
+  };
 
   return (
     <form
@@ -114,6 +190,32 @@ export const SignInForm = ({
 
       {mutation.error ? (
         <p className="text-sm text-destructive">{mutation.error.message}</p>
+      ) : null}
+
+      {isEmailNotVerifiedError ? (
+        <div className="space-y-2">
+          <Button
+            className="w-full"
+            disabled={resendMutation.isPending || cooldownSeconds > 0}
+            onClick={() => {
+              void handleResendVerification();
+            }}
+            type="button"
+            variant="outline"
+          >
+            {resendMutation.isPending
+              ? "Sending verification..."
+              : cooldownSeconds > 0
+                ? `Resend available in ${cooldownSeconds}s`
+                : "Resend verification email"}
+          </Button>
+          {resendFeedback ? (
+            <p className="text-sm text-muted-foreground">{resendFeedback}</p>
+          ) : null}
+          {resendError ? (
+            <p className="text-sm text-destructive">{resendError}</p>
+          ) : null}
+        </div>
       ) : null}
 
       <Button className="w-full" disabled={mutation.isPending} type="submit">

@@ -1,5 +1,6 @@
 import type {
   D1Database,
+  ExecutionContext,
   IncomingRequestCfProperties,
 } from "@cloudflare/workers-types";
 import { betterAuth } from "better-auth";
@@ -12,6 +13,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../db";
 import type { CloudflareBindings } from "../env";
+import { APP_NAME, createResendVerificationEmailSender } from "./email";
 
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_DERIVED_KEY_BYTES = 64;
@@ -71,12 +73,14 @@ const verifyPasswordWithNodeCrypto = async ({
 
 function createAuth(
   env?: CloudflareBindings,
-  cf?: IncomingRequestCfProperties
+  cf?: IncomingRequestCfProperties,
+  executionContext?: ExecutionContext
 ) {
   const db = env ? drizzle(env.SUM_DB, { schema }) : undefined;
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
+  const sendVerificationEmail = createResendVerificationEmailSender(env);
 
   return betterAuth({
     secret: env?.BETTER_AUTH_SECRET,
@@ -99,18 +103,35 @@ function createAuth(
         kv: env?.SUM_KV,
       },
       {
-        appName: "Spinupmail",
+        appName: APP_NAME,
         trustedOrigins:
           trustedOrigins && trustedOrigins.length > 0
             ? trustedOrigins
             : ["http://localhost:5173", "http://127.0.0.1:5173"],
         emailAndPassword: {
           enabled: true,
+          requireEmailVerification: true,
           password: {
             hash: hashPasswordWithNodeCrypto,
             verify: verifyPasswordWithNodeCrypto,
           },
         },
+        emailVerification: {
+          sendVerificationEmail,
+          sendOnSignUp: true,
+          sendOnSignIn: false,
+        },
+        ...(executionContext
+          ? {
+              advanced: {
+                backgroundTasks: {
+                  handler: (promise: Promise<unknown>) => {
+                    executionContext.waitUntil(promise);
+                  },
+                },
+              },
+            }
+          : {}),
         session: {
           cookieCache: {
             enabled: true,
@@ -122,6 +143,7 @@ function createAuth(
             allowUserToCreateOrganization: true,
             organizationLimit: 3,
             membershipLimit: 10,
+            requireEmailVerificationOnInvitation: true,
           }),
           apiKey({
             enableSessionForAPIKeys: true,
