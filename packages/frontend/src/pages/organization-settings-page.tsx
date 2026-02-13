@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -318,16 +325,22 @@ export const OrganizationSettingsPage = () => {
                 type="email"
                 required
               />
-              <select
-                className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              <Select
                 value={inviteRole}
-                onChange={event =>
-                  setInviteRole(event.target.value as "member" | "admin")
-                }
+                onValueChange={value => {
+                  if (value === "member" || value === "admin") {
+                    setInviteRole(value);
+                  }
+                }}
               >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
+                <SelectTrigger className="h-9 w-full sm:w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
               <Button disabled={inviteMemberMutation.isPending} type="submit">
                 {inviteMemberMutation.isPending ? "Inviting..." : "Invite"}
               </Button>

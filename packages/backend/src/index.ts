@@ -50,6 +50,9 @@ type ParsedEmailAttachment = {
 };
 
 const getDb = (env: CloudflareBindings) => drizzle(env.SUM_DB, { schema });
+const normalizeDomain = (value: string) =>
+  value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
+
 const getAllowedOrigins = (env: CloudflareBindings) => {
   const configured = env.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
@@ -60,9 +63,11 @@ const getAllowedOrigins = (env: CloudflareBindings) => {
 const getAllowedDomains = (env: CloudflareBindings) => {
   const rawList =
     env.EMAIL_DOMAINS?.split(",")
-      .map(domain => domain.trim().toLowerCase())
+      .map(domain => normalizeDomain(domain))
       .filter(Boolean) ?? [];
-  const fallbackDomain = env.EMAIL_DOMAIN?.trim().toLowerCase();
+  const fallbackDomain = env.EMAIL_DOMAIN
+    ? normalizeDomain(env.EMAIL_DOMAIN)
+    : undefined;
   const fallback = fallbackDomain ? [fallbackDomain] : [];
   const combined = [...rawList, ...fallback];
   const unique = Array.from(new Set(combined));
@@ -73,6 +78,10 @@ const normalizeAddress = (address: string) => address.trim().toLowerCase();
 
 const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const isValidDomain = (value: string) =>
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(
+    value
+  );
 
 const hashForRateLimitKey = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
@@ -104,6 +113,93 @@ const sanitizeLocalPart = (value: string) => {
     .replace(/[^a-z0-9._+-]/g, "");
   return cleaned.replace(/^\.+|\.+$/g, "").slice(0, 64);
 };
+
+const parseAddressMeta = (meta: string | null | undefined): unknown => {
+  if (!meta) return null;
+  try {
+    return JSON.parse(meta);
+  } catch {
+    return meta;
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeAllowedFromDomains = (value: unknown) => {
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+
+  const domains = rawItems
+    .map(item => (typeof item === "string" ? normalizeDomain(item) : ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(domains));
+};
+
+const getAllowedFromDomainsFromMeta = (meta: unknown) => {
+  if (!isRecord(meta)) return [];
+  return normalizeAllowedFromDomains(meta.allowedFromDomains);
+};
+
+const buildAddressMetaForStorage = (
+  meta: unknown,
+  allowedFromDomains: string[]
+): string | undefined | null => {
+  if (allowedFromDomains.length === 0) {
+    if (meta === undefined) return undefined;
+    if (typeof meta === "string") return meta;
+    try {
+      return JSON.stringify(meta);
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (meta === undefined || meta === null) {
+    return JSON.stringify({ allowedFromDomains });
+  }
+
+  if (typeof meta === "string") {
+    try {
+      const parsed = JSON.parse(meta);
+      if (!isRecord(parsed)) return null;
+      return JSON.stringify({ ...parsed, allowedFromDomains });
+    } catch {
+      return null;
+    }
+  }
+
+  if (!isRecord(meta)) return null;
+  return JSON.stringify({ ...meta, allowedFromDomains });
+};
+
+const extractSenderDomain = (value: string | null | undefined) => {
+  if (!value) return null;
+
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const angleAddress = raw.match(/<\s*([^<>]+)\s*>/)?.[1];
+  const firstAddress = (angleAddress ?? raw).split(",")[0]?.trim() ?? "";
+  const candidate = firstAddress.replace(/^mailto:/i, "");
+  const atIndex = candidate.lastIndexOf("@");
+  if (atIndex === -1 || atIndex === candidate.length - 1) return null;
+
+  const domain = normalizeDomain(candidate.slice(atIndex + 1));
+  return domain.length > 0 ? domain : null;
+};
+
+const isSenderDomainAllowed = (
+  senderDomain: string,
+  allowedDomains: string[]
+) =>
+  allowedDomains.some(
+    allowed => senderDomain === allowed || senderDomain.endsWith(`.${allowed}`)
+  );
 
 const parseOptionalTimestamp = (value: string | null) => {
   if (!value) return undefined;
@@ -851,14 +947,8 @@ app.get("/api/email-addresses", async c => {
     .orderBy(desc(emailAddresses.createdAt));
 
   const items = rows.map(row => {
-    let parsedMeta: unknown = null;
-    if (row.meta) {
-      try {
-        parsedMeta = JSON.parse(row.meta);
-      } catch {
-        parsedMeta = row.meta;
-      }
-    }
+    const parsedMeta = parseAddressMeta(row.meta);
+    const allowedFromDomains = getAllowedFromDomainsFromMeta(parsedMeta);
 
     return {
       id: row.id,
@@ -867,6 +957,7 @@ app.get("/api/email-addresses", async c => {
       domain: row.domain,
       tag: row.tag,
       meta: parsedMeta,
+      allowedFromDomains,
       createdAt: row.createdAt ? row.createdAt.toISOString() : null,
       createdAtMs: row.createdAt ? row.createdAt.getTime() : null,
       expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
@@ -886,11 +977,11 @@ app.get("/api/email-addresses", async c => {
 app.post("/api/email-addresses", async c => {
   type CreateBody = {
     localPart?: string;
-    prefix?: string;
     tag?: string;
     ttlMinutes?: number;
     meta?: unknown;
     domain?: string;
+    allowedFromDomains?: string[] | string;
   };
 
   const session = c.get("session");
@@ -902,6 +993,9 @@ app.post("/api/email-addresses", async c => {
       ? body.domain.trim().toLowerCase()
       : undefined;
   const domain = domainFromBody ?? allowedDomains[0];
+  const allowedFromDomains = normalizeAllowedFromDomains(
+    body.allowedFromDomains
+  );
 
   if (!domain || allowedDomains.length === 0) {
     c.status(400);
@@ -912,23 +1006,29 @@ app.post("/api/email-addresses", async c => {
     c.status(400);
     return c.json({ error: "domain is invalid" });
   }
+  if (!isValidDomain(domain)) {
+    c.status(400);
+    return c.json({ error: "domain is invalid" });
+  }
 
   if (!allowedDomains.includes(domain)) {
     c.status(400);
     return c.json({ error: "domain is not allowed" });
   }
+  if (!allowedFromDomains.every(isValidDomain)) {
+    c.status(400);
+    return c.json({ error: "allowedFromDomains contains invalid domain(s)" });
+  }
 
-  const prefix =
-    typeof body.prefix === "string" && body.prefix.trim().length > 0
-      ? body.prefix
-      : "test";
   const providedLocalPart =
     typeof body.localPart === "string" ? body.localPart : "";
-  let localPart = sanitizeLocalPart(providedLocalPart);
+  const localPart = sanitizeLocalPart(providedLocalPart);
   if (!localPart) {
-    const safePrefix = sanitizeLocalPart(prefix) || "test";
-    const suffix = crypto.randomUUID().split("-")[0];
-    localPart = `${safePrefix}-${suffix}`;
+    c.status(400);
+    return c.json({
+      error:
+        "localPart is required and may only contain letters, numbers, dot, underscore, plus, and dash",
+    });
   }
 
   const address = normalizeAddress(`${localPart}@${domain}`);
@@ -939,18 +1039,15 @@ app.post("/api/email-addresses", async c => {
     ttlMinutes && ttlMinutes > 0 ? now + ttlMinutes * 60 * 1000 : undefined;
   const expiresAt = expiresAtMs ? new Date(expiresAtMs) : undefined;
 
-  let meta: string | undefined;
-  if (body.meta !== undefined) {
-    if (typeof body.meta === "string") {
-      meta = body.meta;
-    } else {
-      try {
-        meta = JSON.stringify(body.meta);
-      } catch {
-        meta = undefined;
-      }
-    }
+  const meta = buildAddressMetaForStorage(body.meta, allowedFromDomains);
+  if (meta === null) {
+    c.status(400);
+    return c.json({
+      error:
+        "allowedFromDomains requires meta to be an object (or JSON object string)",
+    });
   }
+  const responseMeta = meta !== undefined ? parseAddressMeta(meta) : undefined;
 
   const db = getDb(c.env);
   const id = crypto.randomUUID();
@@ -993,7 +1090,8 @@ app.post("/api/email-addresses", async c => {
       localPart,
       domain,
       tag: typeof body.tag === "string" ? body.tag : undefined,
-      meta: body.meta ?? undefined,
+      meta: responseMeta,
+      allowedFromDomains,
       createdAt: new Date(now).toISOString(),
       createdAtMs: now,
       expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
@@ -1365,7 +1463,6 @@ const handleIncomingEmail = async (
   ctx: ExecutionContext
 ) => {
   try {
-    const db = getDb(env);
     const recipient = normalizeAddress(message.to);
     const atIndex = recipient.lastIndexOf("@");
 
@@ -1374,12 +1471,14 @@ const handleIncomingEmail = async (
       return;
     }
 
+    const db = getDb(env);
     const addressRow = await db
       .select({
         id: emailAddresses.id,
         organizationId: emailAddresses.organizationId,
         userId: emailAddresses.userId,
         expiresAt: emailAddresses.expiresAt,
+        meta: emailAddresses.meta,
       })
       .from(emailAddresses)
       .where(eq(emailAddresses.address, recipient))
@@ -1401,6 +1500,26 @@ const handleIncomingEmail = async (
     if (!addressRow.organizationId) {
       message.setReject("Address organization is not configured");
       return;
+    }
+
+    const addressMeta = parseAddressMeta(addressRow.meta);
+    const allowedFromDomains = getAllowedFromDomainsFromMeta(addressMeta);
+    if (allowedFromDomains.length > 0) {
+      const senderRaw = message.from ?? message.headers.get("from");
+      const senderDomain = extractSenderDomain(senderRaw);
+      const isAllowed =
+        senderDomain !== null &&
+        isSenderDomainAllowed(senderDomain, allowedFromDomains);
+
+      if (!isAllowed) {
+        console.info("[email] Dropped email from disallowed sender domain", {
+          to: recipient,
+          from: senderRaw ?? "unknown",
+          senderDomain: senderDomain ?? "unknown",
+          allowedFromDomains,
+        });
+        return;
+      }
     }
 
     const maxBytes =

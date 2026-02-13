@@ -42,6 +42,13 @@ export const AddressList = ({
                   <p className="text-xs text-muted-foreground">
                     Last received: {formatDate(address.lastReceivedAt)}
                   </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    Allowed senders:{" "}
+                    {address.allowedFromDomains &&
+                    address.allowedFromDomains.length > 0
+                      ? address.allowedFromDomains.join(", ")
+                      : "Any domain"}
+                  </p>
                 </div>
                 {address.tag ? (
                   <Badge variant="secondary">{address.tag}</Badge>

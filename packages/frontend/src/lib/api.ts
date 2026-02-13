@@ -84,6 +84,7 @@ export type EmailAddress = {
   domain: string;
   tag?: string | null;
   meta?: unknown;
+  allowedFromDomains?: string[];
   createdAt: string | null;
   createdAtMs: number | null;
   expiresAt: string | null;
@@ -178,6 +179,7 @@ export const createEmailAddress = async (
     ttlMinutes?: number;
     meta?: unknown;
     domain?: string;
+    allowedFromDomains?: string[];
   },
   options?: { organizationId?: string | null }
 ) => {
