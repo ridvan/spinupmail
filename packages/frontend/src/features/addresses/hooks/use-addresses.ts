@@ -1,30 +1,53 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { createEmailAddress, listDomains, listEmailAddresses } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
+type CreateAddressPayload = Parameters<typeof createEmailAddress>[0];
+
 export const useAddressesQuery = () => {
+  const { activeOrganizationId, isOrganizationSwitching } = useAuth();
+
   return useQuery({
-    queryKey: queryKeys.addresses,
-    queryFn: listEmailAddresses,
+    queryKey: queryKeys.addresses(activeOrganizationId),
+    queryFn: ({ signal }) =>
+      listEmailAddresses({
+        signal,
+        organizationId: activeOrganizationId,
+      }),
+    enabled: Boolean(activeOrganizationId && !isOrganizationSwitching),
     staleTime: 20_000,
   });
 };
 
 export const useDomainsQuery = () => {
+  const { activeOrganizationId, isOrganizationSwitching } = useAuth();
+
   return useQuery({
-    queryKey: queryKeys.domains,
-    queryFn: listDomains,
+    queryKey: queryKeys.domains(activeOrganizationId),
+    queryFn: ({ signal }) =>
+      listDomains({
+        signal,
+        organizationId: activeOrganizationId,
+      }),
+    enabled: Boolean(activeOrganizationId && !isOrganizationSwitching),
     staleTime: 5 * 60 * 1000,
   });
 };
 
 export const useCreateAddressMutation = () => {
   const queryClient = useQueryClient();
+  const { activeOrganizationId } = useAuth();
 
   return useMutation({
-    mutationFn: createEmailAddress,
+    mutationFn: (payload: CreateAddressPayload) =>
+      createEmailAddress(payload, {
+        organizationId: activeOrganizationId,
+      }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.addresses });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.addresses(activeOrganizationId),
+      });
     },
   });
 };

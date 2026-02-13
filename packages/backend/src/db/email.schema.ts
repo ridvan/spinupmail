@@ -1,11 +1,14 @@
 import { relations, sql } from "drizzle-orm";
 import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
-import { users } from "./auth.schema";
+import { organizations, users } from "./auth.schema";
 
 export const emailAddresses = sqliteTable(
   "email_addresses",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -25,7 +28,15 @@ export const emailAddresses = sqliteTable(
   },
   table => [
     index("email_addresses_domain_idx").on(table.domain),
-    index("email_addresses_user_created_idx").on(table.userId, table.createdAt),
+    index("email_addresses_org_created_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
+    index("email_addresses_org_user_created_idx").on(
+      table.organizationId,
+      table.userId,
+      table.createdAt
+    ),
   ]
 );
 
@@ -64,6 +75,9 @@ export const emailAttachments = sqliteTable(
     emailId: text("email_id")
       .notNull()
       .references(() => emails.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     addressId: text("address_id")
       .notNull()
       .references(() => emailAddresses.id, { onDelete: "cascade" }),
@@ -81,9 +95,14 @@ export const emailAttachments = sqliteTable(
       .notNull(),
   },
   table => [
-    index("email_attachments_user_email_created_idx").on(
-      table.userId,
+    index("email_attachments_org_email_created_idx").on(
+      table.organizationId,
       table.emailId,
+      table.createdAt
+    ),
+    index("email_attachments_org_address_created_idx").on(
+      table.organizationId,
+      table.addressId,
       table.createdAt
     ),
   ]
@@ -100,6 +119,10 @@ export const emailAddressesRelations = relations(
 export const emailAddressesUserRelations = relations(
   emailAddresses,
   ({ one }) => ({
+    organization: one(organizations, {
+      fields: [emailAddresses.organizationId],
+      references: [organizations.id],
+    }),
     user: one(users, {
       fields: [emailAddresses.userId],
       references: [users.id],
@@ -125,6 +148,10 @@ export const emailAttachmentsRelations = relations(
     address: one(emailAddresses, {
       fields: [emailAttachments.addressId],
       references: [emailAddresses.id],
+    }),
+    organization: one(organizations, {
+      fields: [emailAttachments.organizationId],
+      references: [organizations.id],
     }),
     user: one(users, {
       fields: [emailAttachments.userId],

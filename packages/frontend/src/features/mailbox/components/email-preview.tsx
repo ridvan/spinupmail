@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useTheme } from "@/components/theme-provider";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   downloadEmailAttachment,
   type EmailAttachment,
@@ -35,6 +36,7 @@ export const EmailPreview = ({
   isLoading = false,
 }: EmailPreviewProps) => {
   const { theme } = useTheme();
+  const { activeOrganizationId } = useAuth();
   const [downloadingAttachmentId, setDownloadingAttachmentId] = React.useState<
     string | null
   >(null);
@@ -73,6 +75,7 @@ export const EmailPreview = ({
         emailId: email.id,
         attachmentId: attachment.id,
         fallbackFilename: attachment.filename,
+        organizationId: activeOrganizationId,
       });
     } catch (error) {
       const message =

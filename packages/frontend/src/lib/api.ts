@@ -7,11 +7,27 @@ type ApiError = {
 
 const getApiUrl = (path: string) => `${API_BASE}${path}`;
 
-const apiFetch = async <T>(path: string, init?: RequestInit) => {
-  const response = await fetch(getApiUrl(path), {
+const appendOrganizationCacheKey = (
+  path: string,
+  organizationId?: string | null
+) => {
+  if (!organizationId) return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}_org=${encodeURIComponent(organizationId)}`;
+};
+
+const apiFetch = async <T>(
+  path: string,
+  init?: RequestInit,
+  organizationId?: string | null
+) => {
+  const scopedPath = appendOrganizationCacheKey(path, organizationId);
+  const response = await fetch(getApiUrl(scopedPath), {
     credentials: "include",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
+      ...(organizationId ? { "X-Org-Id": organizationId } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -127,29 +143,52 @@ export type DomainConfig = {
   default: string | null;
 };
 
-export const listEmailAddresses = async () => {
+export const listEmailAddresses = async (options?: {
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
   const data = await apiFetch<{ items: EmailAddress[] }>(
-    "/api/email-addresses"
+    "/api/email-addresses",
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
   );
   return data.items;
 };
 
-export const listDomains = async () => {
-  return apiFetch<DomainConfig>("/api/domains");
+export const listDomains = async (options?: {
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
+  return apiFetch<DomainConfig>(
+    "/api/domains",
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  );
 };
 
-export const createEmailAddress = async (payload: {
-  localPart?: string;
-  prefix?: string;
-  tag?: string;
-  ttlMinutes?: number;
-  meta?: unknown;
-  domain?: string;
-}) => {
-  return apiFetch<EmailAddress & { id: string }>("/api/email-addresses", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export const createEmailAddress = async (
+  payload: {
+    localPart?: string;
+    prefix?: string;
+    tag?: string;
+    ttlMinutes?: number;
+    meta?: unknown;
+    domain?: string;
+  },
+  options?: { organizationId?: string | null }
+) => {
+  return apiFetch<EmailAddress & { id: string }>(
+    "/api/email-addresses",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options?.organizationId
+  );
 };
 
 export const listEmails = async (options: {
@@ -157,6 +196,8 @@ export const listEmails = async (options: {
   address?: string;
   limit?: number;
   order?: "asc" | "desc";
+  signal?: AbortSignal;
+  organizationId?: string | null;
 }) => {
   const query = new URLSearchParams();
   if (options.addressId) query.set("addressId", options.addressId);
@@ -167,34 +208,54 @@ export const listEmails = async (options: {
     address: string;
     addressId: string;
     items: EmailListItem[];
-  }>(`/api/emails?${query.toString()}`);
+  }>(
+    `/api/emails?${query.toString()}`,
+    {
+      signal: options.signal,
+    },
+    options.organizationId
+  );
   return data;
 };
 
 export const getEmail = async (
   emailId: string,
-  options?: { raw?: boolean }
+  options?: {
+    raw?: boolean;
+    signal?: AbortSignal;
+    organizationId?: string | null;
+  }
 ) => {
   const query = new URLSearchParams();
   if (options?.raw) query.set("raw", "1");
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
-  return apiFetch<EmailDetail>(`/api/emails/${emailId}${suffix}`);
+  return apiFetch<EmailDetail>(
+    `/api/emails/${emailId}${suffix}`,
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  );
 };
 
 export const downloadEmailAttachment = async (params: {
   emailId: string;
   attachmentId: string;
   fallbackFilename?: string;
+  organizationId?: string | null;
 }) => {
-  const response = await fetch(
-    getApiUrl(
-      `/api/emails/${params.emailId}/attachments/${params.attachmentId}`
-    ),
-    {
-      credentials: "include",
-      method: "GET",
-    }
+  const scopedPath = appendOrganizationCacheKey(
+    `/api/emails/${params.emailId}/attachments/${params.attachmentId}`,
+    params.organizationId
   );
+  const response = await fetch(getApiUrl(scopedPath), {
+    credentials: "include",
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      ...(params.organizationId ? { "X-Org-Id": params.organizationId } : {}),
+    },
+  });
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response));

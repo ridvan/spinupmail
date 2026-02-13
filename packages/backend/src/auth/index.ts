@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "better-auth/plugins";
+import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
@@ -117,6 +118,11 @@ function createAuth(
           },
         },
         plugins: [
+          organization({
+            allowUserToCreateOrganization: true,
+            organizationLimit: 3,
+            membershipLimit: 10,
+          }),
           apiKey({
             enableSessionForAPIKeys: true,
             apiKeyHeaders: ["x-api-key"],

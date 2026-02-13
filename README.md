@@ -7,9 +7,10 @@ frontend.
 
 ## What You Get
 
-- Create unlimited email addresses tied to a user account
+- Create unlimited email addresses scoped to an organization
+- Create and join organizations (max 3 per user, max 10 members per org)
 - Receive emails via Cloudflare Email Routing and store them in D1
-- Browse emails in the UI
+- Browse organization-scoped emails in the UI
 - Store inbound mail attachments in Cloudflare R2 and download them in UI/API
 - Generate API keys for automation (e.g., test suites)
 
@@ -187,22 +188,29 @@ This keeps the frontend and API on the same domain.
 
 1. Open the Pages URL
 2. Sign up / sign in
-3. Create a new email address
-4. Send an email to that address
-5. View emails in the UI
+3. Create a new organization or join one using an invitation link
+4. Create a new email address
+5. Send an email to that address
+6. View emails in the UI
 
 ## API Usage (Automation)
 
 Generate an API key from the UI. Then use it to access the API:
 
+- API key requests must include `X-Org-Id` with an organization the API key
+  owner belongs to.
+- Session-cookie requests use the active organization from the user session.
+
 ```bash
 curl "https://your-domain.com/api/email-addresses" \
-  -H "X-API-Key: <your_api_key>"
+  -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>"
 ```
 
 ```bash
 curl "https://your-domain.com/api/emails?address=john-123@your-domain.com" \
-  -H "X-API-Key: <your_api_key>"
+  -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>"
 ```
 
 Download an email attachment:
@@ -210,6 +218,7 @@ Download an email attachment:
 ```bash
 curl -L "https://your-domain.com/api/emails/<email_id>/attachments/<attachment_id>" \
   -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>" \
   --output attachment.bin
 ```
 
@@ -220,16 +229,16 @@ Attachment handling is part of the inbound email pipeline:
 1. Email is received by the Worker through Cloudflare Email Routing.
 2. MIME content is parsed with `postal-mime` (including attachments).
 3. Each attachment is validated and uploaded to the `R2_BUCKET` binding under:
-   - `email-attachments/<userId>/<addressId>/<emailId>/<attachmentId>-<filename>`
-4. Metadata is saved in D1 table `email_attachments` with ownership links (`user_id`, `address_id`, `email_id`).
+   - `email-attachments/<organizationId>/<addressId>/<emailId>/<attachmentId>-<filename>`
+4. Metadata is saved in D1 table `email_attachments` with ownership links (`organization_id`, `user_id`, `address_id`, `email_id`).
 5. `/api/emails` and `/api/emails/:id` include attachment metadata for UI/API consumers.
 6. Downloads are served through authenticated endpoint:
    - `GET /api/emails/:id/attachments/:attachmentId`
-   - Access is restricted to the owning user (session cookie or API key).
+   - Access is restricted to members of the owning organization (session cookie or API key + `X-Org-Id`).
 7. Raw MIME is **not persisted in D1 by default**. Optional debug mode can store
    raw MIME in private R2 and serve it through:
    - `GET /api/emails/:id/raw`
-   - Access is restricted to the owning user (session cookie or API key).
+   - Access is restricted to members of the owning organization (session cookie or API key + `X-Org-Id`).
 
 Limits:
 

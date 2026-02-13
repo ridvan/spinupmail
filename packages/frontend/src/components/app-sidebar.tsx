@@ -10,6 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { OrganizationSwitcher } from "@/components/organization-switcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +68,11 @@ const navItems: NavItem[] = [
     to: "/settings",
     icon: Settings05Icon,
   },
+  {
+    title: "Organization",
+    to: "/organization/settings",
+    icon: Settings05Icon,
+  },
 ];
 
 const getInitials = (value: string | undefined) => {
@@ -102,6 +108,7 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
 
       <SidebarContent>
         <SidebarGroup>
+          <OrganizationSwitcher />
           <SidebarGroupLabel className="group-data-[collapsible=icon]:mt-0! group-data-[collapsible=icon]:opacity-100!">
             <span className="group-data-[collapsible=icon]:hidden pl-2.5">
               Navigate

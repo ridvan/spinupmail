@@ -6,8 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  requireActiveOrganizationLoader,
+  requireNoActiveOrganizationLoader,
   redirectIfAuthenticatedLoader,
-  requireAuthLoader,
 } from "@/features/auth/hooks/route-loaders";
 import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { AddressManagementPage } from "@/pages/address-management-page";
@@ -16,6 +17,8 @@ import { LoginPage } from "@/pages/login-page";
 import { LoginTwoFactorPage } from "@/pages/login-two-factor-page";
 import { MailboxPage } from "@/pages/mailbox-page";
 import { NotFoundPage } from "@/pages/not-found-page";
+import { OrganizationOnboardingPage } from "@/pages/organization-onboarding-page";
+import { OrganizationSettingsPage } from "@/pages/organization-settings-page";
 import { ProtectedLayoutPage } from "@/pages/protected-layout-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { SettingsPage } from "@/pages/settings-page";
@@ -66,8 +69,16 @@ const routes: RouteObject[] = [
     handle: { title: "Two-factor verification" },
   },
   {
+    path: "/onboarding/organization",
+    loader: requireNoActiveOrganizationLoader,
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <OrganizationOnboardingPage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Organization onboarding" },
+  },
+  {
     path: "/",
-    loader: requireAuthLoader,
+    loader: requireActiveOrganizationLoader,
     hydrateFallbackElement: hydrationFallbackElement,
     element: <ProtectedLayoutPage />,
     errorElement: <RouteErrorPage />,
@@ -91,6 +102,11 @@ const routes: RouteObject[] = [
         path: "settings",
         element: <SettingsPage />,
         handle: { title: "Settings" },
+      },
+      {
+        path: "organization/settings",
+        element: <OrganizationSettingsPage />,
+        handle: { title: "Organization settings" },
       },
       {
         path: "*",

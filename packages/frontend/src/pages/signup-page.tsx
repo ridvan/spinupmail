@@ -18,6 +18,8 @@ export const SignupPage = () => {
     () => safeNextPath(searchParams.get("next")),
     [searchParams]
   );
+  const postSignUpPath =
+    nextPath === "/" ? "/onboarding/organization" : nextPath;
 
   const loginHref =
     nextPath === "/" ? "/login" : `/login?next=${encodeURIComponent(nextPath)}`;
@@ -30,7 +32,9 @@ export const SignupPage = () => {
       subtitle="Create your workspace and start managing disposable inboxes in minutes."
       title="Create account"
     >
-      <SignUpForm onSuccess={() => navigate(nextPath, { replace: true })} />
+      <SignUpForm
+        onSuccess={() => navigate(postSignUpPath, { replace: true })}
+      />
     </AuthShell>
   );
 };

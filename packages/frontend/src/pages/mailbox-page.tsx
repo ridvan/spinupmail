@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { MailboxView } from "@/features/mailbox/components/mailbox-view";
 import {
   useMailboxEmailDetailQuery,
@@ -7,6 +8,7 @@ import {
 } from "@/features/mailbox/hooks/use-mailbox";
 
 export const MailboxPage = () => {
+  const { activeOrganizationId } = useAuth();
   const addressesQuery = useAddressesQuery();
   const [selectedAddressId, setSelectedAddressId] = React.useState<
     string | null
@@ -16,35 +18,65 @@ export const MailboxPage = () => {
   );
 
   React.useEffect(() => {
-    const addresses = addressesQuery.data ?? [];
-    if (addresses.length === 0) {
+    setSelectedAddressId(null);
+    setSelectedEmailId(null);
+  }, [activeOrganizationId]);
+
+  const currentAddresses = React.useMemo(
+    () => addressesQuery.data ?? [],
+    [addressesQuery.data]
+  );
+  const currentAddressIds = React.useMemo(
+    () => new Set(currentAddresses.map(address => address.id)),
+    [currentAddresses]
+  );
+  const resolvedSelectedAddressId =
+    selectedAddressId && currentAddressIds.has(selectedAddressId)
+      ? selectedAddressId
+      : null;
+
+  React.useEffect(() => {
+    if (currentAddresses.length === 0) {
       setSelectedAddressId(null);
       return;
     }
 
-    const hasSelected = addresses.some(
-      address => address.id === selectedAddressId
+    const hasSelected = Boolean(
+      selectedAddressId && currentAddressIds.has(selectedAddressId)
     );
     if (!hasSelected) {
-      setSelectedAddressId(addresses[0]?.id ?? null);
+      setSelectedAddressId(currentAddresses[0]?.id ?? null);
     }
-  }, [addressesQuery.data, selectedAddressId]);
+  }, [currentAddresses, currentAddressIds, selectedAddressId]);
 
-  const emailsQuery = useMailboxEmailsQuery(selectedAddressId);
-  const emailDetailQuery = useMailboxEmailDetailQuery(selectedEmailId);
+  const emailsQuery = useMailboxEmailsQuery(resolvedSelectedAddressId);
+  const currentEmails = React.useMemo(
+    () => emailsQuery.data?.items ?? [],
+    [emailsQuery.data?.items]
+  );
+  const currentEmailIds = React.useMemo(
+    () => new Set(currentEmails.map(email => email.id)),
+    [currentEmails]
+  );
+  const resolvedSelectedEmailId =
+    selectedEmailId && currentEmailIds.has(selectedEmailId)
+      ? selectedEmailId
+      : null;
+  const emailDetailQuery = useMailboxEmailDetailQuery(resolvedSelectedEmailId);
 
   React.useEffect(() => {
-    const emails = emailsQuery.data?.items ?? [];
-    if (emails.length === 0) {
+    if (currentEmails.length === 0) {
       setSelectedEmailId(null);
       return;
     }
 
-    const hasSelected = emails.some(email => email.id === selectedEmailId);
+    const hasSelected = Boolean(
+      selectedEmailId && currentEmailIds.has(selectedEmailId)
+    );
     if (!hasSelected) {
-      setSelectedEmailId(emails[0]?.id ?? null);
+      setSelectedEmailId(currentEmails[0]?.id ?? null);
     }
-  }, [emailsQuery.data, selectedEmailId]);
+  }, [currentEmails, currentEmailIds, selectedEmailId]);
 
   return (
     <div className="space-y-6">
@@ -84,8 +116,8 @@ export const MailboxPage = () => {
           setSelectedEmailId(null);
         }}
         onSelectEmail={setSelectedEmailId}
-        selectedAddressId={selectedAddressId}
-        selectedEmailId={selectedEmailId}
+        selectedAddressId={resolvedSelectedAddressId}
+        selectedEmailId={resolvedSelectedEmailId}
       />
     </div>
   );

@@ -24,6 +24,7 @@ type AuthSession = NonNullable<
 type Variables = {
   auth: ReturnType<typeof createAuth>;
   session: AuthSession;
+  organizationId: string;
 };
 
 const app = new Hono<{ Bindings: CloudflareBindings; Variables: Variables }>();
@@ -197,6 +198,64 @@ const requireAuth: MiddlewareHandler = async (c, next) => {
   }
 };
 
+const getSessionActiveOrganizationId = (session: AuthSession) => {
+  const value = (
+    session.session as AuthSession["session"] & {
+      activeOrganizationId?: string | null;
+    }
+  ).activeOrganizationId;
+
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const requireOrganizationScope: MiddlewareHandler = async (c, next) => {
+  const auth = c.get("auth");
+  const session = c.get("session");
+  const headerOrganizationId = c.req.header("x-org-id")?.trim() || null;
+  const isApiKeyRequest = Boolean(c.req.header("x-api-key"));
+
+  if (isApiKeyRequest && !headerOrganizationId) {
+    c.status(400);
+    return c.json({ error: "x-org-id header is required for api key usage" });
+  }
+
+  const organizationId =
+    headerOrganizationId ?? getSessionActiveOrganizationId(session);
+
+  if (!organizationId) {
+    c.status(400);
+    return c.json({ error: "active organization is required" });
+  }
+
+  try {
+    const organization = await auth.api.getFullOrganization({
+      headers: c.req.raw.headers,
+      query: {
+        organizationId,
+        membersLimit: 1,
+      },
+    });
+
+    if (!organization?.id) {
+      c.status(403);
+      return c.json({ error: "forbidden" });
+    }
+  } catch (error) {
+    const authFailure = getAuthFailureResponse(error);
+    if (authFailure) {
+      c.status(authFailure.status);
+      return c.json({ error: authFailure.error });
+    }
+    c.status(403);
+    return c.json({ error: "forbidden" });
+  }
+
+  c.set("organizationId", organizationId);
+  await next();
+};
+
 const readJsonBody = async <T>(c: Parameters<MiddlewareHandler>[0]) => {
   try {
     return (await c.req.json()) as T;
@@ -302,14 +361,14 @@ const buildContentDisposition = (filename: string) => {
 };
 
 const getRawEmailR2Key = ({
-  userId,
+  organizationId,
   addressId,
   emailId,
 }: {
-  userId: string;
+  organizationId: string;
   addressId: string;
   emailId: string;
-}) => `email-raw/${userId}/${addressId}/${emailId}.eml`;
+}) => `email-raw/${organizationId}/${addressId}/${emailId}.eml`;
 
 const getRawDownloadPath = (
   env: CloudflareBindings,
@@ -472,6 +531,7 @@ const persistAttachments = async ({
   env,
   db,
   emailId,
+  organizationId,
   addressId,
   userId,
 }: {
@@ -479,6 +539,7 @@ const persistAttachments = async ({
   env: CloudflareBindings;
   db: ReturnType<typeof getDb>;
   emailId: string;
+  organizationId: string;
   addressId: string;
   userId: string;
 }) => {
@@ -504,7 +565,7 @@ const persistAttachments = async ({
 
     const attachmentId = crypto.randomUUID();
     const filename = sanitizeFilename(attachment.filename);
-    const r2Key = `email-attachments/${userId}/${addressId}/${emailId}/${attachmentId}-${filename}`;
+    const r2Key = `email-attachments/${organizationId}/${addressId}/${emailId}/${attachmentId}-${filename}`;
 
     let uploaded = false;
     try {
@@ -520,6 +581,7 @@ const persistAttachments = async ({
         .values({
           id: attachmentId,
           emailId,
+          organizationId,
           addressId,
           userId,
           filename,
@@ -553,14 +615,14 @@ const persistRawEmailToR2 = async ({
   env,
   rawBytes,
   emailId,
+  organizationId,
   addressId,
-  userId,
 }: {
   env: CloudflareBindings;
   rawBytes: Uint8Array;
   emailId: string;
+  organizationId: string;
   addressId: string;
-  userId: string;
 }) => {
   const persistRawToR2 = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_R2, false);
   if (!persistRawToR2) return;
@@ -572,7 +634,7 @@ const persistRawEmailToR2 = async ({
     return;
   }
 
-  const rawKey = getRawEmailR2Key({ userId, addressId, emailId });
+  const rawKey = getRawEmailR2Key({ organizationId, addressId, emailId });
   try {
     await env.R2_BUCKET.put(rawKey, rawBytes, {
       httpMetadata: {
@@ -596,7 +658,7 @@ app.use(
       const allowed = getAllowedOrigins(c.env);
       return allowed.includes(origin) ? origin : null;
     },
-    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "X-Org-Id"],
     allowMethods: ["POST", "GET", "OPTIONS", "DELETE"],
     exposeHeaders: ["Content-Length", "Content-Disposition", "Content-Type"],
     maxAge: 600,
@@ -626,6 +688,10 @@ app.use("/api/email-addresses", requireAuth);
 app.use("/api/email-addresses/*", requireAuth);
 app.use("/api/emails", requireAuth);
 app.use("/api/emails/*", requireAuth);
+app.use("/api/email-addresses", requireOrganizationScope);
+app.use("/api/email-addresses/*", requireOrganizationScope);
+app.use("/api/emails", requireOrganizationScope);
+app.use("/api/emails/*", requireOrganizationScope);
 
 app.get("/api/domains", async c => {
   const allowed = getAllowedDomains(c.env);
@@ -639,7 +705,7 @@ app.get("/api/domains", async c => {
 });
 
 app.get("/api/email-addresses", async c => {
-  const session = c.get("session");
+  const organizationId = c.get("organizationId");
   const db = getDb(c.env);
   const rows = await db
     .select({
@@ -654,7 +720,7 @@ app.get("/api/email-addresses", async c => {
       lastReceivedAt: emailAddresses.lastReceivedAt,
     })
     .from(emailAddresses)
-    .where(eq(emailAddresses.userId, session.user.id))
+    .where(eq(emailAddresses.organizationId, organizationId))
     .orderBy(desc(emailAddresses.createdAt));
 
   const items = rows.map(row => {
@@ -701,6 +767,7 @@ app.post("/api/email-addresses", async c => {
   };
 
   const session = c.get("session");
+  const organizationId = c.get("organizationId");
   const body = await readJsonBody<CreateBody>(c);
   const allowedDomains = getAllowedDomains(c.env);
   const domainFromBody =
@@ -765,6 +832,7 @@ app.post("/api/email-addresses", async c => {
       .insert(emailAddresses)
       .values({
         id,
+        organizationId,
         userId: session.user.id,
         address,
         localPart,
@@ -810,7 +878,7 @@ app.post("/api/email-addresses", async c => {
 });
 
 app.get("/api/emails", async c => {
-  const session = c.get("session");
+  const organizationId = c.get("organizationId");
   const query = new URL(c.req.url).searchParams;
   const addressParam = query.get("address");
   const addressIdParam = query.get("addressId");
@@ -838,7 +906,7 @@ app.get("/api/emails", async c => {
         .where(
           and(
             eq(emailAddresses.id, addressIdParam),
-            eq(emailAddresses.userId, session.user.id)
+            eq(emailAddresses.organizationId, organizationId)
           )
         )
         .get()
@@ -851,7 +919,7 @@ app.get("/api/emails", async c => {
         .where(
           and(
             eq(emailAddresses.address, normalizeAddress(addressParam ?? "")),
-            eq(emailAddresses.userId, session.user.id)
+            eq(emailAddresses.organizationId, organizationId)
           )
         )
         .get();
@@ -905,7 +973,7 @@ app.get("/api/emails", async c => {
           .from(emailAttachments)
           .where(
             and(
-              eq(emailAttachments.userId, session.user.id),
+              eq(emailAttachments.organizationId, organizationId),
               inArray(emailAttachments.emailId, emailIds)
             )
           )
@@ -947,7 +1015,7 @@ app.get("/api/emails", async c => {
 });
 
 app.get("/api/emails/:id", async c => {
-  const session = c.get("session");
+  const organizationId = c.get("organizationId");
   const emailId = c.req.param("id");
   const includeRaw =
     c.req.query("raw") === "true" || c.req.query("raw") === "1";
@@ -974,7 +1042,7 @@ app.get("/api/emails/:id", async c => {
       emailAddresses,
       and(
         eq(emailAddresses.id, emails.addressId),
-        eq(emailAddresses.userId, session.user.id)
+        eq(emailAddresses.organizationId, organizationId)
       )
     )
     .where(eq(emails.id, emailId))
@@ -999,7 +1067,7 @@ app.get("/api/emails/:id", async c => {
     .where(
       and(
         eq(emailAttachments.emailId, row.id),
-        eq(emailAttachments.userId, session.user.id)
+        eq(emailAttachments.organizationId, organizationId)
       )
     )
     .orderBy(asc(emailAttachments.createdAt));
@@ -1041,7 +1109,7 @@ app.get("/api/emails/:id", async c => {
 });
 
 app.get("/api/emails/:id/raw", async c => {
-  const session = c.get("session");
+  const organizationId = c.get("organizationId");
   const emailId = c.req.param("id");
   const db = getDb(c.env);
 
@@ -1056,7 +1124,7 @@ app.get("/api/emails/:id/raw", async c => {
       emailAddresses,
       and(
         eq(emailAddresses.id, emails.addressId),
-        eq(emailAddresses.userId, session.user.id)
+        eq(emailAddresses.organizationId, organizationId)
       )
     )
     .where(eq(emails.id, emailId))
@@ -1084,7 +1152,7 @@ app.get("/api/emails/:id/raw", async c => {
   }
 
   const rawKey = getRawEmailR2Key({
-    userId: session.user.id,
+    organizationId,
     addressId: row.addressId,
     emailId: row.id,
   });
@@ -1105,7 +1173,7 @@ app.get("/api/emails/:id/raw", async c => {
 });
 
 app.get("/api/emails/:id/attachments/:attachmentId", async c => {
-  const session = c.get("session");
+  const organizationId = c.get("organizationId");
   if (!c.env.R2_BUCKET) {
     c.status(503);
     return c.json({ error: "Attachment storage is not configured" });
@@ -1122,7 +1190,7 @@ app.get("/api/emails/:id/attachments/:attachmentId", async c => {
       and(
         eq(emailAttachments.id, attachmentId),
         eq(emailAttachments.emailId, emailId),
-        eq(emailAttachments.userId, session.user.id)
+        eq(emailAttachments.organizationId, organizationId)
       )
     )
     .get();
@@ -1182,6 +1250,7 @@ const handleIncomingEmail = async (
     const addressRow = await db
       .select({
         id: emailAddresses.id,
+        organizationId: emailAddresses.organizationId,
         userId: emailAddresses.userId,
         expiresAt: emailAddresses.expiresAt,
       })
@@ -1199,6 +1268,11 @@ const handleIncomingEmail = async (
       // Silently dropping might cause senders to keep retrying,
       // but rejecting might cause bounce back emails which can be undesirable.
       message.setReject("Address expired");
+      return;
+    }
+
+    if (!addressRow.organizationId) {
+      message.setReject("Address organization is not configured");
       return;
     }
 
@@ -1252,8 +1326,8 @@ const handleIncomingEmail = async (
       env,
       rawBytes,
       emailId,
+      organizationId: addressRow.organizationId,
       addressId: addressRow.id,
-      userId: addressRow.userId,
     });
 
     await persistAttachments({
@@ -1261,6 +1335,7 @@ const handleIncomingEmail = async (
       env,
       db,
       emailId,
+      organizationId: addressRow.organizationId,
       addressId: addressRow.id,
       userId: addressRow.userId,
     });
