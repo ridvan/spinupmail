@@ -18,11 +18,7 @@ const readRequestPath = (request: Request) => {
 };
 
 const getSessionOrRedirect = async (request: Request) => {
-  const session = await authClient.getSession({
-    query: {
-      disableCookieCache: true,
-    },
-  });
+  const session = await authClient.getSession();
 
   if (session.error || !session.data?.user || !session.data?.session) {
     const next = encodeURIComponent(readRequestPath(request));
@@ -102,11 +98,7 @@ export const requireNoActiveOrganizationLoader = async ({
 export const redirectIfAuthenticatedLoader = async ({
   request,
 }: LoaderFunctionArgs) => {
-  const session = await authClient.getSession({
-    query: {
-      disableCookieCache: true,
-    },
-  });
+  const session = await authClient.getSession();
 
   if (!session.error && session.data?.user && session.data?.session) {
     const url = new URL(request.url);

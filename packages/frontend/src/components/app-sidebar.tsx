@@ -88,13 +88,20 @@ const getInitials = (value: string | undefined) => {
 export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const navigateIfNeeded = React.useCallback(
+    (to: string) => {
+      if (location.pathname === to) return;
+      void navigate(to);
+    },
+    [location.pathname, navigate]
+  );
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" {...props}>
       <SidebarHeader className="h-16 border-b border-border/70 mt-px">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => void navigate("/")} size="lg">
+            <SidebarMenuButton onClick={() => navigateIfNeeded("/")} size="lg">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-primary">
                 <HugeiconsIcon icon={Mail} strokeWidth={2} />
               </div>
@@ -131,7 +138,7 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => void navigate(item.to)}
+                      onClick={() => navigateIfNeeded(item.to)}
                       tooltip={item.title}
                       className="pl-4"
                     >
@@ -183,7 +190,9 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
                   <DropdownMenuLabel className="text-xs text-muted-foreground">
                     Account
                   </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => void navigate("/settings")}>
+                  <DropdownMenuItem
+                    onClick={() => navigateIfNeeded("/settings")}
+                  >
                     <HugeiconsIcon icon={Settings05Icon} strokeWidth={2} />
                     Settings
                   </DropdownMenuItem>
