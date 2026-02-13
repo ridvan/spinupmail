@@ -23,6 +23,17 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const maskEmailForLogs = (email: string) => {
+  const normalized = email.trim().toLowerCase();
+  const atIndex = normalized.indexOf("@");
+  if (atIndex <= 1) return "***";
+  const local = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex + 1);
+  const first = local[0] ?? "*";
+  const last = local[local.length - 1] ?? "*";
+  return `${first}***${last}@${domain || "***"}`;
+};
+
 const buildVerificationEmailHtml = (verificationUrl: string) => {
   const safeUrl = escapeHtml(verificationUrl);
 
@@ -116,12 +127,20 @@ export const createResendVerificationEmailSender = (
     }
 
     const resend = new Resend(env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: user.email,
-      subject: `Verify your ${APP_NAME} email`,
-      text: buildVerificationEmailText(url),
-      html: buildVerificationEmailHtml(url),
-    });
+    try {
+      await resend.emails.send({
+        from: env.RESEND_FROM_EMAIL,
+        to: user.email,
+        subject: `Verify your ${APP_NAME} email`,
+        text: buildVerificationEmailText(url),
+        html: buildVerificationEmailHtml(url),
+      });
+    } catch (error) {
+      console.error("[auth] Failed to send verification email via Resend", {
+        recipient: maskEmailForLogs(user.email),
+        error,
+      });
+      throw error;
+    }
   };
 };
