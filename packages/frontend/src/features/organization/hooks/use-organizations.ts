@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { setLastActiveOrganizationId } from "@/features/organization/utils/active-organization-storage";
 import { createOrganizationWithGeneratedSlug } from "@/features/organization/utils/create-organization";
+import { listOrganizationStats } from "@/lib/api";
 import { authClient } from "@/lib/auth";
+import { queryKeys } from "@/lib/query-keys";
 
 export type OrganizationItem = {
   id: string;
@@ -74,6 +76,15 @@ export const useOrganizationsQuery = () => {
       return (result.data ?? []) as OrganizationItem[];
     },
     staleTime: 15_000,
+  });
+};
+
+export const useOrganizationStatsQuery = () => {
+  return useQuery({
+    queryKey: queryKeys.organizationStats,
+    queryFn: ({ signal }) => listOrganizationStats({ signal }),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -361,6 +372,9 @@ export const useRemoveMemberMutation = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["auth", "organization"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.organizationStats,
       });
     },
   });

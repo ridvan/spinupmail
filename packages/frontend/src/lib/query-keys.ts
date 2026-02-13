@@ -1,4 +1,5 @@
 export const queryKeys = {
+  organizationStats: ["app", "organization-stats"] as const,
   addresses: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses"] as const,
   domains: (organizationId: string | null) =>

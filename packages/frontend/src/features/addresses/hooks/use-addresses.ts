@@ -45,9 +45,14 @@ export const useCreateAddressMutation = () => {
         organizationId: activeOrganizationId,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.addresses(activeOrganizationId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.addresses(activeOrganizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.organizationStats,
+        }),
+      ]);
     },
   });
 };

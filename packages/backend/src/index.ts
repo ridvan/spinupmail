@@ -6,7 +6,13 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import sanitizeHtml from "sanitize-html";
 import PostalMime, { type Attachment as PostalAttachment } from "postal-mime";
 import { createAuth } from "./auth";
-import { emailAddresses, emailAttachments, emails, schema } from "./db";
+import {
+  emailAddresses,
+  emailAttachments,
+  emails,
+  members,
+  schema,
+} from "./db";
 import type {
   ExecutionContext,
   ForwardableEmailMessage,
@@ -907,6 +913,7 @@ app.all("/api/auth/*", async c => {
 });
 
 app.use("/api/domains", requireAuth);
+app.use("/api/organizations/stats", requireAuth);
 app.use("/api/email-addresses", requireAuth);
 app.use("/api/email-addresses/*", requireAuth);
 app.use("/api/emails", requireAuth);
@@ -915,6 +922,97 @@ app.use("/api/email-addresses", requireOrganizationScope);
 app.use("/api/email-addresses/*", requireOrganizationScope);
 app.use("/api/emails", requireOrganizationScope);
 app.use("/api/emails/*", requireOrganizationScope);
+
+app.get("/api/organizations/stats", async c => {
+  const session = c.get("session");
+  const userId = session.user.id;
+
+  if (!userId) {
+    c.status(401);
+    return c.json({ error: "unauthorized" });
+  }
+
+  const db = getDb(c.env);
+  const membershipRows = await db
+    .select({
+      organizationId: members.organizationId,
+    })
+    .from(members)
+    .where(eq(members.userId, userId));
+
+  const organizationIds = Array.from(
+    new Set(membershipRows.map(row => row.organizationId))
+  );
+
+  if (organizationIds.length === 0) {
+    return c.json({ items: [] }, 200, {
+      "Cache-Control": "private, max-age=60",
+    });
+  }
+
+  const [memberCountRows, addressCountRows, emailCountRows] = await Promise.all(
+    [
+      db
+        .select({
+          organizationId: members.organizationId,
+          count: sql<number>`count(*)`,
+        })
+        .from(members)
+        .where(inArray(members.organizationId, organizationIds))
+        .groupBy(members.organizationId),
+      db
+        .select({
+          organizationId: emailAddresses.organizationId,
+          count: sql<number>`count(*)`,
+        })
+        .from(emailAddresses)
+        .where(inArray(emailAddresses.organizationId, organizationIds))
+        .groupBy(emailAddresses.organizationId),
+      db
+        .select({
+          organizationId: emailAddresses.organizationId,
+          count: sql<number>`count(*)`,
+        })
+        .from(emails)
+        .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
+        .where(inArray(emailAddresses.organizationId, organizationIds))
+        .groupBy(emailAddresses.organizationId),
+    ]
+  );
+
+  const memberCountByOrganizationId = new Map<string, number>();
+  for (const row of memberCountRows) {
+    memberCountByOrganizationId.set(row.organizationId, Number(row.count) || 0);
+  }
+
+  const addressCountByOrganizationId = new Map<string, number>();
+  for (const row of addressCountRows) {
+    if (!row.organizationId) continue;
+    addressCountByOrganizationId.set(
+      row.organizationId,
+      Number(row.count) || 0
+    );
+  }
+
+  const emailCountByOrganizationId = new Map<string, number>();
+  for (const row of emailCountRows) {
+    if (!row.organizationId) continue;
+    emailCountByOrganizationId.set(row.organizationId, Number(row.count) || 0);
+  }
+
+  const items = organizationIds.map(organizationId => {
+    return {
+      organizationId,
+      memberCount: memberCountByOrganizationId.get(organizationId) ?? 0,
+      addressCount: addressCountByOrganizationId.get(organizationId) ?? 0,
+      emailCount: emailCountByOrganizationId.get(organizationId) ?? 0,
+    };
+  });
+
+  return c.json({ items }, 200, {
+    "Cache-Control": "private, max-age=60",
+  });
+});
 
 app.get("/api/domains", async c => {
   const allowed = getAllowedDomains(c.env);

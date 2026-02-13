@@ -1,5 +1,11 @@
 import * as React from "react";
-import { PlusSignIcon, BookOpen02Icon } from "@hugeicons/core-free-icons";
+import {
+  BookOpen02Icon,
+  Mail01Icon,
+  Mailbox01Icon,
+  PlusSignIcon,
+  UserMultiple02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
@@ -15,11 +21,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   type OrganizationItem,
   useCreateOrganizationMutation,
   useOrganizationsQuery,
+  useOrganizationStatsQuery,
   useSetActiveOrganizationMutation,
 } from "@/features/organization/hooks/use-organizations";
 
@@ -28,6 +41,7 @@ const MAX_ORGANIZATIONS = 3;
 export const OrganizationSwitcher = () => {
   const { activeOrganizationId } = useAuth();
   const organizationsQuery = useOrganizationsQuery();
+  const organizationStatsQuery = useOrganizationStatsQuery();
   const setActiveMutation = useSetActiveOrganizationMutation();
   const createMutation = useCreateOrganizationMutation();
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -36,6 +50,29 @@ export const OrganizationSwitcher = () => {
   const activeOrganization =
     organizations.find(org => org.id === activeOrganizationId) ??
     organizations[0];
+  const organizationStatsById = React.useMemo(() => {
+    const stats = organizationStatsQuery.data ?? [];
+    return new Map(stats.map(item => [item.organizationId, item]));
+  }, [organizationStatsQuery.data]);
+  const activeOrganizationStats = activeOrganization
+    ? organizationStatsById.get(activeOrganization.id)
+    : undefined;
+  const hasLoadedStats = organizationStatsQuery.data !== undefined;
+  const formatCountValue = (value: number | undefined) => {
+    if (typeof value === "number") return value.toLocaleString();
+    return hasLoadedStats ? "0" : "--";
+  };
+  const formatCountLabel = (
+    value: number | undefined,
+    singular: string,
+    plural: string
+  ) => {
+    if (typeof value === "number") {
+      return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
+    }
+    if (hasLoadedStats) return `0 ${plural}`;
+    return `Loading ${plural}`;
+  };
 
   const isBusy =
     organizationsQuery.isLoading ||
@@ -95,9 +132,85 @@ export const OrganizationSwitcher = () => {
                 <span className="truncate text-sm font-medium">
                   {activeOrganization.name}
                 </span>
-                <span className="truncate text-xs text-sidebar-foreground/70">
-                  {organizations.length}/{MAX_ORGANIZATIONS} organizations
-                </span>
+                <TooltipProvider delay={120}>
+                  <span className="flex items-center gap-2.5 text-xs text-sidebar-foreground/70">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <span className="inline-flex items-center gap-1" />
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={UserMultiple02Icon}
+                          strokeWidth={2}
+                          className="size-3!"
+                        />
+                        <span>
+                          {formatCountValue(
+                            activeOrganizationStats?.memberCount
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {formatCountLabel(
+                          activeOrganizationStats?.memberCount,
+                          "member",
+                          "members"
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <span className="inline-flex items-center gap-1" />
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={Mailbox01Icon}
+                          strokeWidth={2}
+                          className="size-3.5!"
+                        />
+                        <span>
+                          {formatCountValue(
+                            activeOrganizationStats?.addressCount
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {formatCountLabel(
+                          activeOrganizationStats?.addressCount,
+                          "email address",
+                          "email addresses"
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <span className="inline-flex items-center gap-1" />
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={Mail01Icon}
+                          strokeWidth={2}
+                          className="size-3!"
+                        />
+                        <span>
+                          {formatCountValue(
+                            activeOrganizationStats?.emailCount
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {formatCountLabel(
+                          activeOrganizationStats?.emailCount,
+                          "email received",
+                          "emails received"
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </TooltipProvider>
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent

@@ -144,6 +144,13 @@ export type DomainConfig = {
   default: string | null;
 };
 
+export type OrganizationStatsItem = {
+  organizationId: string;
+  memberCount: number;
+  addressCount: number;
+  emailCount: number;
+};
+
 export const listEmailAddresses = async (options?: {
   signal?: AbortSignal;
   organizationId?: string | null;
@@ -169,6 +176,18 @@ export const listDomains = async (options?: {
     },
     options?.organizationId
   );
+};
+
+export const listOrganizationStats = async (options?: {
+  signal?: AbortSignal;
+}) => {
+  const data = await apiFetch<{ items: OrganizationStatsItem[] }>(
+    "/api/organizations/stats",
+    {
+      signal: options?.signal,
+    }
+  );
+  return data.items;
 };
 
 export const createEmailAddress = async (
