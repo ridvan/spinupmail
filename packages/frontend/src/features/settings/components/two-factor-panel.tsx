@@ -1,4 +1,6 @@
 import * as React from "react";
+import { Copy01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
@@ -68,18 +70,23 @@ export const TwoFactorPanel = () => {
     string[] | null
   >(null);
   const [didCopySetupKey, setDidCopySetupKey] = React.useState(false);
+  const [didCopyBackupCodes, setDidCopyBackupCodes] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(
     null
   );
-  const copyResetTimeoutRef = React.useRef<number | null>(null);
+  const setupCopyResetTimeoutRef = React.useRef<number | null>(null);
+  const backupCopyResetTimeoutRef = React.useRef<number | null>(null);
 
   const twoFactorEnabled = isTwoFactorEnabled(user);
 
   React.useEffect(
     () => () => {
-      if (copyResetTimeoutRef.current !== null) {
-        window.clearTimeout(copyResetTimeoutRef.current);
+      if (setupCopyResetTimeoutRef.current !== null) {
+        window.clearTimeout(setupCopyResetTimeoutRef.current);
+      }
+      if (backupCopyResetTimeoutRef.current !== null) {
+        window.clearTimeout(backupCopyResetTimeoutRef.current);
       }
     },
     []
@@ -235,15 +242,34 @@ export const TwoFactorPanel = () => {
       await navigator.clipboard.writeText(setupKey);
       setDidCopySetupKey(true);
 
-      if (copyResetTimeoutRef.current !== null) {
-        window.clearTimeout(copyResetTimeoutRef.current);
+      if (setupCopyResetTimeoutRef.current !== null) {
+        window.clearTimeout(setupCopyResetTimeoutRef.current);
       }
 
-      copyResetTimeoutRef.current = window.setTimeout(() => {
+      setupCopyResetTimeoutRef.current = window.setTimeout(() => {
         setDidCopySetupKey(false);
       }, 1600);
     } catch {
       setErrorMessage("Could not copy setup key. Copy it manually.");
+    }
+  };
+
+  const handleCopyBackupCodes = async () => {
+    if (!backupCodesToDisplay?.length) return;
+
+    try {
+      await navigator.clipboard.writeText(backupCodesToDisplay.join("\n"));
+      setDidCopyBackupCodes(true);
+
+      if (backupCopyResetTimeoutRef.current !== null) {
+        window.clearTimeout(backupCopyResetTimeoutRef.current);
+      }
+
+      backupCopyResetTimeoutRef.current = window.setTimeout(() => {
+        setDidCopyBackupCodes(false);
+      }, 1600);
+    } catch {
+      setErrorMessage("Could not copy backup codes. Copy them manually.");
     }
   };
 
@@ -322,7 +348,7 @@ export const TwoFactorPanel = () => {
             </div>
 
             <div className="mx-auto grid w-full max-w-4xl gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
-              <div className="mx-auto w-full max-w-[200px] rounded-2xl border border-border/70 bg-white p-4 shadow-sm">
+              <div className="mx-auto w-full max-w-[200px] border border-border/70 bg-white p-4 mt-1 shadow-sm">
                 <QRCode
                   bgColor="#FFFFFF"
                   fgColor="#111111"
@@ -355,6 +381,7 @@ export const TwoFactorPanel = () => {
                         type="button"
                         variant="outline"
                       >
+                        <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
                         {didCopySetupKey ? "Copied" : "Copy"}
                       </InputGroupButton>
                     </InputGroupAddon>
@@ -546,9 +573,21 @@ export const TwoFactorPanel = () => {
 
         {backupCodesToDisplay?.length ? (
           <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/10 p-4">
-            <p className="text-sm font-medium">
-              Backup codes (save these somewhere safe)
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">
+                Backup codes (save these somewhere safe)
+              </p>
+              <Button
+                className="min-w-24"
+                onClick={() => void handleCopyBackupCodes()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
+                {didCopyBackupCodes ? "Copied" : "Copy codes"}
+              </Button>
+            </div>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {backupCodesToDisplay.map(code => (
                 <code
