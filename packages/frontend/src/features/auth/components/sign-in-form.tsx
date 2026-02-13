@@ -13,6 +13,7 @@ import { useSignInMutation } from "@/features/auth/hooks/use-auth-mutations";
 
 type SignInFormProps = {
   onSuccess?: () => Promise<void> | void;
+  onTwoFactorRequired?: () => Promise<void> | void;
 };
 
 const signInSchema = z.object({
@@ -20,7 +21,10 @@ const signInSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const SignInForm = ({ onSuccess }: SignInFormProps) => {
+export const SignInForm = ({
+  onSuccess,
+  onTwoFactorRequired,
+}: SignInFormProps) => {
   const mutation = useSignInMutation();
 
   const form = useForm({
@@ -32,7 +36,11 @@ export const SignInForm = ({ onSuccess }: SignInFormProps) => {
       onSubmit: signInSchema,
     },
     onSubmit: async ({ value }) => {
-      await mutation.mutateAsync(value);
+      const result = await mutation.mutateAsync(value);
+      if (result.requiresTwoFactor) {
+        await onTwoFactorRequired?.();
+        return;
+      }
       await onSuccess?.();
     },
   });

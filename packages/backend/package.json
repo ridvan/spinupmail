@@ -8,7 +8,7 @@
     "cf-typegen": "pnpm exec wrangler types --env-interface CloudflareBindings",
     "auth:generate": "npx --yes @better-auth/cli@latest generate --config src/auth/cli.ts --output src/db/auth.schema.ts -y",
     "auth:format": "npx --yes prettier --write src/db/auth.schema.ts",
-    "auth:update": "npm run auth:generate && npm run auth:format",
+    "auth:update": "pnpm run auth:generate && pnpm run auth:format",
     "db:generate": "drizzle-kit generate",
     "db:migrate:dev": "pnpm exec wrangler d1 migrations apply SUM_DB --local",
     "db:migrate:prod": "pnpm exec wrangler d1 migrations apply SUM_DB --remote",

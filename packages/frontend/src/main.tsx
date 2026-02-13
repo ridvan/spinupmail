@@ -13,6 +13,7 @@ import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { AddressManagementPage } from "@/pages/address-management-page";
 import { HomePage } from "@/pages/home-page";
 import { LoginPage } from "@/pages/login-page";
+import { LoginTwoFactorPage } from "@/pages/login-two-factor-page";
 import { MailboxPage } from "@/pages/mailbox-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { ProtectedLayoutPage } from "@/pages/protected-layout-page";
@@ -55,6 +56,14 @@ const routes: RouteObject[] = [
     element: <SignupPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Sign up" },
+  },
+  {
+    path: "/login/2fa",
+    loader: redirectIfAuthenticatedLoader,
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <LoginTwoFactorPage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Two-factor verification" },
   },
   {
     path: "/",

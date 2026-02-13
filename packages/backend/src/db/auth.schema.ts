@@ -17,6 +17,9 @@ export const users = sqliteTable("users", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   isAnonymous: integer("is_anonymous", { mode: "boolean" }).default(false),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" })
+    .default(false)
+    .notNull(),
 });
 
 export const sessions = sqliteTable(
@@ -135,10 +138,34 @@ export const apikeys = sqliteTable(
   table => [index("apikeys_userId_idx").on(table.userId)]
 );
 
+export const twoFactors = sqliteTable(
+  "twoFactors",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  table => [
+    index("twoFactors_secret_idx").on(table.secret),
+    index("twoFactors_userId_idx").on(table.userId),
+  ]
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
   apikeys: many(apikeys),
+  twoFactors: many(twoFactors),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -158,6 +185,13 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const apikeysRelations = relations(apikeys, ({ one }) => ({
   users: one(users, {
     fields: [apikeys.userId],
+    references: [users.id],
+  }),
+}));
+
+export const twoFactorsRelations = relations(twoFactors, ({ one }) => ({
+  users: one(users, {
+    fields: [twoFactors.userId],
     references: [users.id],
   }),
 }));

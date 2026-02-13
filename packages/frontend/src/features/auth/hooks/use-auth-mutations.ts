@@ -17,8 +17,13 @@ export const useSignInMutation = () => {
         throw new Error(result.error.message || "Sign in failed");
       }
 
+      const signInData = result.data as { twoFactorRedirect?: boolean } | null;
+      if (signInData?.twoFactorRedirect) {
+        return { requiresTwoFactor: true };
+      }
+
       await authClient.getSession();
-      return result.data;
+      return { requiresTwoFactor: false };
     },
   });
 };

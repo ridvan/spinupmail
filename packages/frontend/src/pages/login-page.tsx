@@ -23,6 +23,10 @@ export const LoginPage = () => {
     nextPath === "/"
       ? "/signup"
       : `/signup?next=${encodeURIComponent(nextPath)}`;
+  const twoFactorHref =
+    nextPath === "/"
+      ? "/login/2fa"
+      : `/login/2fa?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <AuthShell
@@ -32,7 +36,10 @@ export const LoginPage = () => {
       subtitle="Access your inbox workspace with your email and password."
       title="Sign in"
     >
-      <SignInForm onSuccess={() => navigate(nextPath, { replace: true })} />
+      <SignInForm
+        onSuccess={() => navigate(nextPath, { replace: true })}
+        onTwoFactorRequired={() => navigate(twoFactorHref, { replace: true })}
+      />
     </AuthShell>
   );
 };

@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "better-auth/plugins";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../db";
@@ -97,6 +98,7 @@ function createAuth(
         kv: env?.SUM_KV,
       },
       {
+        appName: "Spinupmail",
         trustedOrigins:
           trustedOrigins && trustedOrigins.length > 0
             ? trustedOrigins
@@ -119,6 +121,9 @@ function createAuth(
             enableSessionForAPIKeys: true,
             apiKeyHeaders: ["x-api-key"],
             defaultPrefix: "spin_",
+          }),
+          twoFactor({
+            issuer: "Spinupmail",
           }),
         ],
         rateLimit: {

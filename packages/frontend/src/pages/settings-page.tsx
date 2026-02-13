@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiKeysPanel } from "@/features/settings/components/api-keys-panel";
+import { TwoFactorPanel } from "@/features/settings/components/two-factor-panel";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 
 export const SettingsPage = () => {
@@ -34,6 +35,8 @@ export const SettingsPage = () => {
           </p>
         </CardContent>
       </Card>
+
+      <TwoFactorPanel />
 
       <ApiKeysPanel />
     </div>
