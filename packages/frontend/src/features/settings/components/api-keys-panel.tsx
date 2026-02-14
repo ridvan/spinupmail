@@ -157,7 +157,7 @@ export const ApiKeysPanel = () => {
                 <TableRow key={item.id}>
                   <TableCell>{item.name || "Untitled"}</TableCell>
                   <TableCell className="font-mono text-xs">
-                    {(item.prefix ?? "") + (item.start ?? "")}
+                    {item.start ?? ""}
                     {item.prefix || item.start ? "..." : "-"}
                   </TableCell>
                   <TableCell>{formatDate(item.createdAt)}</TableCell>

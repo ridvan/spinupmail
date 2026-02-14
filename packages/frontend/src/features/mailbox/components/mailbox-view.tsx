@@ -214,8 +214,8 @@ export const MailboxView = ({
               />
               <p className="text-sm text-muted-foreground">
                 {selectedAddressId
-                  ? "No emails received yet"
-                  : "Select an address to view emails"}
+                  ? "No emails received yet. Send an email to this address to test things out!"
+                  : "Select an address to view its emails."}
               </p>
             </div>
           ) : (
@@ -275,7 +275,7 @@ export const MailboxView = ({
             />
             <div>
               <p className="text-sm font-medium text-muted-foreground">
-                No message selected
+                No email selected
               </p>
               <p className="text-xs text-muted-foreground/70">
                 Choose a message from the list to preview

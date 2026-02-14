@@ -1,5 +1,9 @@
 export const queryKeys = {
   organizationStats: ["app", "organization-stats"] as const,
+  emailActivity: (organizationId: string | null) =>
+    ["app", "organizations", organizationId, "email-activity"] as const,
+  emailSummary: (organizationId: string | null) =>
+    ["app", "organizations", organizationId, "email-summary"] as const,
   addresses: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses"] as const,
   domains: (organizationId: string | null) =>

@@ -190,6 +190,47 @@ export const listOrganizationStats = async (options?: {
   return data.items;
 };
 
+export type EmailActivityDay = {
+  date: string;
+  count: number;
+};
+
+export const listEmailActivity = async (options?: {
+  days?: number;
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.days) query.set("days", String(options.days));
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const data = await apiFetch<{ daily: EmailActivityDay[] }>(
+    `/api/organizations/stats/email-activity${suffix}`,
+    { signal: options?.signal },
+    options?.organizationId
+  );
+  return data.daily;
+};
+
+export type EmailSummary = {
+  totalEmailCount: number;
+  attachmentCount: number;
+  attachmentSizeTotal: number;
+  topDomains: { domain: string; count: number }[];
+  busiestInboxes: { address: string; count: number }[];
+  dormantInboxes: { address: string; createdAt: string | null }[];
+};
+
+export const getEmailSummary = async (options?: {
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
+  return apiFetch<EmailSummary>(
+    "/api/organizations/stats/email-summary",
+    { signal: options?.signal },
+    options?.organizationId
+  );
+};
+
 export const createEmailAddress = async (
   payload: {
     localPart?: string;

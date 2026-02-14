@@ -8,8 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatCard } from "@/features/dashboard/components/stat-card";
-import { useDashboardStats } from "@/features/dashboard/hooks/use-dashboard-stats";
+import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
+import { EmailStatsCard } from "@/features/dashboard/components/email-stats-card";
+import { ReceivedEmailsChart } from "@/features/dashboard/components/received-emails-chart";
+import { InboxGrowthChart } from "@/features/dashboard/components/inbox-growth-chart";
 
 const formatDate = (value: string | null) => {
   if (!value) return "Never";
@@ -21,26 +23,21 @@ const formatDate = (value: string | null) => {
 };
 
 export const HomePage = () => {
-  const { stats, addressesQuery, apiKeysQuery } = useDashboardStats();
+  const addressesQuery = useAddressesQuery();
   const recentAddresses = (addressesQuery.data ?? []).slice(0, 8);
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map(item => (
-          <StatCard key={item.label} stat={item} />
-        ))}
+      <section className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+        <ReceivedEmailsChart />
+        <InboxGrowthChart />
+        <EmailStatsCard />
       </section>
 
       <Card className="border-border/70 bg-card/60">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             Recent Address Activity
-            {apiKeysQuery.data ? (
-              <Badge variant="secondary">
-                {apiKeysQuery.data.length} API keys
-              </Badge>
-            ) : null}
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -102,7 +102,7 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => navigateIfNeeded("/")} size="lg">
               <img
-                src="/logo.png"
+                src="/logo-transparent.png"
                 alt="SpinupMail"
                 className="size-8 shrink-0 rounded-lg object-contain"
               />

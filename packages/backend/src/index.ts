@@ -914,6 +914,9 @@ app.all("/api/auth/*", async c => {
 
 app.use("/api/domains", requireAuth);
 app.use("/api/organizations/stats", requireAuth);
+app.use("/api/organizations/stats/*", requireAuth);
+app.use("/api/organizations/stats/email-activity", requireOrganizationScope);
+app.use("/api/organizations/stats/email-summary", requireOrganizationScope);
 app.use("/api/email-addresses", requireAuth);
 app.use("/api/email-addresses/*", requireAuth);
 app.use("/api/emails", requireAuth);
@@ -1012,6 +1015,155 @@ app.get("/api/organizations/stats", async c => {
   return c.json({ items }, 200, {
     "Cache-Control": "private, max-age=60",
   });
+});
+
+app.get("/api/organizations/stats/email-activity", async c => {
+  const organizationId = c.get("organizationId");
+  const query = new URL(c.req.url).searchParams;
+  const days = clampNumber(query.get("days"), 1, 30, 14);
+
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - (days - 1));
+  cutoff.setUTCHours(0, 0, 0, 0);
+
+  const db = getDb(c.env);
+  const dailyRows = await db
+    .select({
+      date: sql<string>`date(${emails.receivedAt} / 1000, 'unixepoch')`,
+      count: sql<number>`count(*)`,
+    })
+    .from(emails)
+    .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
+    .where(
+      and(
+        eq(emailAddresses.organizationId, organizationId),
+        gte(emails.receivedAt, cutoff)
+      )
+    )
+    .groupBy(sql`date(${emails.receivedAt} / 1000, 'unixepoch')`)
+    .orderBy(asc(sql`date(${emails.receivedAt} / 1000, 'unixepoch')`));
+
+  const countsMap = new Map<string, number>();
+  for (const row of dailyRows) {
+    countsMap.set(row.date, Number(row.count) || 0);
+  }
+
+  const daily: { date: string; count: number }[] = [];
+  const cursor = new Date(cutoff);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  while (cursor <= today) {
+    const dateKey = cursor.toISOString().slice(0, 10);
+    daily.push({ date: dateKey, count: countsMap.get(dateKey) ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return c.json({ daily }, 200, {
+    "Cache-Control": "private, max-age=60",
+  });
+});
+
+app.get("/api/organizations/stats/email-summary", async c => {
+  const organizationId = c.get("organizationId");
+  const db = getDb(c.env);
+
+  const senderDomainExpr = sql<string>`lower(trim(replace(substr(${emails.from}, instr(${emails.from}, '@') + 1), '>', '')))`;
+
+  const [
+    emailCountRow,
+    attachmentStatsRows,
+    topDomainsRows,
+    busiestInboxesRows,
+    dormantInboxesRows,
+  ] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(emails)
+      .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
+      .where(eq(emailAddresses.organizationId, organizationId)),
+    db
+      .select({
+        attachmentCount: sql<number>`count(*)`,
+        attachmentSizeTotal: sql<number>`coalesce(sum(${emailAttachments.size}), 0)`,
+      })
+      .from(emailAttachments)
+      .where(eq(emailAttachments.organizationId, organizationId)),
+    db
+      .select({
+        domain: senderDomainExpr,
+        count: sql<number>`count(*)`,
+      })
+      .from(emails)
+      .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
+      .where(eq(emailAddresses.organizationId, organizationId))
+      .groupBy(senderDomainExpr)
+      .orderBy(desc(sql`count(*)`))
+      .limit(3),
+    db
+      .select({
+        address: emailAddresses.address,
+        count: sql<number>`count(*)`,
+      })
+      .from(emails)
+      .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
+      .where(eq(emailAddresses.organizationId, organizationId))
+      .groupBy(emails.addressId, emailAddresses.address)
+      .orderBy(desc(sql`count(*)`))
+      .limit(3),
+    db
+      .select({
+        address: emailAddresses.address,
+        createdAt: emailAddresses.createdAt,
+      })
+      .from(emailAddresses)
+      .where(
+        and(
+          eq(emailAddresses.organizationId, organizationId),
+          sql`${emailAddresses.lastReceivedAt} is null`
+        )
+      )
+      .orderBy(asc(emailAddresses.createdAt)),
+  ]);
+
+  const totalEmailCount = Number(emailCountRow[0]?.count ?? 0) || 0;
+  const attachmentCount =
+    Number(attachmentStatsRows[0]?.attachmentCount ?? 0) || 0;
+  const attachmentSizeTotal =
+    Number(attachmentStatsRows[0]?.attachmentSizeTotal ?? 0) || 0;
+  const topDomains = topDomainsRows
+    .filter(row => row.domain && String(row.domain).length > 0)
+    .map(row => ({
+      domain: String(row.domain),
+      count: Number(row.count) || 0,
+    }));
+
+  const busiestInboxes = busiestInboxesRows.map(row => ({
+    address: String(row.address ?? ""),
+    count: Number(row.count) || 0,
+  }));
+
+  const dormantInboxes = dormantInboxesRows.map(row => ({
+    address: String(row.address ?? ""),
+    createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+  }));
+
+  return c.json(
+    {
+      totalEmailCount,
+      attachmentCount,
+      attachmentSizeTotal,
+      topDomains,
+      busiestInboxes,
+      dormantInboxes,
+    },
+    200,
+    {
+      "Cache-Control": "private, max-age=60",
+    }
+  );
 });
 
 app.get("/api/domains", async c => {
