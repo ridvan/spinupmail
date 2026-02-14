@@ -121,6 +121,16 @@ const routes: RouteObject[] = [
         handle: { title: "Mailbox" },
       },
       {
+        path: "mailbox/:addressId",
+        element: <MailboxPage />,
+        handle: { title: "Address List" },
+      },
+      {
+        path: "mailbox/:addressId/:mailId",
+        element: <MailboxPage />,
+        handle: { title: "View Email" },
+      },
+      {
         path: "addresses",
         element: <AddressManagementPage />,
         handle: { title: "Address Management" },

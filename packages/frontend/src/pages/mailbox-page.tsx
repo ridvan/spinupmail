@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useNavigate, useParams } from "react-router";
 import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -8,20 +9,22 @@ import {
   useMailboxEmailsQuery,
 } from "@/features/mailbox/hooks/use-mailbox";
 
+const buildMailboxPath = (addressId: string | null, mailId?: string | null) => {
+  if (!addressId) return "/mailbox";
+  if (!mailId) return `/mailbox/${addressId}`;
+  return `/mailbox/${addressId}/${mailId}`;
+};
+
 export const MailboxPage = () => {
+  const navigate = useNavigate();
+  const params = useParams<{ addressId?: string; mailId?: string }>();
+  const routeAddressId = params.addressId ?? null;
+  const routeMailId = params.mailId ?? null;
   const { activeOrganizationId } = useAuth();
   const addressesQuery = useAddressesQuery();
-  const [selectedAddressId, setSelectedAddressId] = useLocalStorage<
+  const [preferredAddressId, setPreferredAddressId] = useLocalStorage<
     string | null
   >(`mailbox:address:${activeOrganizationId ?? "none"}`, null);
-  const [selectedEmailId, setSelectedEmailId] = React.useState<string | null>(
-    null
-  );
-
-  // Reset email selection on org change (address is restored from localStorage)
-  React.useEffect(() => {
-    setSelectedEmailId(null);
-  }, [activeOrganizationId]);
 
   const currentAddresses = React.useMemo(
     () => addressesQuery.data ?? [],
@@ -31,28 +34,27 @@ export const MailboxPage = () => {
     () => new Set(currentAddresses.map(address => address.id)),
     [currentAddresses]
   );
-  const resolvedSelectedAddressId =
-    selectedAddressId && currentAddressIds.has(selectedAddressId)
-      ? selectedAddressId
-      : null;
+  const resolvedSelectedAddressId = React.useMemo(() => {
+    if (routeAddressId && currentAddressIds.has(routeAddressId)) {
+      return routeAddressId;
+    }
+
+    if (preferredAddressId && currentAddressIds.has(preferredAddressId)) {
+      return preferredAddressId;
+    }
+
+    return currentAddresses[0]?.id ?? null;
+  }, [routeAddressId, preferredAddressId, currentAddresses, currentAddressIds]);
 
   React.useEffect(() => {
-    if (currentAddresses.length === 0) {
-      setSelectedAddressId(null);
-      return;
-    }
-
-    const hasSelected = Boolean(
-      selectedAddressId && currentAddressIds.has(selectedAddressId)
-    );
-    if (!hasSelected) {
-      setSelectedAddressId(currentAddresses[0]?.id ?? null);
-    }
+    if (addressesQuery.isLoading) return;
+    if (preferredAddressId === resolvedSelectedAddressId) return;
+    setPreferredAddressId(resolvedSelectedAddressId);
   }, [
-    currentAddresses,
-    currentAddressIds,
-    selectedAddressId,
-    setSelectedAddressId,
+    addressesQuery.isLoading,
+    preferredAddressId,
+    resolvedSelectedAddressId,
+    setPreferredAddressId,
   ]);
 
   const emailsQuery = useMailboxEmailsQuery(resolvedSelectedAddressId);
@@ -65,11 +67,47 @@ export const MailboxPage = () => {
     [currentEmails]
   );
   const resolvedSelectedEmailId = React.useMemo(() => {
-    if (selectedEmailId && currentEmailIds.has(selectedEmailId)) {
-      return selectedEmailId;
+    if (routeMailId && currentEmailIds.has(routeMailId)) {
+      return routeMailId;
     }
+
     return currentEmails[0]?.id ?? null;
-  }, [selectedEmailId, currentEmailIds, currentEmails]);
+  }, [routeMailId, currentEmailIds, currentEmails]);
+
+  const currentMailboxPath = React.useMemo(
+    () => buildMailboxPath(routeAddressId, routeMailId),
+    [routeAddressId, routeMailId]
+  );
+
+  React.useEffect(() => {
+    if (addressesQuery.isLoading) return;
+
+    if (!resolvedSelectedAddressId) {
+      if (currentMailboxPath !== "/mailbox") {
+        void navigate("/mailbox", { replace: true });
+      }
+      return;
+    }
+
+    if (routeMailId && emailsQuery.isLoading) return;
+
+    const nextPath = buildMailboxPath(
+      resolvedSelectedAddressId,
+      resolvedSelectedEmailId
+    );
+    if (nextPath !== currentMailboxPath) {
+      void navigate(nextPath, { replace: true });
+    }
+  }, [
+    addressesQuery.isLoading,
+    currentMailboxPath,
+    emailsQuery.isLoading,
+    navigate,
+    resolvedSelectedAddressId,
+    resolvedSelectedEmailId,
+    routeMailId,
+  ]);
+
   const emailDetailQuery = useMailboxEmailDetailQuery(resolvedSelectedEmailId);
 
   return (
@@ -98,10 +136,19 @@ export const MailboxPage = () => {
         previewEmail={emailDetailQuery.data ?? null}
         previewEmailLoading={emailDetailQuery.isLoading}
         onSelectAddress={addressId => {
-          setSelectedAddressId(addressId);
-          setSelectedEmailId(null);
+          setPreferredAddressId(addressId);
+          const nextPath = buildMailboxPath(addressId);
+          if (nextPath !== currentMailboxPath) {
+            void navigate(nextPath);
+          }
         }}
-        onSelectEmail={setSelectedEmailId}
+        onSelectEmail={emailId => {
+          if (!resolvedSelectedAddressId) return;
+          const nextPath = buildMailboxPath(resolvedSelectedAddressId, emailId);
+          if (nextPath !== currentMailboxPath) {
+            void navigate(nextPath);
+          }
+        }}
         selectedAddressId={resolvedSelectedAddressId}
         selectedEmailId={resolvedSelectedEmailId}
       />
