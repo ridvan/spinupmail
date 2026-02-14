@@ -913,17 +913,12 @@ app.all("/api/auth/*", async c => {
 });
 
 app.use("/api/domains", requireAuth);
-app.use("/api/organizations/stats", requireAuth);
 app.use("/api/organizations/stats/*", requireAuth);
 app.use("/api/organizations/stats/email-activity", requireOrganizationScope);
 app.use("/api/organizations/stats/email-summary", requireOrganizationScope);
-app.use("/api/email-addresses", requireAuth);
 app.use("/api/email-addresses/*", requireAuth);
-app.use("/api/emails", requireAuth);
 app.use("/api/emails/*", requireAuth);
-app.use("/api/email-addresses", requireOrganizationScope);
 app.use("/api/email-addresses/*", requireOrganizationScope);
-app.use("/api/emails", requireOrganizationScope);
 app.use("/api/emails/*", requireOrganizationScope);
 
 app.get("/api/organizations/stats", async c => {
