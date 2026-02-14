@@ -89,7 +89,7 @@ export const MailboxPage = () => {
       return;
     }
 
-    if (routeMailId && emailsQuery.isLoading) return;
+    if (!routeMailId && emailsQuery.isLoading) return;
 
     const nextPath = buildMailboxPath(
       resolvedSelectedAddressId,
