@@ -13,6 +13,7 @@ type AuthContextValue = {
   activeOrganizationId: string | null;
   isAuthenticated: boolean;
   hasActiveOrganization: boolean;
+  isSigningOut: boolean;
   isOrganizationSwitching: boolean;
   isLoading: boolean;
   isRefetching: boolean;
@@ -28,6 +29,7 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { data, isPending, isRefetching, refetch } = authClient.useSession();
   const queryClient = useQueryClient();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [isOrganizationSwitching, setIsOrganizationSwitching] =
     React.useState(false);
   const [pendingOrganizationId, setPendingOrganizationId] = React.useState<
@@ -36,8 +38,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const sessionActiveOrganizationId =
     (data?.session as { activeOrganizationId?: string | null } | undefined)
       ?.activeOrganizationId ?? null;
-  const activeOrganizationId =
-    pendingOrganizationId ?? sessionActiveOrganizationId;
+  const activeOrganizationId = isSigningOut
+    ? null
+    : (pendingOrganizationId ?? sessionActiveOrganizationId);
 
   React.useEffect(() => {
     if (!sessionActiveOrganizationId) return;
@@ -59,22 +62,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refetch]);
 
   const signOut = React.useCallback(async () => {
-    await queryClient.cancelQueries({ queryKey: ["app"] });
+    setIsSigningOut(true);
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ["app"] }),
+      queryClient.cancelQueries({ queryKey: ["auth"] }),
+    ]);
 
-    const result = await authClient.signOut();
+    try {
+      const result = await authClient.signOut();
 
-    if (result.error) {
-      throw new Error(result.error.message || "Unable to sign out");
+      if (result.error) {
+        throw new Error(result.error.message || "Unable to sign out");
+      }
+
+      setPendingOrganizationId(null);
+      setIsOrganizationSwitching(false);
+      clearLastActiveOrganizationId();
+      queryClient.removeQueries({ queryKey: ["app"] });
+      queryClient.removeQueries({ queryKey: ["auth"] });
+      await refetch({
+        query: {
+          disableCookieCache: true,
+        },
+      });
+    } finally {
+      setIsSigningOut(false);
     }
-
-    setPendingOrganizationId(null);
-    setIsOrganizationSwitching(false);
-    clearLastActiveOrganizationId();
-    await refetch({
-      query: {
-        disableCookieCache: true,
-      },
-    });
   }, [queryClient, refetch]);
 
   const beginOrganizationSwitch = React.useCallback(
@@ -108,8 +121,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       session: data ?? null,
       user: data?.user ?? null,
       activeOrganizationId,
-      isAuthenticated: Boolean(data?.user),
+      isAuthenticated: Boolean(data?.user) && !isSigningOut,
       hasActiveOrganization: Boolean(activeOrganizationId),
+      isSigningOut,
       isOrganizationSwitching,
       isLoading: isPending,
       isRefetching,
@@ -122,6 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [
       data,
       activeOrganizationId,
+      isSigningOut,
       isOrganizationSwitching,
       isPending,
       isRefetching,
