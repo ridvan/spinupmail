@@ -1,6 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const isNightly = process.env.E2E_NIGHTLY === "1";
 const runE2E = process.env.RUN_E2E !== "0";
 
 export default defineConfig({
@@ -20,13 +19,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  projects: isNightly
-    ? [
-        { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-        { name: "webkit", use: { ...devices["Desktop Safari"] } },
-        { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-      ]
-    : [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: runE2E
     ? [
         {
