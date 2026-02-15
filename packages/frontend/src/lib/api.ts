@@ -313,6 +313,19 @@ export const getEmail = async (
   );
 };
 
+export const deleteEmail = async (
+  emailId: string,
+  options?: { organizationId?: string | null }
+) => {
+  return apiFetch<{ id: string; deleted: boolean }>(
+    `/api/emails/${encodeURIComponent(emailId)}`,
+    {
+      method: "DELETE",
+    },
+    options?.organizationId
+  );
+};
+
 export const downloadEmailAttachment = async (params: {
   emailId: string;
   attachmentId: string;

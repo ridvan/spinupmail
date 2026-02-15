@@ -1,9 +1,20 @@
 import * as React from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
 import {
   downloadEmailAttachment,
   type EmailAttachment,
@@ -37,6 +48,10 @@ export const EmailPreview = ({
 }: EmailPreviewProps) => {
   const { theme } = useTheme();
   const { activeOrganizationId } = useAuth();
+  const deleteMutation = useDeleteEmailMutation(email?.addressId ?? null);
+  const [pendingDeleteEmailId, setPendingDeleteEmailId] = React.useState<
+    string | null
+  >(null);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = React.useState<
     string | null
   >(null);
@@ -88,17 +103,36 @@ export const EmailPreview = ({
     }
   };
   const attachments = email.attachments ?? [];
+  const handleDeleteEmail = async () => {
+    try {
+      await deleteMutation.mutateAsync(email.id);
+      setPendingDeleteEmailId(null);
+    } catch {
+      // Error shown from mutation state.
+    }
+  };
 
   return (
     <div className="space-y-3">
-      <div>
-        <p className="text-base font-semibold">
-          {email.subject || "No subject"}
-        </p>
-        <p className="text-xs text-muted-foreground">From {email.from}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatDate(email.receivedAt)}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">
+            {email.subject || "No subject"}
+          </p>
+          <p className="text-xs text-muted-foreground">From {email.from}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatDate(email.receivedAt)}
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
+          disabled={deleteMutation.isPending}
+          onClick={() => setPendingDeleteEmailId(email.id)}
+        >
+          Delete email
+        </Button>
       </div>
       <Separator />
 
@@ -179,6 +213,45 @@ export const EmailPreview = ({
           ) : null}
         </div>
       ) : null}
+
+      {deleteMutation.error ? (
+        <p className="text-xs text-destructive">
+          {deleteMutation.error.message}
+        </p>
+      ) : null}
+
+      <AlertDialog
+        open={pendingDeleteEmailId === email.id}
+        onOpenChange={isOpen => {
+          if (deleteMutation.isPending) return;
+          setPendingDeleteEmailId(isOpen ? email.id : null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this message and all of its
+              attachments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={event => {
+                event.preventDefault();
+                void handleDeleteEmail();
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete email"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

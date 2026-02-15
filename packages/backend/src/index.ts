@@ -1590,6 +1590,80 @@ app.get("/api/emails", async c => {
   );
 });
 
+app.delete("/api/emails/:id", async c => {
+  const organizationId = c.get("organizationId");
+  const emailId = c.req.param("id");
+  const db = getDb(c.env);
+
+  const emailRow = await db
+    .select({
+      id: emails.id,
+      addressId: emails.addressId,
+    })
+    .from(emails)
+    .innerJoin(
+      emailAddresses,
+      and(
+        eq(emailAddresses.id, emails.addressId),
+        eq(emailAddresses.organizationId, organizationId)
+      )
+    )
+    .where(eq(emails.id, emailId))
+    .get();
+
+  if (!emailRow) {
+    c.status(404);
+    return c.json({ error: "email not found" });
+  }
+
+  const attachmentRows = await db
+    .select({ r2Key: emailAttachments.r2Key })
+    .from(emailAttachments)
+    .where(
+      and(
+        eq(emailAttachments.emailId, emailRow.id),
+        eq(emailAttachments.organizationId, organizationId)
+      )
+    );
+
+  if (c.env.R2_BUCKET) {
+    const r2Keys = [
+      ...attachmentRows.map(row => row.r2Key),
+      getRawEmailR2Key({
+        organizationId,
+        addressId: emailRow.addressId,
+        emailId: emailRow.id,
+      }),
+    ];
+
+    try {
+      for (const batch of chunkArray(r2Keys, 1000)) {
+        await c.env.R2_BUCKET.delete(batch);
+      }
+    } catch (error) {
+      console.error("[email] Failed to delete email files from R2", {
+        organizationId,
+        emailId: emailRow.id,
+        error,
+      });
+      c.status(500);
+      return c.json({ error: "failed to clean up email files" });
+    }
+  }
+
+  await db
+    .delete(emails)
+    .where(
+      and(eq(emails.id, emailRow.id), eq(emails.addressId, emailRow.addressId))
+    )
+    .run();
+
+  return c.json({
+    id: emailRow.id,
+    deleted: true,
+  });
+});
+
 app.get("/api/emails/:id", async c => {
   const organizationId = c.get("organizationId");
   const emailId = c.req.param("id");

@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { getEmail, listEmails } from "@/lib/api";
+import { deleteEmail, getEmail, listEmails } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 export const useMailboxEmailsQuery = (addressId: string | null) => {
@@ -44,5 +44,36 @@ export const useMailboxEmailDetailQuery = (emailId: string | null) => {
       activeOrganizationId && emailId && !isOrganizationSwitching
     ),
     staleTime: 10_000,
+  });
+};
+
+export const useDeleteEmailMutation = (addressId: string | null) => {
+  const queryClient = useQueryClient();
+  const { activeOrganizationId } = useAuth();
+
+  return useMutation({
+    mutationFn: (emailId: string) =>
+      deleteEmail(emailId, {
+        organizationId: activeOrganizationId,
+      }),
+    onSuccess: async (_result, emailId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.emails(activeOrganizationId, addressId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.organizationStats,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.emailActivity(activeOrganizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.emailSummary(activeOrganizationId),
+        }),
+        queryClient.removeQueries({
+          queryKey: queryKeys.emailDetail(activeOrganizationId, emailId),
+        }),
+      ]);
+    },
   });
 };
