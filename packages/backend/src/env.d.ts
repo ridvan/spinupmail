@@ -5,11 +5,6 @@ declare global {
     EMAIL_STORE_RAW_IN_DB?: string;
     EMAIL_STORE_RAW_IN_R2?: string;
   }
-
-  namespace NodeJS {
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    interface ProcessEnv extends Partial<CloudflareBindings> {}
-  }
 }
 
 export {};
