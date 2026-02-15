@@ -50,6 +50,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 4.20260207.0
         version: 4.20260207.0
+      '@hono/zod-validator':
+        specifier: ^0.7.5
+        version: 0.7.6(hono@4.11.8)(zod@4.3.6)
       better-auth:
         specifier: ^1.4.18
         version: 1.4.18(drizzle-kit@0.31.8)(drizzle-orm@0.44.7(@cloudflare/workers-types@4.20260207.0)(kysely@0.28.11))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -71,6 +74,9 @@ importers:
       sanitize-html:
         specifier: ^2.17.0
         version: 2.17.0
+      zod:
+        specifier: ^4.1.5
+        version: 4.3.6
     devDependencies:
       '@types/node':
         specifier: ^22.15.30
@@ -984,6 +990,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/zod-validator@0.7.6':
+    resolution: {integrity: sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      zod: ^3.25.0 || ^4.0.0
 
   '@hugeicons/core-free-icons@3.1.1':
     resolution: {integrity: sha512-UpS2lUQFi5sKyJSWwM6rO+BnPLvVz1gsyCpPHeZyVuZqi89YH8ksliza4cwaODqKOZyeXmG8juo1ty4QtQofkg==}
@@ -5101,6 +5113,11 @@ snapshots:
   '@hono/node-server@1.19.9(hono@4.11.8)':
     dependencies:
       hono: 4.11.8
+
+  '@hono/zod-validator@0.7.6(hono@4.11.8)(zod@4.3.6)':
+    dependencies:
+      hono: 4.11.8
+      zod: 4.3.6
 
   '@hugeicons/core-free-icons@3.1.1': {}
 

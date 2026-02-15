@@ -1,0 +1,41 @@
+export const normalizeDomain = (value: string) =>
+  value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
+
+export const getAllowedOrigins = (env: CloudflareBindings) => {
+  const configured = env.CORS_ORIGIN?.split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+  if (configured && configured.length > 0) return configured;
+  return ["http://localhost:5173", "http://127.0.0.1:5173"];
+};
+
+export const getAllowedDomains = (env: CloudflareBindings) => {
+  const rawList =
+    env.EMAIL_DOMAINS?.split(",")
+      .map(domain => normalizeDomain(domain))
+      .filter(Boolean) ?? [];
+  const fallbackDomain = env.EMAIL_DOMAIN
+    ? normalizeDomain(env.EMAIL_DOMAIN)
+    : undefined;
+  const fallback = fallbackDomain ? [fallbackDomain] : [];
+  const combined = [...rawList, ...fallback];
+  return Array.from(new Set(combined));
+};
+
+export const parsePositiveNumber = (value: string | null | undefined) => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+};
+
+export const parseBooleanEnv = (
+  value: string | null | undefined,
+  fallback = false
+) => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+};

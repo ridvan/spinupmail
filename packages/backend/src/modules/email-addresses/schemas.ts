@@ -1,0 +1,16 @@
+import { z } from "zod";
+
+export const createEmailAddressBodySchema = z
+  .object({
+    localPart: z.string().optional(),
+    tag: z.string().optional(),
+    ttlMinutes: z.number().optional(),
+    meta: z.unknown().optional(),
+    domain: z.string().optional(),
+    allowedFromDomains: z.union([z.array(z.string()), z.string()]).optional(),
+  })
+  .passthrough();
+
+export type CreateEmailAddressBody = z.infer<
+  typeof createEmailAddressBodySchema
+>;

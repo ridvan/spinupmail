@@ -26,6 +26,20 @@ frontend.
 - `packages/backend` — Cloudflare Worker (Hono + Better Auth + D1 + KV + R2)
 - `packages/frontend` — React + shadcn UI (Vite)
 
+### Backend Source Structure
+
+- `packages/backend/src/index.ts` — Worker entrypoint and API composition
+- `packages/backend/src/app/` — app types and shared middleware
+- `packages/backend/src/modules/` — domain modules (`auth-http`, `domains`, `organizations`, `email-addresses`, `emails`, `inbound-email`)
+- `packages/backend/src/shared/` — shared constants, helpers, validation, and utilities
+- `packages/backend/src/platform/` — platform integrations (auth runtime and DB client)
+
+### Backend Import Style
+
+- Backend TypeScript uses path aliases with `@/*` mapped to `packages/backend/src/*`.
+- Prefer `@/shared/...`, `@/modules/...`, `@/platform/...`, and `@/app/...` for cross-folder imports.
+- Keep `./...` imports for files in the same folder.
+
 ## 1. Install Dependencies
 
 From the repo root:
