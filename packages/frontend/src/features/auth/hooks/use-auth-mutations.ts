@@ -6,6 +6,12 @@ import {
 import { authClient } from "@/lib/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+const safeNextPath = (value: string | null) => {
+  if (!value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//")) return "/";
+  return value;
+};
 
 const getAuthErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error !== "object" || !error) return fallback;
@@ -48,6 +54,18 @@ const getSignUpCallbackURL = () => {
     loginUrl.searchParams.set("next", next);
   }
   return loginUrl.toString();
+};
+
+const getSocialAuthCallbackURL = () => {
+  if (typeof window === "undefined") return undefined;
+  const currentUrl = new URL(window.location.href);
+  const nextPath = safeNextPath(currentUrl.searchParams.get("next"));
+  return new URL(nextPath, window.location.origin).toString();
+};
+
+const getSocialAuthErrorCallbackURL = () => {
+  if (typeof window === "undefined") return undefined;
+  return window.location.href;
 };
 
 const getResendVerificationCallbackURL = () => {
@@ -117,6 +135,55 @@ export const useSignUpMutation = () => {
       if (result.error) {
         throw new AuthMutationError(
           getAuthErrorMessage(result.error, "Sign up failed"),
+          {
+            code: getAuthErrorCode(result.error),
+          }
+        );
+      }
+
+      return result.data;
+    },
+  });
+};
+
+export const useGoogleSignInMutation = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: getSocialAuthCallbackURL(),
+        errorCallbackURL: getSocialAuthErrorCallbackURL(),
+      });
+
+      if (result.error) {
+        throw new AuthMutationError(
+          getAuthErrorMessage(result.error, "Google sign in failed"),
+          {
+            code: getAuthErrorCode(result.error),
+          }
+        );
+      }
+
+      return result.data;
+    },
+  });
+};
+
+export const useGoogleSignUpMutation = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const callbackURL = getSocialAuthCallbackURL();
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL,
+        newUserCallbackURL: callbackURL,
+        errorCallbackURL: getSocialAuthErrorCallbackURL(),
+        requestSignUp: true,
+      });
+
+      if (result.error) {
+        throw new AuthMutationError(
+          getAuthErrorMessage(result.error, "Google sign up failed"),
           {
             code: getAuthErrorCode(result.error),
           }

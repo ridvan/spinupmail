@@ -89,6 +89,8 @@ Set the secrets for the Worker:
 ```bash
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 pnpm exec wrangler secret put RESEND_API_KEY
 pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
 ```
@@ -96,9 +98,58 @@ pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
 Use the Worker URL or your API route URL:
 
 - `BETTER_AUTH_BASE_URL = https://<your-domain>/api/auth`
+- `GOOGLE_CLIENT_ID = <google oauth web client id>`
+- `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be configured in `wrangler.toml` `[vars]` with a verified sender/domain.
+
+### Google OAuth Setup (Sign in / Sign up with Google)
+
+Spinupmail uses Better Auth social login with Google OAuth.
+
+1. Create a Google Cloud project:
+   - Open Google Cloud Console: `https://console.cloud.google.com/`
+   - Select or create a project.
+2. Configure OAuth consent screen:
+   - Go to **APIs & Services** -> **OAuth consent screen**
+   - Choose user type (usually **External**)
+   - Fill app name, support email, and developer contact email
+3. Create OAuth client credentials:
+   - Go to **APIs & Services** -> **Credentials**
+   - Click **Create Credentials** -> **OAuth client ID**
+   - Application type: **Web application**
+4. Add authorized JavaScript Origins:
+
+- `http://127.0.0.1:5173`
+- `https://your-domain.com`
+
+5. Add authorized redirect URI(s):
+   - Local backend:
+     - `http://localhost:8787/api/auth/callback/google`
+   - Production backend (pick the one you deploy):
+     - `https://<your-api-domain>/api/auth/callback/google`
+     - or `https://<your-frontend-domain>/api/auth/callback/google` (if Worker is routed on the frontend domain under `/api/*`)
+6. Copy values:
+   - `Client ID` -> `GOOGLE_CLIENT_ID`
+   - `Client secret` -> `GOOGLE_CLIENT_SECRET`
+7. Save credentials to Worker secrets:
+
+```bash
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+Local development with `wrangler dev`:
+
+- You should also place these in `packages/backend/.dev.vars`:
+  - `GOOGLE_CLIENT_ID=...`
+  - `GOOGLE_CLIENT_SECRET=...`
+
+Important:
+
+- `CORS_ORIGIN` must include your frontend origin(s) (for example `http://localhost:5173` and your production app origin), because Better Auth validates callback URLs against trusted origins.
+- Frontend does not need separate Google env vars for this OAuth redirect flow.
 
 ## 4. Database Migrations
 

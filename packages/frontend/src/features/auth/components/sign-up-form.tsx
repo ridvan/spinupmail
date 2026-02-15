@@ -14,7 +14,10 @@ import {
   TurnstileWidget,
   type TurnstileWidgetHandle,
 } from "@/features/auth/components/turnstile-widget";
-import { useSignUpMutation } from "@/features/auth/hooks/use-auth-mutations";
+import {
+  useGoogleSignUpMutation,
+  useSignUpMutation,
+} from "@/features/auth/hooks/use-auth-mutations";
 import { toFieldErrors } from "@/features/form-utils/to-field-errors";
 
 type SignUpFormProps = {
@@ -29,6 +32,7 @@ const signUpSchema = z.object({
 
 export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   const mutation = useSignUpMutation();
+  const googleMutation = useGoogleSignUpMutation();
   const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
   const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
@@ -82,6 +86,10 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
         <Field>
           <Button
             className="w-full border-white/15 bg-white/4 hover:bg-white/8"
+            disabled={googleMutation.isPending}
+            onClick={() => {
+              void googleMutation.mutateAsync();
+            }}
             type="button"
             variant="outline"
           >
@@ -91,8 +99,15 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
                 fill="currentColor"
               />
             </svg>
-            Sign up with Google
+            {googleMutation.isPending
+              ? "Redirecting..."
+              : "Sign up with Google"}
           </Button>
+          {googleMutation.error ? (
+            <p className="pt-2 text-sm text-destructive">
+              {googleMutation.error.message}
+            </p>
+          ) : null}
         </Field>
         <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
           Or continue with
@@ -207,7 +222,12 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
 
       <Button
         className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200"
-        disabled={mutation.isPending || !siteKey || !captchaToken}
+        disabled={
+          mutation.isPending ||
+          googleMutation.isPending ||
+          !siteKey ||
+          !captchaToken
+        }
         type="submit"
       >
         {mutation.isPending ? "Creating account..." : "Create account"}

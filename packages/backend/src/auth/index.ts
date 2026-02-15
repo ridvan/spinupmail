@@ -77,6 +77,9 @@ function createAuth(
   executionContext?: ExecutionContext
 ) {
   const db = env ? drizzle(env.SUM_DB, { schema }) : undefined;
+  const googleClientId = env?.GOOGLE_CLIENT_ID?.trim();
+  const googleClientSecret = env?.GOOGLE_CLIENT_SECRET?.trim();
+  const hasGoogleOAuth = Boolean(googleClientId) && Boolean(googleClientSecret);
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
@@ -121,6 +124,16 @@ function createAuth(
           sendOnSignUp: true,
           sendOnSignIn: false,
         },
+        socialProviders: hasGoogleOAuth
+          ? {
+              google: {
+                clientId: googleClientId!,
+                clientSecret: googleClientSecret!,
+                prompt: "select_account",
+                accessType: "offline",
+              },
+            }
+          : undefined,
         ...(executionContext
           ? {
               advanced: {

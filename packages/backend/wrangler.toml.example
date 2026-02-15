@@ -37,7 +37,7 @@ EMAIL_DOMAIN = "example.com"
 EMAIL_DOMAINS = "example.com,example-test.com"
 RESEND_FROM_EMAIL = "Spinupmail <verify@example.com>"
 # Configure secrets via `wrangler secret put`:
-# BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, RESEND_API_KEY, TURNSTILE_SECRET_KEY
+# BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"
 # Max body text/html bytes persisted per email row (oversized bodies are dropped)

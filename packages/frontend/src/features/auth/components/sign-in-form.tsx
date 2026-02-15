@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   AuthMutationError,
+  useGoogleSignInMutation,
   useResendVerificationEmailMutation,
   useSignInMutation,
 } from "@/features/auth/hooks/use-auth-mutations";
@@ -38,6 +39,7 @@ export const SignInForm = ({
   showVerificationNotice = false,
 }: SignInFormProps) => {
   const mutation = useSignInMutation();
+  const googleMutation = useGoogleSignInMutation();
   const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
   const resendMutation = useResendVerificationEmailMutation();
   const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
@@ -167,6 +169,10 @@ export const SignInForm = ({
         <Field>
           <Button
             className="w-full border-white/15 bg-white/4 hover:bg-white/8"
+            disabled={googleMutation.isPending}
+            onClick={() => {
+              void googleMutation.mutateAsync();
+            }}
             type="button"
             variant="outline"
           >
@@ -176,8 +182,13 @@ export const SignInForm = ({
                 fill="currentColor"
               />
             </svg>
-            Login with Google
+            {googleMutation.isPending ? "Redirecting..." : "Login with Google"}
           </Button>
+          {googleMutation.error ? (
+            <p className="pt-2 text-sm text-destructive">
+              {googleMutation.error.message}
+            </p>
+          ) : null}
         </Field>
         <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
           Or continue with
@@ -304,7 +315,12 @@ export const SignInForm = ({
 
       <Button
         className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200"
-        disabled={mutation.isPending || !siteKey || !captchaToken}
+        disabled={
+          mutation.isPending ||
+          googleMutation.isPending ||
+          !siteKey ||
+          !captchaToken
+        }
         type="submit"
       >
         {mutation.isPending ? "Signing in..." : "Login"}
