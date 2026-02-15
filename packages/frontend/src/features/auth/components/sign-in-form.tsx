@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import {
   AuthMutationError,
   useGoogleSignInMutation,
+  useRequestPasswordResetMutation,
   useResendVerificationEmailMutation,
   useSignInMutation,
 } from "@/features/auth/hooks/use-auth-mutations";
@@ -26,6 +27,9 @@ type SignInFormProps = {
   onSuccess?: () => Promise<void> | void;
   onTwoFactorRequired?: () => Promise<void> | void;
   showVerificationNotice?: boolean;
+  showPasswordResetNotice?: boolean;
+  isForgotPasswordMode: boolean;
+  onForgotPasswordModeChange: (isForgotPasswordMode: boolean) => void;
 };
 
 const signInSchema = z.object({
@@ -33,13 +37,21 @@ const signInSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+});
+
 export const SignInForm = ({
   onSuccess,
   onTwoFactorRequired,
   showVerificationNotice = false,
+  showPasswordResetNotice = false,
+  isForgotPasswordMode,
+  onForgotPasswordModeChange,
 }: SignInFormProps) => {
   const mutation = useSignInMutation();
   const googleMutation = useGoogleSignInMutation();
+  const forgotPasswordMutation = useRequestPasswordResetMutation();
   const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
   const resendMutation = useResendVerificationEmailMutation();
   const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
@@ -53,6 +65,12 @@ export const SignInForm = ({
   const [resendError, setResendError] = React.useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = React.useState<number | null>(null);
   const [tick, setTick] = React.useState(() => Date.now());
+  const [forgotPasswordFeedback, setForgotPasswordFeedback] = React.useState<
+    string | null
+  >(null);
+  const [forgotPasswordError, setForgotPasswordError] = React.useState<
+    string | null
+  >(null);
 
   const form = useForm({
     defaultValues: {
@@ -115,6 +133,63 @@ export const SignInForm = ({
       mutation.error.code === "EMAIL_NOT_VERIFIED") ||
     /email not verified/i.test(mutation.error?.message ?? "");
 
+  const enterForgotPasswordMode = () => {
+    onForgotPasswordModeChange(true);
+    setForgotPasswordFeedback(null);
+    setForgotPasswordError(null);
+    mutation.reset();
+  };
+
+  const leaveForgotPasswordMode = () => {
+    onForgotPasswordModeChange(false);
+    setForgotPasswordFeedback(null);
+    setForgotPasswordError(null);
+    forgotPasswordMutation.reset();
+  };
+
+  const handleForgotPasswordSubmit = async () => {
+    if (!siteKey) {
+      setCaptchaError("Captcha is not configured.");
+      return;
+    }
+
+    if (!captchaToken) {
+      setCaptchaError("Complete the captcha challenge.");
+      return;
+    }
+
+    const parsed = forgotPasswordSchema.safeParse({
+      email: form.state.values.email.trim(),
+    });
+
+    if (!parsed.success) {
+      setForgotPasswordFeedback(null);
+      setForgotPasswordError(
+        parsed.error.issues[0]?.message ?? "Enter a valid email"
+      );
+      return;
+    }
+
+    setForgotPasswordFeedback(null);
+    setForgotPasswordError(null);
+
+    try {
+      await forgotPasswordMutation.mutateAsync({
+        email: parsed.data.email,
+        captchaToken,
+      });
+      setForgotPasswordFeedback(
+        "If an account exists for that email, a reset link has been sent."
+      );
+    } catch (error) {
+      setForgotPasswordError(
+        error instanceof Error ? error.message : "Unable to send reset link."
+      );
+    } finally {
+      turnstileRef.current?.reset();
+    }
+  };
+
   const handleResendVerification = async () => {
     const email = form.state.values.email.trim();
     if (!email) {
@@ -162,37 +237,53 @@ export const SignInForm = ({
       onSubmit={event => {
         event.preventDefault();
         event.stopPropagation();
+        if (isForgotPasswordMode) {
+          void handleForgotPasswordSubmit();
+          return;
+        }
+
         void form.handleSubmit();
       }}
     >
       <FieldGroup className="gap-6">
-        <Field>
-          <Button
-            className="w-full border-white/15 bg-white/4 hover:bg-white/8"
-            disabled={googleMutation.isPending}
-            onClick={() => {
-              void googleMutation.mutateAsync();
-            }}
-            type="button"
-            variant="outline"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-              <path
-                d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                fill="currentColor"
-              />
-            </svg>
-            {googleMutation.isPending ? "Redirecting..." : "Login with Google"}
-          </Button>
-          {googleMutation.error ? (
-            <p className="pt-2 text-sm text-destructive">
-              {googleMutation.error.message}
-            </p>
-          ) : null}
-        </Field>
-        <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
-          Or continue with
-        </FieldSeparator>
+        {!isForgotPasswordMode ? (
+          <>
+            <Field>
+              <Button
+                className="w-full border-white/15 bg-white/4 hover:bg-white/8 cursor-pointer"
+                disabled={googleMutation.isPending}
+                onClick={() => {
+                  void googleMutation.mutateAsync();
+                }}
+                type="button"
+                variant="outline"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path
+                    d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                    fill="currentColor"
+                  />
+                </svg>
+                {googleMutation.isPending
+                  ? "Redirecting..."
+                  : "Login with Google"}
+              </Button>
+              {googleMutation.error ? (
+                <p className="pt-2 text-sm text-destructive">
+                  {googleMutation.error.message}
+                </p>
+              ) : null}
+            </Field>
+            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
+              Or continue with
+            </FieldSeparator>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Enter your account email and we&apos;ll send you a password reset
+            link.
+          </p>
+        )}
 
         <form.Field
           name="email"
@@ -223,54 +314,65 @@ export const SignInForm = ({
           }}
         />
 
-        <form.Field
-          name="password"
-          children={field => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+        {!isForgotPasswordMode ? (
+          <form.Field
+            name="password"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
 
-            return (
-              <Field data-invalid={isInvalid}>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
-                <Input
-                  autoComplete="current-password"
-                  aria-invalid={isInvalid}
-                  className="border-white/15 bg-white/4 placeholder:text-neutral-500"
-                  id={field.name}
-                  name={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={event => field.handleChange(event.target.value)}
-                  type="password"
-                  value={field.state.value}
-                />
-                {isInvalid ? (
-                  <FieldError errors={toFieldErrors(field.state.meta.errors)} />
-                ) : null}
-              </Field>
-            );
-          }}
-        />
+              return (
+                <Field data-invalid={isInvalid}>
+                  <div className="flex items-center">
+                    <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                    <button
+                      className="ml-auto text-sm underline-offset-4 hover:underline cursor-pointer"
+                      onClick={enterForgotPasswordMode}
+                      type="button"
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                  <Input
+                    autoComplete="current-password"
+                    aria-invalid={isInvalid}
+                    className="border-white/15 bg-white/4 placeholder:text-neutral-500"
+                    id={field.name}
+                    name={field.name}
+                    onBlur={field.handleBlur}
+                    onChange={event => field.handleChange(event.target.value)}
+                    type="password"
+                    value={field.state.value}
+                  />
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
+        ) : null}
       </FieldGroup>
 
-      {showVerificationNotice ? (
+      {showVerificationNotice && !isForgotPasswordMode ? (
         <p className="text-sm text-neutral-300">
           Check your inbox for a verification email, then sign in.
         </p>
       ) : null}
 
-      {mutation.error ? (
+      {showPasswordResetNotice && !isForgotPasswordMode ? (
+        <p className="text-sm text-muted-foreground">
+          Password updated. You can now sign in with your new password.
+        </p>
+      ) : null}
+
+      {mutation.error && !isForgotPasswordMode ? (
         <p className="text-sm text-destructive">{mutation.error.message}</p>
       ) : null}
 
-      {isEmailNotVerifiedError ? (
+      {isEmailNotVerifiedError && !isForgotPasswordMode ? (
         <div className="space-y-2">
           <Button
             className="w-full"
@@ -296,9 +398,22 @@ export const SignInForm = ({
         </div>
       ) : null}
 
+      {isForgotPasswordMode ? (
+        <div className="space-y-2">
+          {forgotPasswordFeedback ? (
+            <p className="text-sm text-muted-foreground">
+              {forgotPasswordFeedback}
+            </p>
+          ) : null}
+          {forgotPasswordError ? (
+            <p className="text-sm text-destructive">{forgotPasswordError}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <TurnstileWidget
-          action="sign-in"
+          action={isForgotPasswordMode ? "request-password-reset" : "sign-in"}
           onTokenChange={token => {
             setCaptchaToken(token);
             if (token) {
@@ -314,17 +429,35 @@ export const SignInForm = ({
       </div>
 
       <Button
-        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200"
+        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200 cursor-pointer"
         disabled={
           mutation.isPending ||
           googleMutation.isPending ||
+          forgotPasswordMutation.isPending ||
           !siteKey ||
           !captchaToken
         }
         type="submit"
       >
-        {mutation.isPending ? "Signing in..." : "Login"}
+        {isForgotPasswordMode
+          ? forgotPasswordMutation.isPending
+            ? "Sending reset link..."
+            : "Send reset link"
+          : mutation.isPending
+            ? "Signing in..."
+            : "Login"}
       </Button>
+
+      {isForgotPasswordMode ? (
+        <Button
+          className="cursor-pointer"
+          onClick={leaveForgotPasswordMode}
+          type="button"
+          variant="ghost"
+        >
+          Back to sign in
+        </Button>
+      ) : null}
     </form>
   );
 };

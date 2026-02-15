@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { AuthLayout } from "@/features/auth/components/auth-layout";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
@@ -13,12 +13,14 @@ const safeNextPath = (value: string | null) => {
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
 
   const nextPath = useMemo(
     () => safeNextPath(searchParams.get("next")),
     [searchParams]
   );
   const needsVerification = searchParams.get("verification") === "required";
+  const passwordResetSuccess = searchParams.get("passwordReset") === "success";
 
   const signupHref =
     nextPath === "/"
@@ -32,7 +34,9 @@ export const LoginPage = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
       <AuthLayout
-        subtitle="Welcome back! Please login to continue."
+        subtitle={
+          isForgotPasswordMode ? "" : "Welcome back! Please login to continue."
+        }
         footer={
           <>
             Don&apos;t have an account?{" "}
@@ -49,9 +53,12 @@ export const LoginPage = () => {
         }
       >
         <SignInForm
+          isForgotPasswordMode={isForgotPasswordMode}
           onSuccess={() => navigate(nextPath, { replace: true })}
           onTwoFactorRequired={() => navigate(twoFactorHref, { replace: true })}
+          showPasswordResetNotice={passwordResetSuccess}
           showVerificationNotice={needsVerification}
+          onForgotPasswordModeChange={setIsForgotPasswordMode}
         />
       </AuthLayout>
     </div>

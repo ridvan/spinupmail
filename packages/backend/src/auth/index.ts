@@ -13,7 +13,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../db";
 import type { CloudflareBindings } from "../env";
-import { APP_NAME, createResendVerificationEmailSender } from "./email";
+import {
+  APP_NAME,
+  createResendResetPasswordEmailSender,
+  createResendVerificationEmailSender,
+} from "./email";
 
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_DERIVED_KEY_BYTES = 64;
@@ -84,6 +88,7 @@ function createAuth(
     .map(origin => origin.trim())
     .filter(Boolean);
   const sendVerificationEmail = createResendVerificationEmailSender(env);
+  const sendResetPassword = createResendResetPasswordEmailSender(env);
 
   return betterAuth({
     secret: env?.BETTER_AUTH_SECRET,
@@ -114,6 +119,8 @@ function createAuth(
         emailAndPassword: {
           enabled: true,
           requireEmailVerification: true,
+          sendResetPassword,
+          revokeSessionsOnPasswordReset: true,
           password: {
             hash: hashPasswordWithNodeCrypto,
             verify: verifyPasswordWithNodeCrypto,
@@ -155,7 +162,11 @@ function createAuth(
           captcha({
             provider: "cloudflare-turnstile",
             secretKey: env?.TURNSTILE_SECRET_KEY ?? "",
-            endpoints: ["/sign-in/email", "/sign-up/email"],
+            endpoints: [
+              "/sign-in/email",
+              "/sign-up/email",
+              "/request-password-reset",
+            ],
           }),
           organization({
             allowUserToCreateOrganization: true,

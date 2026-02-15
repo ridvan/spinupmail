@@ -79,6 +79,11 @@ const getResendVerificationCallbackURL = () => {
   return url.toString();
 };
 
+const getResetPasswordRedirectURL = () => {
+  if (typeof window === "undefined") return undefined;
+  return new URL("/reset-password", window.location.origin).toString();
+};
+
 export const useSignInMutation = () => {
   return useMutation({
     mutationFn: async (values: SignInFormValues) => {
@@ -230,6 +235,57 @@ export const useResendVerificationEmailMutation = () => {
       return {
         cooldownSeconds: payload?.cooldownSeconds ?? 60,
       };
+    },
+  });
+};
+
+export const useRequestPasswordResetMutation = () => {
+  return useMutation({
+    mutationFn: async (values: { email: string; captchaToken: string }) => {
+      const result = await authClient.requestPasswordReset(
+        {
+          email: values.email.trim(),
+          redirectTo: getResetPasswordRedirectURL(),
+        },
+        {
+          headers: {
+            "x-captcha-response": values.captchaToken,
+          },
+        }
+      );
+
+      if (result.error) {
+        throw new AuthMutationError(
+          getAuthErrorMessage(result.error, "Unable to send reset link"),
+          {
+            code: getAuthErrorCode(result.error),
+          }
+        );
+      }
+
+      return result.data;
+    },
+  });
+};
+
+export const useResetPasswordMutation = () => {
+  return useMutation({
+    mutationFn: async (values: { token: string; newPassword: string }) => {
+      const result = await authClient.resetPassword({
+        token: values.token,
+        newPassword: values.newPassword,
+      });
+
+      if (result.error) {
+        throw new AuthMutationError(
+          getAuthErrorMessage(result.error, "Unable to reset password"),
+          {
+            code: getAuthErrorCode(result.error),
+          }
+        );
+      }
+
+      return result.data;
     },
   });
 };

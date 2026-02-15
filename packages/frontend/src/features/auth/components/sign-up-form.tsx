@@ -85,7 +85,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
       <FieldGroup className="gap-6">
         <Field>
           <Button
-            className="w-full border-white/15 bg-white/4 hover:bg-white/8"
+            className="w-full border-white/15 bg-white/4 hover:bg-white/8 cursor-pointer"
             disabled={googleMutation.isPending}
             onClick={() => {
               void googleMutation.mutateAsync();
@@ -221,7 +221,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
       </div>
 
       <Button
-        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200"
+        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200 cursor-pointer"
         disabled={
           mutation.isPending ||
           googleMutation.isPending ||

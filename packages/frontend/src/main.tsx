@@ -26,6 +26,7 @@ import { NotFoundPage } from "@/pages/not-found-page";
 import { OrganizationOnboardingPage } from "@/pages/organization-onboarding-page";
 import { OrganizationSettingsPage } from "@/pages/organization-settings-page";
 import { ProtectedLayoutPage } from "@/pages/protected-layout-page";
+import { ResetPasswordPage } from "@/pages/reset-password-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { SignupPage } from "@/pages/signup-page";
@@ -94,6 +95,13 @@ const routes: RouteObject[] = [
     element: <LoginTwoFactorPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Two-factor verification" },
+  },
+  {
+    path: "/reset-password",
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <ResetPasswordPage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Reset password" },
   },
   {
     path: "/onboarding/organization",
