@@ -1,4 +1,4 @@
-import { createAuth } from "./index";
+import { createAuth } from "@/platform/auth/create-auth";
 
 const env =
   typeof process !== "undefined" && process.env
