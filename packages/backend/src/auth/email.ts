@@ -211,7 +211,7 @@ const isLocalOrigin = (origin: string) => {
 const getEmailLogoUrl = (env?: EmailBrandingEnv) => {
   const origin = getPrimaryAppOrigin(env);
   if (!origin || isLocalOrigin(origin)) return null;
-  return origin ? `${origin}/logo-transparent.png` : null;
+  return `${origin}/logo-transparent.png`;
 };
 
 const buildEmailLogoMarkup = (logoUrl: string | null) => {
