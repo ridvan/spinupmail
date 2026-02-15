@@ -11,6 +11,10 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+  ArrowLeftIcon,
+  type ArrowLeftIconHandle,
+} from "@/components/ui/arrow-left";
+import {
   AuthMutationError,
   useGoogleSignInMutation,
   useRequestPasswordResetMutation,
@@ -52,6 +56,7 @@ export const SignInForm = ({
   const mutation = useSignInMutation();
   const googleMutation = useGoogleSignInMutation();
   const forgotPasswordMutation = useRequestPasswordResetMutation();
+  const backToSignInIconRef = React.useRef<ArrowLeftIconHandle | null>(null);
   const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
   const resendMutation = useResendVerificationEmailMutation();
   const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
@@ -451,10 +456,15 @@ export const SignInForm = ({
       {isForgotPasswordMode ? (
         <Button
           className="cursor-pointer"
+          onBlur={() => backToSignInIconRef.current?.stopAnimation()}
           onClick={leaveForgotPasswordMode}
+          onFocus={() => backToSignInIconRef.current?.startAnimation()}
+          onMouseEnter={() => backToSignInIconRef.current?.startAnimation()}
+          onMouseLeave={() => backToSignInIconRef.current?.stopAnimation()}
           type="button"
           variant="ghost"
         >
+          <ArrowLeftIcon ref={backToSignInIconRef} size={16} />
           Back to sign in
         </Button>
       ) : null}
