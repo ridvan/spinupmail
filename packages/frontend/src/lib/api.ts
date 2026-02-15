@@ -240,6 +240,7 @@ export const createEmailAddress = async (
     meta?: unknown;
     domain?: string;
     allowedFromDomains?: string[];
+    acceptedRiskNotice: boolean;
   },
   options?: { organizationId?: string | null }
 ) => {

@@ -10,7 +10,7 @@ const safeNextPath = (value: string | null) => {
   return value;
 };
 
-export const LoginTwoFactorPage = () => {
+export const SignInTwoFactorPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -20,7 +20,9 @@ export const LoginTwoFactorPage = () => {
   );
 
   const signInHref =
-    nextPath === "/" ? "/login" : `/login?next=${encodeURIComponent(nextPath)}`;
+    nextPath === "/"
+      ? "/sign-in"
+      : `/sign-in?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">

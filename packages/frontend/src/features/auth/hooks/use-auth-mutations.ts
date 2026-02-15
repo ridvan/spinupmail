@@ -48,7 +48,7 @@ const getSignInCallbackURL = () => {
 const getSignUpCallbackURL = () => {
   if (typeof window === "undefined") return undefined;
   const currentUrl = new URL(window.location.href);
-  const loginUrl = new URL("/login", window.location.origin);
+  const loginUrl = new URL("/sign-in", window.location.origin);
   const next = currentUrl.searchParams.get("next");
   if (next) {
     loginUrl.searchParams.set("next", next);
@@ -70,7 +70,7 @@ const getSocialAuthErrorCallbackURL = () => {
 
 const getResendVerificationCallbackURL = () => {
   if (typeof window === "undefined") return undefined;
-  const url = new URL("/login", window.location.origin);
+  const url = new URL("/sign-in", window.location.origin);
   const current = new URL(window.location.href);
   const next = current.searchParams.get("next");
   if (next) {

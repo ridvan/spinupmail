@@ -230,7 +230,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
         }
         type="submit"
       >
-        {mutation.isPending ? "Creating account..." : "Create account"}
+        {mutation.isPending ? "Signing up..." : "Sign up"}
       </Button>
     </form>
   );

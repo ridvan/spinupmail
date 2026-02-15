@@ -8,6 +8,9 @@ export const createEmailAddressBodySchema = z
     meta: z.unknown().optional(),
     domain: z.string().optional(),
     allowedFromDomains: z.union([z.array(z.string()), z.string()]).optional(),
+    acceptedRiskNotice: z.boolean().refine(value => value, {
+      message: "acceptedRiskNotice must be true",
+    }),
   })
   .passthrough();
 

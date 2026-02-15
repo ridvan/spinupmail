@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -161,6 +162,10 @@ const createAddressSchema = z.object({
       values => values.every(domain => domainRegex.test(domain)),
       "Use valid domains like `example.com`"
     ),
+  acceptedRiskNotice: z.boolean().refine(value => value, {
+    message:
+      "You must accept the Terms and Privacy Policy to create an address",
+  }),
 });
 
 export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
@@ -172,6 +177,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
       ttlMinutes: undefined as number | undefined,
       domain: domains[0] ?? "",
       allowedFromDomains: [] as string[],
+      acceptedRiskNotice: false,
     },
     validators: {
       onSubmit: createAddressSchema,
@@ -186,6 +192,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
         domain: selectedDomain,
         allowedFromDomains:
           allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
+        acceptedRiskNotice: value.acceptedRiskNotice,
       });
 
       form.reset({
@@ -375,6 +382,53 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
               {createMutation.error.message}
             </p>
           ) : null}
+
+          <form.Field
+            name="acceptedRiskNotice"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <input
+                      checked={field.state.value}
+                      className="mt-0.5 h-4 w-4 rounded border-border"
+                      id="address-legal-acknowledgement"
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={event =>
+                        field.handleChange(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <Link
+                        className="underline underline-offset-4"
+                        to="/terms"
+                      >
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link
+                        className="underline underline-offset-4"
+                        to="/privacy"
+                      >
+                        Privacy Policy
+                      </Link>
+                    </span>
+                  </label>
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
 
           <Button disabled={createMutation.isPending} type="submit">
             {createMutation.isPending ? "Creating..." : "Create address"}

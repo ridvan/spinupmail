@@ -36,7 +36,7 @@ export default defineConfig({
         },
         {
           command: "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173",
-          url: "http://127.0.0.1:5173/login",
+          url: "http://127.0.0.1:5173/sign-in",
           timeout: 120_000,
           reuseExistingServer: !process.env.CI,
         },

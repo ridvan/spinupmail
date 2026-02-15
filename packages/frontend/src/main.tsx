@@ -19,17 +19,19 @@ import {
 import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { AddressManagementPage } from "@/pages/address-management-page";
 import { HomePage } from "@/pages/home-page";
-import { LoginPage } from "@/pages/login-page";
-import { LoginTwoFactorPage } from "@/pages/login-two-factor-page";
 import { MailboxPage } from "@/pages/mailbox-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { OrganizationOnboardingPage } from "@/pages/organization-onboarding-page";
 import { OrganizationSettingsPage } from "@/pages/organization-settings-page";
+import { PrivacyPolicyPage } from "@/pages/privacy-policy-page";
 import { ProtectedLayoutPage } from "@/pages/protected-layout-page";
 import { ResetPasswordPage } from "@/pages/reset-password-page";
 import { RouteErrorPage } from "@/pages/route-error-page";
 import { SettingsPage } from "@/pages/settings-page";
+import { SignInPage } from "@/pages/sign-in-page";
+import { SignInTwoFactorPage } from "@/pages/sign-in-two-factor-page";
 import { SignupPage } from "@/pages/signup-page";
+import { TermsOfServicePage } from "@/pages/terms-of-service-page";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -73,10 +75,10 @@ const syncDocumentTitle = (matches: DataRouteMatch[]) => {
 
 const routes: RouteObject[] = [
   {
-    path: "/login",
+    path: "/sign-in",
     loader: redirectIfAuthenticatedLoader,
     hydrateFallbackElement: hydrationFallbackElement,
-    element: <LoginPage />,
+    element: <SignInPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Sign in" },
   },
@@ -89,10 +91,10 @@ const routes: RouteObject[] = [
     handle: { title: "Sign up" },
   },
   {
-    path: "/login/2fa",
+    path: "/sign-in/2fa",
     loader: redirectIfAuthenticatedLoader,
     hydrateFallbackElement: hydrationFallbackElement,
-    element: <LoginTwoFactorPage />,
+    element: <SignInTwoFactorPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Two-factor verification" },
   },
@@ -102,6 +104,20 @@ const routes: RouteObject[] = [
     element: <ResetPasswordPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Reset password" },
+  },
+  {
+    path: "/terms",
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <TermsOfServicePage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Terms of service" },
+  },
+  {
+    path: "/privacy",
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <PrivacyPolicyPage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Privacy policy" },
   },
   {
     path: "/onboarding/organization",

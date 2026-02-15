@@ -59,11 +59,11 @@ export const ResetPasswordPage = () => {
         token,
         newPassword: value.newPassword,
       });
-      await navigate("/login?passwordReset=success", { replace: true });
+      await navigate("/sign-in?passwordReset=success", { replace: true });
     },
   });
 
-  const loginLink = "/login";
+  const loginLink = "/sign-in";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">

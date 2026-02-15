@@ -22,7 +22,7 @@ const getSessionOrRedirect = async (request: Request) => {
 
   if (session.error || !session.data?.user || !session.data?.session) {
     const next = encodeURIComponent(readRequestPath(request));
-    throw redirect(`/login?next=${next}`);
+    throw redirect(`/sign-in?next=${next}`);
   }
 
   return session.data;

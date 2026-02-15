@@ -33,7 +33,7 @@ const loaderArgs = (url: string) =>
   }) as never;
 
 describe("route loaders", () => {
-  it("redirects authenticated users away from login", async () => {
+  it("redirects authenticated users away from sign in", async () => {
     mocks.getSession.mockResolvedValue({
       error: null,
       data: {
@@ -44,7 +44,7 @@ describe("route loaders", () => {
 
     await expect(
       redirectIfAuthenticatedLoader(
-        loaderArgs("https://app/login?next=/mailbox")
+        loaderArgs("https://app/sign-in?next=/mailbox")
       )
     ).rejects.toMatchObject({
       status: 302,

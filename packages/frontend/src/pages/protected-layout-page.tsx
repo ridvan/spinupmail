@@ -35,7 +35,7 @@ export const ProtectedLayoutPage = () => {
 
   React.useEffect(() => {
     if (isLoading || user) return;
-    void navigate("/login", { replace: true });
+    void navigate("/sign-in", { replace: true });
   }, [isLoading, navigate, user]);
 
   const handleSignOut = async () => {

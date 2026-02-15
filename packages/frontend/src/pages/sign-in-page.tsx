@@ -10,7 +10,7 @@ const safeNextPath = (value: string | null) => {
   return value;
 };
 
-export const LoginPage = () => {
+export const SignInPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
@@ -28,14 +28,16 @@ export const LoginPage = () => {
       : `/signup?next=${encodeURIComponent(nextPath)}`;
   const twoFactorHref =
     nextPath === "/"
-      ? "/login/2fa"
-      : `/login/2fa?next=${encodeURIComponent(nextPath)}`;
+      ? "/sign-in/2fa"
+      : `/sign-in/2fa?next=${encodeURIComponent(nextPath)}`;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
       <AuthLayout
         subtitle={
-          isForgotPasswordMode ? "" : "Welcome back! Please login to continue."
+          isForgotPasswordMode
+            ? ""
+            : "Welcome back! Please sign in to continue."
         }
         footer={
           <>
@@ -47,8 +49,15 @@ export const LoginPage = () => {
         }
         legal={
           <>
-            By clicking continue, you agree to our{" "}
-            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+            By clicking Sign in, you agree to our{" "}
+            <Link className="underline underline-offset-4" to="/terms">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link className="underline underline-offset-4" to="/privacy">
+              Privacy Policy
+            </Link>
+            .
           </>
         }
       >

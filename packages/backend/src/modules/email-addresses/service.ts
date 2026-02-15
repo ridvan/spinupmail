@@ -26,7 +26,7 @@ import type { AppHonoEnv } from "@/app/types";
 
 const parseCreateBody = (payload: unknown): CreateEmailAddressBody => {
   const parsed = createEmailAddressBodySchema.safeParse(payload);
-  if (!parsed.success) return {};
+  if (!parsed.success) return { acceptedRiskNotice: false };
   return parsed.data;
 };
 
@@ -57,6 +57,14 @@ export const createEmailAddress = async ({
       ? body.domain.trim().toLowerCase()
       : undefined;
   const domain = domainFromBody ?? allowedDomains[0];
+
+  if (body.acceptedRiskNotice !== true) {
+    return {
+      status: 400 as const,
+      body: { error: "acceptedRiskNotice must be true" },
+    };
+  }
+
   const allowedFromDomains = normalizeAllowedFromDomains(
     body.allowedFromDomains
   );

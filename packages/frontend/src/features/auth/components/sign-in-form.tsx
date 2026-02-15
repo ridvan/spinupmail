@@ -271,7 +271,7 @@ export const SignInForm = ({
                 </svg>
                 {googleMutation.isPending
                   ? "Redirecting..."
-                  : "Login with Google"}
+                  : "Sign in with Google"}
               </Button>
               {googleMutation.error ? (
                 <p className="pt-2 text-sm text-destructive">
@@ -450,7 +450,7 @@ export const SignInForm = ({
             : "Send reset link"
           : mutation.isPending
             ? "Signing in..."
-            : "Login"}
+            : "Sign in"}
       </Button>
 
       {isForgotPasswordMode ? (
