@@ -30,5 +30,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
 # misc
 .DS_Store

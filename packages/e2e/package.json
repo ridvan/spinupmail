@@ -1,0 +1,13 @@
+{
+  "name": "@spinupmail/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --config ./playwright.config.ts",
+    "test:smoke": "playwright test --config ./playwright.config.ts --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.2.3"
+  }
+}

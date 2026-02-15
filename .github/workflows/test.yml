@@ -1,0 +1,97 @@
+name: Test Pipeline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pr-checks:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Backend typecheck
+        run: pnpm run build:backend
+
+      - name: Frontend typecheck
+        run: pnpm run typecheck:frontend
+
+      - name: Unit tests
+        run: pnpm run test:unit
+
+      - name: Backend integration tests
+        run: pnpm run test:integration
+
+      - name: Backend worker-runtime integration tests
+        run: pnpm -C packages/backend test:integration:workers
+
+      - name: Frontend component tests
+        run: pnpm run test:component
+
+      - name: Install Playwright (chromium)
+        run: pnpm -C packages/e2e exec playwright install chromium
+
+      - name: E2E smoke shard
+        env:
+          RUN_E2E: "1"
+        run: pnpm -C packages/e2e test:smoke
+
+  nightly:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit + Integration + Component tests
+        run: pnpm run test:unit && pnpm run test:integration && pnpm run test:component
+
+      - name: Worker-runtime integration tests
+        run: pnpm -C packages/backend test:integration:workers
+
+      - name: Install Playwright browsers
+        run: pnpm -C packages/e2e exec playwright install chromium webkit firefox
+
+      - name: Nightly cross-browser E2E
+        env:
+          RUN_E2E: "1"
+          E2E_NIGHTLY: "1"
+        run: pnpm run test:e2e

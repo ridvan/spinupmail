@@ -12,5 +12,6 @@
     "lib": ["ESNext"],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
-  }
+  },
+  "include": ["src", "src/env.d.ts", "worker-configuration.d.ts"]
 }
