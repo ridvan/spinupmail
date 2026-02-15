@@ -513,6 +513,42 @@ const getRawEmailR2Key = ({
   emailId: string;
 }) => `email-raw/${organizationId}/${addressId}/${emailId}.eml`;
 
+const chunkArray = <T>(items: T[], chunkSize: number): T[][] => {
+  if (chunkSize <= 0) return [items];
+
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+const deleteR2ObjectsByPrefix = async ({
+  bucket,
+  prefix,
+}: {
+  bucket: NonNullable<CloudflareBindings["R2_BUCKET"]>;
+  prefix: string;
+}) => {
+  let cursor: string | undefined;
+  const keysToDelete: string[] = [];
+
+  do {
+    const listed = await bucket.list({
+      prefix,
+      cursor,
+      limit: 1000,
+    });
+    keysToDelete.push(...listed.objects.map(object => object.key));
+
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  for (const batch of chunkArray(keysToDelete, 1000)) {
+    await bucket.delete(batch);
+  }
+};
+
 const getRawDownloadPath = (
   env: CloudflareBindings,
   row: { id: string; raw: string | null }
@@ -1351,6 +1387,70 @@ app.post("/api/email-addresses", async c => {
     200,
     { "Cache-Control": "private, max-age=15" }
   );
+});
+
+app.delete("/api/email-addresses/:id", async c => {
+  const organizationId = c.get("organizationId");
+  const addressId = c.req.param("id");
+  const db = getDb(c.env);
+
+  const addressRow = await db
+    .select({
+      id: emailAddresses.id,
+      address: emailAddresses.address,
+    })
+    .from(emailAddresses)
+    .where(
+      and(
+        eq(emailAddresses.id, addressId),
+        eq(emailAddresses.organizationId, organizationId)
+      )
+    )
+    .get();
+
+  if (!addressRow) {
+    c.status(404);
+    return c.json({ error: "address not found" });
+  }
+
+  if (c.env.R2_BUCKET) {
+    try {
+      await Promise.all([
+        deleteR2ObjectsByPrefix({
+          bucket: c.env.R2_BUCKET,
+          prefix: `email-attachments/${organizationId}/${addressRow.id}/`,
+        }),
+        deleteR2ObjectsByPrefix({
+          bucket: c.env.R2_BUCKET,
+          prefix: `email-raw/${organizationId}/${addressRow.id}/`,
+        }),
+      ]);
+    } catch (error) {
+      console.error("[email] Failed to delete R2 objects for address cleanup", {
+        organizationId,
+        addressId: addressRow.id,
+        error,
+      });
+      c.status(500);
+      return c.json({ error: "failed to clean up address files" });
+    }
+  }
+
+  await db
+    .delete(emailAddresses)
+    .where(
+      and(
+        eq(emailAddresses.id, addressRow.id),
+        eq(emailAddresses.organizationId, organizationId)
+      )
+    )
+    .run();
+
+  return c.json({
+    id: addressRow.id,
+    address: addressRow.address,
+    deleted: true,
+  });
 });
 
 app.get("/api/emails", async c => {

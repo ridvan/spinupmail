@@ -253,6 +253,19 @@ export const createEmailAddress = async (
   );
 };
 
+export const deleteEmailAddress = async (
+  addressId: string,
+  options?: { organizationId?: string | null }
+) => {
+  return apiFetch<{ id: string; address: string; deleted: boolean }>(
+    `/api/email-addresses/${encodeURIComponent(addressId)}`,
+    {
+      method: "DELETE",
+    },
+    options?.organizationId
+  );
+};
+
 export const listEmails = async (options: {
   addressId?: string;
   address?: string;
