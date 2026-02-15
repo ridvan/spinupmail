@@ -66,7 +66,7 @@ const invalidateOrganizationQueries = async (
 };
 
 export const useOrganizationsQuery = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return useQuery({
     queryKey: organizationQueryKeys.organizations,
@@ -77,18 +77,18 @@ export const useOrganizationsQuery = () => {
       }
       return (result.data ?? []) as OrganizationItem[];
     },
-    enabled: isAuthenticated && !isLoading,
+    enabled: isAuthenticated,
     staleTime: 15_000,
   });
 };
 
 export const useOrganizationStatsQuery = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return useQuery({
     queryKey: queryKeys.organizationStats,
     queryFn: ({ signal }) => listOrganizationStats({ signal }),
-    enabled: isAuthenticated && !isLoading,
+    enabled: isAuthenticated,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });

@@ -43,7 +43,6 @@ export const ProtectedLayoutPage = () => {
 
     try {
       await signOut();
-      await navigate("/login", { replace: true });
     } catch (error) {
       setSignOutError((error as Error).message);
     }
