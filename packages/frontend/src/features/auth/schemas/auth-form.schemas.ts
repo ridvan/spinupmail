@@ -20,6 +20,10 @@ export const validateSignIn = (values: SignInFormValues): SignInFormErrors => {
     errors.password = "Password is required";
   }
 
+  if (!values.captchaToken) {
+    errors.captchaToken = "Complete the captcha challenge";
+  }
+
   return errors;
 };
 
@@ -42,6 +46,10 @@ export const validateSignUp = (values: SignUpFormValues): SignUpFormErrors => {
     errors.password = "Password is required";
   } else if (values.password.length < 8) {
     errors.password = "Password must be at least 8 characters";
+  }
+
+  if (!values.captchaToken) {
+    errors.captchaToken = "Complete the captcha challenge";
   }
 
   return errors;

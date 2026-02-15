@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,10 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  TurnstileWidget,
+  type TurnstileWidgetHandle,
+} from "@/features/auth/components/turnstile-widget";
 import { useSignUpMutation } from "@/features/auth/hooks/use-auth-mutations";
 import { toFieldErrors } from "@/features/form-utils/to-field-errors";
 
@@ -23,6 +28,12 @@ const signUpSchema = z.object({
 
 export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
   const mutation = useSignUpMutation();
+  const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
+  const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaError, setCaptchaError] = React.useState<string | null>(
+    siteKey ? null : "Captcha is not configured."
+  );
 
   const form = useForm({
     defaultValues: {
@@ -34,7 +45,24 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
       onSubmit: signUpSchema,
     },
     onSubmit: async ({ value }) => {
-      await mutation.mutateAsync(value);
+      if (!siteKey) {
+        setCaptchaError("Captcha is not configured.");
+        return;
+      }
+
+      if (!captchaToken) {
+        setCaptchaError("Complete the captcha challenge.");
+        return;
+      }
+
+      try {
+        await mutation.mutateAsync({
+          ...value,
+          captchaToken,
+        });
+      } finally {
+        turnstileRef.current?.reset();
+      }
       await onSuccess?.();
     },
   });
@@ -137,7 +165,28 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
         <p className="text-sm text-destructive">{mutation.error.message}</p>
       ) : null}
 
-      <Button className="w-full" disabled={mutation.isPending} type="submit">
+      <div className="space-y-2">
+        <TurnstileWidget
+          action="sign-up"
+          onTokenChange={token => {
+            setCaptchaToken(token);
+            if (token) {
+              setCaptchaError(null);
+            }
+          }}
+          ref={turnstileRef}
+          siteKey={siteKey}
+        />
+        {captchaError ? (
+          <p className="text-sm text-destructive">{captchaError}</p>
+        ) : null}
+      </div>
+
+      <Button
+        className="w-full"
+        disabled={mutation.isPending || !siteKey || !captchaToken}
+        type="submit"
+      >
         {mutation.isPending ? "Creating account..." : "Create account"}
       </Button>
     </form>

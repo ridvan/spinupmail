@@ -90,12 +90,14 @@ Set the secrets for the Worker:
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
 pnpm exec wrangler secret put RESEND_API_KEY
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
 Use the Worker URL or your API route URL:
 
 - `BETTER_AUTH_BASE_URL = https://<your-domain>/api/auth`
 - `RESEND_API_KEY = re_...`
+- `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be configured in `wrangler.toml` `[vars]` with a verified sender/domain.
 
 ## 4. Database Migrations
@@ -174,11 +176,13 @@ If you route the Worker on the same domain at `/api/*`, you can set:
 
 - `VITE_AUTH_BASE_URL = /api/auth`
 - `VITE_API_BASE_URL = /api`
+- `VITE_TURNSTILE_SITE_KEY = <Cloudflare Turnstile site key>`
 
 If you prefer a separate API domain:
 
 - `VITE_AUTH_BASE_URL = https://api.your-domain.com/api/auth`
 - `VITE_API_BASE_URL = https://api.your-domain.com`
+- `VITE_TURNSTILE_SITE_KEY = <Cloudflare Turnstile site key>`
 
 ## 8. Route API Requests to the Worker
 
@@ -273,14 +277,16 @@ Set `.env` for frontend local dev if needed:
 ```
 VITE_AUTH_BASE_URL=http://localhost:8787/api/auth
 VITE_API_BASE_URL=http://localhost:8787
+VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
-For local auth, add a `/Users/absolute/myoss/spinupmail/packages/backend/.dev.vars`
+For local auth, add a `packages/backend/.dev.vars`
 file (not committed):
 
 ```
 BETTER_AUTH_SECRET=dev-secret
 BETTER_AUTH_BASE_URL=http://localhost:8787/api/auth
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 ```
 
 The frontend dev server proxies `/api/*` to `http://127.0.0.1:8787`, so you can

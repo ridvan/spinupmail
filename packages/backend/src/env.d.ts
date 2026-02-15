@@ -10,6 +10,7 @@ export interface CloudflareBindings {
   R2_BUCKET?: R2Bucket;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_BASE_URL: string;
+  TURNSTILE_SECRET_KEY: string;
   RESEND_API_KEY: string;
   RESEND_FROM_EMAIL: string;
   CORS_ORIGIN?: string;

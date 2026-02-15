@@ -14,6 +14,10 @@ import {
   useResendVerificationEmailMutation,
   useSignInMutation,
 } from "@/features/auth/hooks/use-auth-mutations";
+import {
+  TurnstileWidget,
+  type TurnstileWidgetHandle,
+} from "@/features/auth/components/turnstile-widget";
 import { toFieldErrors } from "@/features/form-utils/to-field-errors";
 
 type SignInFormProps = {
@@ -31,7 +35,13 @@ export const SignInForm = ({
   onTwoFactorRequired,
 }: SignInFormProps) => {
   const mutation = useSignInMutation();
+  const turnstileRef = React.useRef<TurnstileWidgetHandle | null>(null);
   const resendMutation = useResendVerificationEmailMutation();
+  const siteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaError, setCaptchaError] = React.useState<string | null>(
+    siteKey ? null : "Captcha is not configured."
+  );
   const [resendFeedback, setResendFeedback] = React.useState<string | null>(
     null
   );
@@ -48,12 +58,31 @@ export const SignInForm = ({
       onSubmit: signInSchema,
     },
     onSubmit: async ({ value }) => {
-      const result = await mutation.mutateAsync(value);
-      if (result.requiresTwoFactor) {
-        await onTwoFactorRequired?.();
+      if (!siteKey) {
+        setCaptchaError("Captcha is not configured.");
         return;
       }
-      await onSuccess?.();
+
+      if (!captchaToken) {
+        setCaptchaError("Complete the captcha challenge.");
+        return;
+      }
+
+      let result: Awaited<ReturnType<typeof mutation.mutateAsync>>;
+      try {
+        result = await mutation.mutateAsync({
+          ...value,
+          captchaToken,
+        });
+      } finally {
+        turnstileRef.current?.reset();
+      }
+
+      if (result.requiresTwoFactor) {
+        await onTwoFactorRequired?.();
+      } else {
+        await onSuccess?.();
+      }
     },
   });
 
@@ -218,7 +247,28 @@ export const SignInForm = ({
         </div>
       ) : null}
 
-      <Button className="w-full" disabled={mutation.isPending} type="submit">
+      <div className="space-y-2">
+        <TurnstileWidget
+          action="sign-in"
+          onTokenChange={token => {
+            setCaptchaToken(token);
+            if (token) {
+              setCaptchaError(null);
+            }
+          }}
+          ref={turnstileRef}
+          siteKey={siteKey}
+        />
+        {captchaError ? (
+          <p className="text-sm text-destructive">{captchaError}</p>
+        ) : null}
+      </div>
+
+      <Button
+        className="w-full"
+        disabled={mutation.isPending || !siteKey || !captchaToken}
+        type="submit"
+      >
         {mutation.isPending ? "Signing in..." : "Sign in"}
       </Button>
     </form>
