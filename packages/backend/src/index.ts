@@ -801,7 +801,13 @@ app.use(
       const allowed = getAllowedOrigins(c.env);
       return allowed.includes(origin) ? origin : null;
     },
-    allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "X-Org-Id"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-API-Key",
+      "X-Org-Id",
+      "X-Captcha-Response",
+    ],
     allowMethods: ["POST", "GET", "OPTIONS", "DELETE"],
     exposeHeaders: ["Content-Length", "Content-Disposition", "Content-Type"],
     maxAge: 600,

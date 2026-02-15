@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import { AuthShell } from "@/features/auth/components/auth-shell";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { AuthLayout } from "@/features/auth/components/auth-layout";
 import { SignUpForm } from "@/features/auth/components/sign-up-form";
 
 const safeNextPath = (value: string | null) => {
@@ -24,16 +24,28 @@ export const SignupPage = () => {
     nextPath === "/" ? "/login" : `/login?next=${encodeURIComponent(nextPath)}`;
 
   return (
-    <AuthShell
-      altCta="Sign in"
-      altHref={loginHref}
-      altLabel="Already have an account?"
-      subtitle="Create your workspace and start managing disposable inboxes in minutes."
-      title="Create account"
-    >
-      <SignUpForm
-        onSuccess={() => navigate(postSignUpPath, { replace: true })}
-      />
-    </AuthShell>
+    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+      <AuthLayout
+        subtitle="Create your account and start managing disposable email addresses in minutes."
+        footer={
+          <>
+            Already have an account?{" "}
+            <Link className="text-neutral-300 hover:text-white" to={loginHref}>
+              Sign in
+            </Link>
+          </>
+        }
+        legal={
+          <>
+            By clicking continue, you agree to our{" "}
+            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+          </>
+        }
+      >
+        <SignUpForm
+          onSuccess={() => navigate(postSignUpPath, { replace: true })}
+        />
+      </AuthLayout>
+    </div>
   );
 };

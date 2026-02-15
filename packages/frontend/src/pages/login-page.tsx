@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import { AuthShell } from "@/features/auth/components/auth-shell";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { AuthLayout } from "@/features/auth/components/auth-layout";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 
 const safeNextPath = (value: string | null) => {
@@ -30,21 +30,30 @@ export const LoginPage = () => {
       : `/login/2fa?next=${encodeURIComponent(nextPath)}`;
 
   return (
-    <AuthShell
-      altCta="Create one"
-      altHref={signupHref}
-      altLabel="Need an account?"
-      subtitle={
-        needsVerification
-          ? "Check your inbox for a verification email, then sign in."
-          : "Access your inbox workspace with your email and password."
-      }
-      title="Sign in"
-    >
-      <SignInForm
-        onSuccess={() => navigate(nextPath, { replace: true })}
-        onTwoFactorRequired={() => navigate(twoFactorHref, { replace: true })}
-      />
-    </AuthShell>
+    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+      <AuthLayout
+        subtitle="Welcome back! Please login to continue."
+        footer={
+          <>
+            Don&apos;t have an account?{" "}
+            <Link className="text-neutral-300 hover:text-white" to={signupHref}>
+              Sign up
+            </Link>
+          </>
+        }
+        legal={
+          <>
+            By clicking continue, you agree to our{" "}
+            <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+          </>
+        }
+      >
+        <SignInForm
+          onSuccess={() => navigate(nextPath, { replace: true })}
+          onTwoFactorRequired={() => navigate(twoFactorHref, { replace: true })}
+          showVerificationNotice={needsVerification}
+        />
+      </AuthLayout>
+    </div>
   );
 };
