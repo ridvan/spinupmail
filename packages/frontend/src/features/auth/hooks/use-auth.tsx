@@ -59,13 +59,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refetch]);
 
   const signOut = React.useCallback(async () => {
+    await queryClient.cancelQueries({ queryKey: ["app"] });
+
     const result = await authClient.signOut();
 
     if (result.error) {
       throw new Error(result.error.message || "Unable to sign out");
     }
 
-    queryClient.removeQueries({ queryKey: ["app"] });
     setPendingOrganizationId(null);
     setIsOrganizationSwitching(false);
     clearLastActiveOrganizationId();
