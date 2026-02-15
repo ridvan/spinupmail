@@ -407,6 +407,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                       I agree to the{" "}
                       <Link
                         className="underline underline-offset-4"
+                        target="_blank"
                         to="/terms"
                       >
                         Terms of Service
@@ -414,6 +415,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                       and{" "}
                       <Link
                         className="underline underline-offset-4"
+                        target="_blank"
                         to="/privacy"
                       >
                         Privacy Policy

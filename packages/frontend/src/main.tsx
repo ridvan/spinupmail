@@ -80,7 +80,7 @@ const routes: RouteObject[] = [
     hydrateFallbackElement: hydrationFallbackElement,
     element: <SignInPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Sign in" },
+    handle: { title: "Sign In" },
   },
   {
     path: "/signup",
@@ -88,7 +88,7 @@ const routes: RouteObject[] = [
     hydrateFallbackElement: hydrationFallbackElement,
     element: <SignupPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Sign up" },
+    handle: { title: "Sign Up" },
   },
   {
     path: "/sign-in/2fa",
@@ -96,28 +96,28 @@ const routes: RouteObject[] = [
     hydrateFallbackElement: hydrationFallbackElement,
     element: <SignInTwoFactorPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Two-factor verification" },
+    handle: { title: "Two-factor Verification" },
   },
   {
     path: "/reset-password",
     hydrateFallbackElement: hydrationFallbackElement,
     element: <ResetPasswordPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Reset password" },
+    handle: { title: "Reset Password" },
   },
   {
     path: "/terms",
     hydrateFallbackElement: hydrationFallbackElement,
     element: <TermsOfServicePage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Terms of service" },
+    handle: { title: "Terms of Service" },
   },
   {
     path: "/privacy",
     hydrateFallbackElement: hydrationFallbackElement,
     element: <PrivacyPolicyPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Privacy policy" },
+    handle: { title: "Privacy Policy" },
   },
   {
     path: "/onboarding/organization",
@@ -125,7 +125,7 @@ const routes: RouteObject[] = [
     hydrateFallbackElement: hydrationFallbackElement,
     element: <OrganizationOnboardingPage />,
     errorElement: <RouteErrorPage />,
-    handle: { title: "Organization onboarding" },
+    handle: { title: "Organization Onboarding" },
   },
   {
     path: "/",
@@ -172,7 +172,7 @@ const routes: RouteObject[] = [
       {
         path: "*",
         element: <NotFoundPage />,
-        handle: { title: "Not found" },
+        handle: { title: "Not Found" },
       },
     ],
   },

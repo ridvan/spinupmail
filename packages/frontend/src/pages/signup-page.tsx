@@ -40,11 +40,19 @@ export const SignupPage = () => {
         legal={
           <>
             By clicking Sign up, you agree to our{" "}
-            <Link className="underline underline-offset-4" to="/terms">
+            <Link
+              className="underline underline-offset-4"
+              target="_blank"
+              to="/terms"
+            >
               Terms of Service
             </Link>{" "}
             and{" "}
-            <Link className="underline underline-offset-4" to="/privacy">
+            <Link
+              className="underline underline-offset-4"
+              target="_blank"
+              to="/privacy"
+            >
               Privacy Policy
             </Link>
             .

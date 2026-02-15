@@ -13,8 +13,8 @@ export const PrivacyPolicyPage = () => {
             <Link className="underline underline-offset-4" to="/terms">
               Terms of Service
             </Link>
-            <Link className="underline underline-offset-4" to="/sign-in">
-              Sign in
+            <Link className="underline underline-offset-4" to="/">
+              Dashboard
             </Link>
           </div>
         </div>

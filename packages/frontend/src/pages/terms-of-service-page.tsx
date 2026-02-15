@@ -13,8 +13,8 @@ export const TermsOfServicePage = () => {
             <Link className="underline underline-offset-4" to="/privacy">
               Privacy Policy
             </Link>
-            <Link className="underline underline-offset-4" to="/sign-in">
-              Sign in
+            <Link className="underline underline-offset-4" to="/">
+              Dashboard
             </Link>
           </div>
         </div>
