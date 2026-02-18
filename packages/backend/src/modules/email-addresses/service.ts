@@ -10,9 +10,12 @@ import {
   parseAddressMeta,
   sanitizeLocalPart,
 } from "@/shared/validation";
+import { clampNumber } from "@/shared/utils/dates";
 import {
   createEmailAddressBodySchema,
+  listRecentAddressActivityQuerySchema,
   type CreateEmailAddressBody,
+  type ListRecentAddressActivityQuery,
 } from "./schemas";
 import {
   deleteAddressByIdAndOrganization,
@@ -20,14 +23,47 @@ import {
   findAddressByValue,
   insertAddress,
   listAddressesByOrganization,
+  listRecentAddressActivityPage,
 } from "./repo";
 import { toEmailAddressListItem } from "./dto";
 import type { AppHonoEnv } from "@/app/types";
+
+const RECENT_ACTIVITY_PAGE_LIMIT_DEFAULT = 10;
+const RECENT_ACTIVITY_PAGE_LIMIT_MAX = 50;
+const RECENT_ACTIVITY_CURSOR_SEPARATOR = ":";
 
 const parseCreateBody = (payload: unknown): CreateEmailAddressBody => {
   const parsed = createEmailAddressBodySchema.safeParse(payload);
   if (!parsed.success) return { acceptedRiskNotice: false };
   return parsed.data;
+};
+
+const parseRecentAddressActivityQuery = (
+  payload: unknown
+): ListRecentAddressActivityQuery => {
+  const parsed = listRecentAddressActivityQuerySchema.safeParse(payload);
+  if (!parsed.success) return {};
+  return parsed.data;
+};
+
+const encodeRecentAddressActivityCursor = (value: {
+  recentActivityMs: number;
+  id: string;
+}) => `${value.recentActivityMs}${RECENT_ACTIVITY_CURSOR_SEPARATOR}${value.id}`;
+
+const decodeRecentAddressActivityCursor = (value: string) => {
+  const separatorIndex = value.indexOf(RECENT_ACTIVITY_CURSOR_SEPARATOR);
+  if (separatorIndex <= 0 || separatorIndex >= value.length - 1) return null;
+
+  const recentActivityMsRaw = value.slice(0, separatorIndex);
+  const id = value.slice(separatorIndex + 1);
+  const recentActivityMs = Number(recentActivityMsRaw);
+
+  if (!Number.isFinite(recentActivityMs) || recentActivityMs < 0 || !id) {
+    return null;
+  }
+
+  return { recentActivityMs, id };
 };
 
 export const listEmailAddresses = async (
@@ -37,6 +73,61 @@ export const listEmailAddresses = async (
   const db = getDb(env);
   const rows = await listAddressesByOrganization(db, organizationId);
   return { items: rows.map(toEmailAddressListItem) };
+};
+
+export const listRecentAddressActivity = async ({
+  env,
+  organizationId,
+  queryPayload,
+}: {
+  env: CloudflareBindings;
+  organizationId: string;
+  queryPayload: unknown;
+}) => {
+  const query = parseRecentAddressActivityQuery(queryPayload);
+  const limit = clampNumber(
+    query.limit ?? null,
+    1,
+    RECENT_ACTIVITY_PAGE_LIMIT_MAX,
+    RECENT_ACTIVITY_PAGE_LIMIT_DEFAULT
+  );
+  const cursor = query.cursor
+    ? decodeRecentAddressActivityCursor(query.cursor)
+    : null;
+
+  if (query.cursor && !cursor) {
+    return {
+      status: 400 as const,
+      body: { error: "invalid cursor" },
+    };
+  }
+
+  const db = getDb(env);
+  const rows = await listRecentAddressActivityPage({
+    db,
+    organizationId,
+    limit,
+    cursor: cursor ?? undefined,
+  });
+
+  const hasNext = rows.length > limit;
+  const pageRows = hasNext ? rows.slice(0, limit) : rows;
+  const lastPageRow = pageRows.at(-1);
+  const nextCursor =
+    hasNext && lastPageRow
+      ? encodeRecentAddressActivityCursor({
+          recentActivityMs: Number(lastPageRow.recentActivityMs),
+          id: lastPageRow.id,
+        })
+      : null;
+
+  return {
+    status: 200 as const,
+    body: {
+      items: pageRows.map(toEmailAddressListItem),
+      nextCursor,
+    },
+  };
 };
 
 export const createEmailAddress = async ({

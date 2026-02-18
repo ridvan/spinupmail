@@ -8,6 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 
 const chartConfig = {
@@ -78,7 +79,7 @@ export const InboxGrowthChart = () => {
       <CardHeader className="space-y-0.5 pb-1 pt-3">
         <div className="flex items-start justify-between">
           <CardTitle className="text-xs font-medium text-muted-foreground">
-            Total Inboxes
+            Total Addresses
           </CardTitle>
           <Badge
             variant="outline"
@@ -88,15 +89,33 @@ export const InboxGrowthChart = () => {
           </Badge>
         </div>
         <p className="text-2xl font-semibold tracking-tight">
-          {isLoading ? "–" : totalInboxes.toLocaleString()}
+          {isLoading ? (
+            <Skeleton className="h-8 w-10 rounded-sm" />
+          ) : (
+            totalInboxes.toLocaleString()
+          )}
         </p>
       </CardHeader>
       <CardContent className="mt-auto pb-0.5 pt-0">
-        {isLoading || !chartData.length ? (
+        {isLoading ? (
+          <div className="h-[130px] w-full overflow-visible px-1">
+            <div className="flex h-full flex-col justify-end">
+              <div className="h-[100px] rounded-sm">
+                <Skeleton className="h-full w-full rounded-sm" />
+              </div>
+              <div className="mt-2 flex justify-between px-3">
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <Skeleton
+                    key={`total-addresses-tick-skeleton-${index}`}
+                    className="h-2 w-3 rounded-sm"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : !chartData.length ? (
           <div className="flex h-[130px] items-center justify-center">
-            <p className="text-xs text-muted-foreground">
-              {isLoading ? "Loading..." : "No data yet"}
-            </p>
+            <p className="text-xs text-muted-foreground">No data yet</p>
           </div>
         ) : (
           <ChartContainer

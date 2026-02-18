@@ -55,6 +55,14 @@ export const useCreateAddressMutation = () => {
           queryKey: queryKeys.addresses(activeOrganizationId),
         }),
         queryClient.invalidateQueries({
+          queryKey: [
+            "app",
+            "organizations",
+            activeOrganizationId,
+            "recent-address-activity",
+          ],
+        }),
+        queryClient.invalidateQueries({
           queryKey: queryKeys.organizationStats,
         }),
       ]);
@@ -84,6 +92,14 @@ export const useDeleteAddressMutation = () => {
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.emailSummary(activeOrganizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: [
+            "app",
+            "organizations",
+            activeOrganizationId,
+            "recent-address-activity",
+          ],
         }),
         queryClient.invalidateQueries({
           queryKey: ["app", "organizations", activeOrganizationId, "emails"],

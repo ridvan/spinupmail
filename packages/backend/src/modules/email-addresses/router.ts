@@ -5,11 +5,33 @@ import {
   createEmailAddress,
   deleteEmailAddress,
   listEmailAddresses,
+  listRecentAddressActivity,
 } from "./service";
-import { createEmailAddressBodySchema } from "./schemas";
+import {
+  createEmailAddressBodySchema,
+  listRecentAddressActivityQuerySchema,
+} from "./schemas";
 
 export const createEmailAddressesRouter = () => {
   const router = new Hono<AppHonoEnv>();
+
+  router.get(
+    "/email-addresses/recent-activity",
+    zValidator("query", listRecentAddressActivityQuerySchema),
+    async c => {
+      const organizationId = c.get("organizationId");
+      const query = c.req.valid("query");
+      const result = await listRecentAddressActivity({
+        env: c.env,
+        organizationId,
+        queryPayload: query,
+      });
+
+      return c.json(result.body, result.status, {
+        "Cache-Control": "private, max-age=5",
+      });
+    }
+  );
 
   router.get("/email-addresses", async c => {
     const organizationId = c.get("organizationId");

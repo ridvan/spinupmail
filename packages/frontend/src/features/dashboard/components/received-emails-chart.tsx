@@ -7,6 +7,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEmailActivityQuery } from "@/features/dashboard/hooks/use-email-activity";
 
 const chartConfig = {
@@ -46,13 +47,38 @@ export const ReceivedEmailsChart = () => {
           </Badge>
         </div>
         <p className="text-2xl font-semibold tracking-tight">
-          {isLoading ? "–" : total.toLocaleString()}
+          {isLoading ? (
+            <Skeleton className="h-8 w-10 rounded-sm" />
+          ) : (
+            total.toLocaleString()
+          )}
         </p>
       </CardHeader>
       <CardContent className="mt-auto pb-0.5 pt-0">
         {isLoading || !daily ? (
-          <div className="flex h-[130px] items-center justify-center">
-            <p className="text-xs text-muted-foreground">Loading...</p>
+          <div className="h-[120px] w-full overflow-visible px-1">
+            <div className="flex h-full flex-col justify-end">
+              <div className="flex h-[100px] items-end gap-1 px-3">
+                {[30, 44, 36, 52, 28, 60, 40, 48, 34, 56, 42, 50, 32, 46].map(
+                  (height, index) => (
+                    <Skeleton
+                      // Keep skeleton bars aligned to final chart footprint.
+                      key={`received-email-bar-skeleton-${index}`}
+                      className="w-full rounded-sm"
+                      style={{ height: `${height}px` }}
+                    />
+                  )
+                )}
+              </div>
+              <div className="mt-2 flex justify-between px-3">
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <Skeleton
+                    key={`received-email-tick-skeleton-${index}`}
+                    className="h-2 w-3 rounded-sm"
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <ChartContainer

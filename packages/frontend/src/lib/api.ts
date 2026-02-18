@@ -165,6 +165,29 @@ export const listEmailAddresses = async (options?: {
   return data.items;
 };
 
+export const listRecentAddressActivity = async (options?: {
+  limit?: number;
+  cursor?: string;
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.limit) query.set("limit", String(options.limit));
+  if (options?.cursor) query.set("cursor", options.cursor);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiFetch<{
+    items: EmailAddress[];
+    nextCursor: string | null;
+  }>(
+    `/api/email-addresses/recent-activity${suffix}`,
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  );
+};
+
 export const listDomains = async (options?: {
   signal?: AbortSignal;
   organizationId?: string | null;
@@ -216,8 +239,12 @@ export type EmailSummary = {
   attachmentCount: number;
   attachmentSizeTotal: number;
   topDomains: { domain: string; count: number }[];
-  busiestInboxes: { address: string; count: number }[];
-  dormantInboxes: { address: string; createdAt: string | null }[];
+  busiestInboxes: { addressId: string; address: string; count: number }[];
+  dormantInboxes: {
+    addressId: string;
+    address: string;
+    createdAt: string | null;
+  }[];
 };
 
 export const getEmailSummary = async (options?: {

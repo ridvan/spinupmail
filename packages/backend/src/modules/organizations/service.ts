@@ -125,11 +125,13 @@ export const getEmailSummaryStats = async ({
     }));
 
   const busiestInboxes = busiestInboxesRows.map(row => ({
+    addressId: String(row.addressId ?? ""),
     address: String(row.address ?? ""),
     count: Number(row.count) || 0,
   }));
 
   const dormantInboxes = dormantInboxesRows.map(row => ({
+    addressId: String(row.addressId ?? ""),
     address: String(row.address ?? ""),
     createdAt: row.createdAt ? row.createdAt.toISOString() : null,
   }));

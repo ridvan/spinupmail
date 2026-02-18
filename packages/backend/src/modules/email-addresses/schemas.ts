@@ -14,6 +14,16 @@ export const createEmailAddressBodySchema = z
   })
   .passthrough();
 
+export const listRecentAddressActivityQuerySchema = z
+  .object({
+    limit: z.string().optional(),
+    cursor: z.string().optional(),
+  })
+  .passthrough();
+
 export type CreateEmailAddressBody = z.infer<
   typeof createEmailAddressBodySchema
+>;
+export type ListRecentAddressActivityQuery = z.infer<
+  typeof listRecentAddressActivityQuerySchema
 >;

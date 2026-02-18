@@ -4,6 +4,19 @@ export const queryKeys = {
     ["app", "organizations", organizationId, "email-activity"] as const,
   emailSummary: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "email-summary"] as const,
+  recentAddressActivity: (
+    organizationId: string | null,
+    cursor: string | null,
+    limit: number
+  ) =>
+    [
+      "app",
+      "organizations",
+      organizationId,
+      "recent-address-activity",
+      limit,
+      cursor,
+    ] as const,
   addresses: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses"] as const,
   domains: (organizationId: string | null) =>

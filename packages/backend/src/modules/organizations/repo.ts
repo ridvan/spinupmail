@@ -113,17 +113,19 @@ export const findEmailSummary = async (db: AppDb, organizationId: string) => {
       .limit(3),
     db
       .select({
+        addressId: emailAddresses.id,
         address: emailAddresses.address,
         count: sql<number>`count(*)`,
       })
       .from(emails)
       .innerJoin(emailAddresses, eq(emails.addressId, emailAddresses.id))
       .where(eq(emailAddresses.organizationId, organizationId))
-      .groupBy(emails.addressId, emailAddresses.address)
+      .groupBy(emailAddresses.id, emailAddresses.address)
       .orderBy(desc(sql`count(*)`))
       .limit(3),
     db
       .select({
+        addressId: emailAddresses.id,
         address: emailAddresses.address,
         createdAt: emailAddresses.createdAt,
       })

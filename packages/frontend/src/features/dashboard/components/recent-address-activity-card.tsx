@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -23,10 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { EmailAddress } from "@/lib/api";
+import { Link } from "react-router";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useRecentAddressActivityQuery } from "@/features/dashboard/hooks/use-recent-address-activity";
 import { cn } from "@/lib/utils";
 
-const RECENT_ROWS_LIMIT = 8;
+const RECENT_ACTIVITY_PAGE_SIZE = 10;
+const LOADING_SKELETON_ROW_COUNT = 3;
 
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -35,7 +38,11 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 
 const formatDateTime = (value: string | null) => {
   if (!value) return "Never";
-  return dateTimeFormatter.format(new Date(value));
+  return (
+    <span className="w-[185px]">
+      {dateTimeFormatter.format(new Date(value))}
+    </span>
+  );
 };
 
 type ActivityRow = {
@@ -73,29 +80,43 @@ const getLifecycleBadge = (expiresAt: string | null) => {
   return <Badge variant="outline">Expires {formatDateTime(expiresAt)}</Badge>;
 };
 
-type RecentAddressActivityCardProps = {
-  addresses: EmailAddress[];
-  errorMessage: string | null;
-  isLoading: boolean;
-};
-
 const getSortIcon = (direction: false | "asc" | "desc") => {
   if (direction === "asc") return <ArrowUp className="size-3.5" />;
   if (direction === "desc") return <ArrowDown className="size-3.5" />;
   return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
 };
 
-export const RecentAddressActivityCard = ({
-  addresses,
-  errorMessage,
-  isLoading,
-}: RecentAddressActivityCardProps) => {
+export const RecentAddressActivityCard = () => {
+  const { activeOrganizationId } = useAuth();
+  const [cursor, setCursor] = React.useState<string | null>(null);
+  const [cursorHistory, setCursorHistory] = React.useState<
+    Array<string | null>
+  >([]);
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "recentActivityMs", desc: true },
   ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
+
+  React.useEffect(() => {
+    setCursor(null);
+    setCursorHistory([]);
+  }, [activeOrganizationId]);
+
+  const recentAddressActivityQuery = useRecentAddressActivityQuery({
+    cursor,
+    limit: RECENT_ACTIVITY_PAGE_SIZE,
+  });
+  const isLoading = recentAddressActivityQuery.isLoading;
+  const isPlaceholderData = recentAddressActivityQuery.isPlaceholderData;
+  const isFetching = recentAddressActivityQuery.isFetching;
+  const errorMessage = recentAddressActivityQuery.error?.message ?? null;
+  const addresses = recentAddressActivityQuery.data?.items;
+  const nextCursor = recentAddressActivityQuery.data?.nextCursor ?? null;
+  const pageNumber = cursorHistory.length + 1;
+  const canGoPrevious = cursorHistory.length > 0;
+
   const cycleSorting = React.useCallback(
     (columnId: string, direction: false | "asc" | "desc") => {
       if (direction === false) {
@@ -114,7 +135,7 @@ export const RecentAddressActivityCard = ({
   );
 
   const recentRows = React.useMemo<ActivityRow[]>(() => {
-    const allRows = addresses.map(address => {
+    return (addresses ?? []).map(address => {
       const createdAtMs = toTimestamp(address.createdAt, address.createdAtMs);
       const lastReceivedAtMs = toTimestamp(
         address.lastReceivedAt,
@@ -134,10 +155,6 @@ export const RecentAddressActivityCard = ({
         expiresAt: address.expiresAt,
       };
     });
-
-    return allRows
-      .sort((left, right) => right.recentActivityMs - left.recentActivityMs)
-      .slice(0, RECENT_ROWS_LIMIT);
   }, [addresses]);
 
   const columns = React.useMemo<ColumnDef<ActivityRow>[]>(
@@ -149,7 +166,7 @@ export const RecentAddressActivityCard = ({
           return (
             <Button
               className={cn(
-                "-ml-2",
+                "justify-start",
                 sortDirection
                   ? "bg-muted hover:bg-muted"
                   : "text-muted-foreground"
@@ -164,9 +181,12 @@ export const RecentAddressActivityCard = ({
           );
         },
         cell: ({ row }) => (
-          <div className="max-w-2xs truncate font-mono text-xs sm:text-sm">
+          <Link
+            className="block w-[260px] pl-3 truncate font-mono text-xs sm:text-sm hover:underline"
+            to={`/mailbox/${encodeURIComponent(row.original.id)}`}
+          >
             {row.original.address}
-          </div>
+          </Link>
         ),
       },
       {
@@ -195,7 +215,9 @@ export const RecentAddressActivityCard = ({
           row.original.lastReceivedAt ? (
             formatDateTime(row.original.lastReceivedAt)
           ) : (
-            <span className="text-muted-foreground">No email yet</span>
+            <span className="text-muted-foreground w-[130px]">
+              No activity yet
+            </span>
           ),
       },
       {
@@ -246,6 +268,21 @@ export const RecentAddressActivityCard = ({
 
   const addressFilterValue =
     (table.getColumn("address")?.getFilterValue() as string) ?? "";
+  const isTableLoading = isLoading || isPlaceholderData;
+  const filteredRows = table.getRowModel().rows;
+
+  const handleNextPage = React.useCallback(() => {
+    if (!nextCursor || isFetching) return;
+    setCursorHistory(previous => [...previous, cursor]);
+    setCursor(nextCursor);
+  }, [cursor, isFetching, nextCursor]);
+
+  const handlePreviousPage = React.useCallback(() => {
+    if (!canGoPrevious || isFetching) return;
+    const previousCursor = cursorHistory[cursorHistory.length - 1] ?? null;
+    setCursorHistory(previous => previous.slice(0, -1));
+    setCursor(previousCursor);
+  }, [canGoPrevious, cursorHistory, isFetching]);
 
   return (
     <Card className="border-border/70 bg-card/60">
@@ -255,85 +292,118 @@ export const RecentAddressActivityCard = ({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner />
-            <span>Loading activity...</span>
-          </div>
-        ) : errorMessage ? (
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        ) : recentRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No addresses yet. Create one to begin.
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+          <Input
+            value={addressFilterValue}
+            onChange={event =>
+              table.getColumn("address")?.setFilterValue(event.target.value)
+            }
+            className={cn(
+              "w-full sm:max-w-xs",
+              addressFilterValue &&
+                "border-primary/50 bg-muted/40 ring-1 ring-primary/25"
+            )}
+            placeholder="Filter by address..."
+          />
+          <p
+            className={cn(
+              "text-xs",
+              errorMessage ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {errorMessage
+              ? errorMessage
+              : isTableLoading
+                ? "Loading activity..."
+                : `Showing ${filteredRows.length} of ${recentRows.length} addresses on page ${pageNumber}`}
           </p>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
-              <Input
-                value={addressFilterValue}
-                onChange={event =>
-                  table.getColumn("address")?.setFilterValue(event.target.value)
-                }
-                className={cn(
-                  "w-full sm:max-w-xs",
-                  addressFilterValue &&
-                    "border-primary/50 bg-muted/40 ring-1 ring-primary/25"
-                )}
-                placeholder="Filter by address..."
-              />
-              <p className="text-xs text-muted-foreground">
-                Showing {table.getRowModel().rows.length} of {recentRows.length}{" "}
-                recent addresses ({addresses.length} total)
-              </p>
-            </div>
+        </div>
 
-            <div className="overflow-hidden rounded-lg border border-border/70">
-              <Table className="min-w-[640px]">
-                <TableHeader>
-                  {table.getHeaderGroups().map(headerGroup => (
-                    <TableRow key={headerGroup.id}>
-                      {headerGroup.headers.map(header => (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      ))}
-                    </TableRow>
+        <div className="overflow-hidden rounded-lg border border-border/70">
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              {table.getHeaderGroups().map(headerGroup => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map(header => (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
                   ))}
-                </TableHeader>
-                <TableBody>
-                  {table.getRowModel().rows.length > 0 ? (
-                    table.getRowModel().rows.map(row => (
-                      <TableRow key={row.id}>
-                        {row.getVisibleCells().map(cell => (
-                          <TableCell key={cell.id}>
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        className="h-20 text-center text-muted-foreground"
-                        colSpan={columns.length}
-                      >
-                        No addresses match this filter.
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isTableLoading ? (
+                Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
+                  (_, index) => (
+                    <TableRow key={`recent-address-activity-skeleton-${index}`}>
+                      <TableCell className="pl-5 w-[466px]">
+                        <Skeleton className="h-4 w-46" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-46" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-46" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-16 rounded-full" />
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
+                  )
+                )
+              ) : filteredRows.length > 0 ? (
+                filteredRows.map(row => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map(cell => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    className="h-20 text-center text-muted-foreground"
+                    colSpan={columns.length}
+                  >
+                    {recentRows.length === 0
+                      ? "No addresses yet. Create one to begin."
+                      : "No addresses match this filter."}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <Button
+            disabled={!canGoPrevious || isFetching}
+            onClick={handlePreviousPage}
+            size="sm"
+            variant="outline"
+          >
+            Previous
+          </Button>
+          <Button
+            disabled={!nextCursor || isFetching}
+            onClick={handleNextPage}
+            size="sm"
+            variant="outline"
+          >
+            Next
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
