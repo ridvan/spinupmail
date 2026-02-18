@@ -10,8 +10,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
@@ -30,9 +32,14 @@ type EmailPreviewProps = {
 const formatDate = (value: string | null) => {
   if (!value) return "Unknown time";
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   }).format(new Date(value));
 };
 
@@ -49,6 +56,9 @@ export const EmailPreview = ({
   const { theme } = useTheme();
   const { activeOrganizationId } = useAuth();
   const deleteMutation = useDeleteEmailMutation(email?.addressId ?? null);
+  const deleteIconRef = React.useRef<DeleteIconHandle>(null);
+  const confirmDeleteIconRef = React.useRef<DeleteIconHandle>(null);
+  const cancelDeleteIconRef = React.useRef<XIconHandle>(null);
   const [pendingDeleteEmailId, setPendingDeleteEmailId] = React.useState<
     string | null
   >(null);
@@ -65,6 +75,12 @@ export const EmailPreview = ({
         ? "dark"
         : "light"
       : theme;
+  const previewBackgroundColor =
+    previewTheme === "dark" ? "#121212" : "#ffffff";
+  const emailPreviewDoc = React.useMemo(
+    () => (email?.html ? buildEmailPreview(email.html, previewTheme) : null),
+    [email?.html, previewTheme]
+  );
 
   if (isLoading) {
     return (
@@ -127,24 +143,35 @@ export const EmailPreview = ({
         <Button
           type="button"
           size="sm"
-          variant="destructive"
+          variant="outline"
+          className="cursor-pointer"
           disabled={deleteMutation.isPending}
+          onMouseEnter={() => {
+            deleteIconRef.current?.startAnimation();
+          }}
+          onMouseLeave={() => {
+            deleteIconRef.current?.stopAnimation();
+          }}
           onClick={() => setPendingDeleteEmailId(email.id)}
         >
-          Delete email
+          <DeleteIcon ref={deleteIconRef} size={16} aria-hidden="true" />
+          Delete
         </Button>
       </div>
       <Separator />
 
-      {email.html ? (
-        <div className="overflow-hidden rounded-md border border-border/70 bg-background">
+      {emailPreviewDoc ? (
+        <div
+          className="relative h-96 overflow-hidden rounded-md border border-border/70"
+          style={{ backgroundColor: previewBackgroundColor }}
+        >
           <iframe
-            className="h-96 w-full"
-            key={previewTheme}
-            loading="lazy"
+            className="h-full w-full"
+            key={`${email.id}:${previewTheme}`}
+            loading="eager"
             referrerPolicy="no-referrer"
             sandbox=""
-            srcDoc={buildEmailPreview(email.html, previewTheme)}
+            srcDoc={emailPreviewDoc}
             title="Email preview"
           />
         </div>
@@ -231,23 +258,46 @@ export const EmailPreview = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this email?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this message and all of its
+              This will permanently delete this email and all of its
               attachments.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="cursor-pointer"
+              onMouseEnter={() => {
+                cancelDeleteIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                cancelDeleteIconRef.current?.stopAnimation();
+              }}
+            >
+              <XIcon ref={cancelDeleteIconRef} size={16} aria-hidden="true" />
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
+              className="cursor-pointer"
               disabled={deleteMutation.isPending}
+              onMouseEnter={() => {
+                confirmDeleteIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                confirmDeleteIconRef.current?.stopAnimation();
+              }}
               onClick={event => {
                 event.preventDefault();
                 void handleDeleteEmail();
               }}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete email"}
+              <DeleteIcon
+                ref={confirmDeleteIconRef}
+                size={16}
+                className="text-destructive"
+                aria-hidden="true"
+              />
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

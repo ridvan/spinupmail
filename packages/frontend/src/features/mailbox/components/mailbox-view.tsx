@@ -14,6 +14,9 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { DeleteIcon } from "@/components/ui/delete";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -40,6 +43,11 @@ const formatRelativeDate = (value: string | null) => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const formattedTime = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 
   const isToday = date.toDateString() === now.toDateString();
 
@@ -48,32 +56,32 @@ const formatRelativeDate = (value: string | null) => {
   const isYesterday = date.toDateString() === yesterday.toDateString();
 
   if (isToday) {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(date);
+    return `Today, ${formattedTime}`;
   }
 
-  if (isYesterday) return "Yesterday";
+  if (isYesterday) return `Yesterday, ${formattedTime}`;
 
   if (diffDays < 7) {
-    return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(
-      date
-    );
+    const weekday = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+    }).format(date);
+    return `${weekday}, ${formattedTime}`;
   }
 
   if (date.getFullYear() === now.getFullYear()) {
-    return new Intl.DateTimeFormat(undefined, {
+    const shortDate = new Intl.DateTimeFormat(undefined, {
       month: "short",
       day: "numeric",
     }).format(date);
+    return `${shortDate}, ${formattedTime}`;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  const fullDate = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
   }).format(date);
+  return `${fullDate}, ${formattedTime}`;
 };
 
 export const MailboxView = ({
@@ -110,7 +118,7 @@ export const MailboxView = ({
   }, [addressCommandOpen]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/70 md:flex-row">
+    <div className="flex min-h-0 max-h-[750px] flex-1 flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10 md:flex-row">
       {/* Left panel: Address selector + Email list */}
       <div className="flex w-full shrink-0 flex-col bg-card/40 md:w-[380px]">
         {/* Address selector */}
@@ -192,7 +200,7 @@ export const MailboxView = ({
         <Separator />
 
         {/* Email list */}
-        <div className="max-h-48 overflow-y-auto md:max-h-none md:flex-1">
+        <ScrollArea className="h-48 min-h-0 md:h-auto md:flex-1">
           {emailsLoading ? (
             <div className="space-y-1 p-2">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -214,16 +222,16 @@ export const MailboxView = ({
               />
               <p className="text-sm text-muted-foreground">
                 {selectedAddressId
-                  ? "No emails received yet. Send an email to this address to test things out!"
+                  ? "No emails received yet. Send an email to this address to test things out."
                   : "Select an address to view its emails."}
               </p>
             </div>
           ) : (
-            <div className="p-1.5">
+            <div>
               {emails.map(email => (
                 <button
                   className={cn(
-                    "flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left transition cursor-pointer",
+                    "flex w-full flex-col gap-0.5 border-b border-border/50 px-3 py-2 text-left transition cursor-pointer last:border-b-0",
                     selectedEmailId === email.id
                       ? "bg-primary/10 text-foreground"
                       : "hover:bg-muted/50"
@@ -247,20 +255,32 @@ export const MailboxView = ({
               ))}
             </div>
           )}
-        </div>
+        </ScrollArea>
       </div>
 
       {/* Right panel: Email preview */}
       <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/70 bg-card/20 md:border-l md:border-t-0">
         {previewEmailLoading ? (
-          <div className="space-y-4 p-5">
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-64" />
-              <Skeleton className="h-3.5 w-40" />
-              <Skeleton className="h-3.5 w-28" />
+          <div className="space-y-3 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Skeleton className="h-6 w-64" />
+                <Skeleton className="mt-0.5 h-4 w-40" />
+                <Skeleton className="mt-0.5 h-3 w-44" />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled
+                className="cursor-default"
+              >
+                <DeleteIcon size={16} aria-hidden="true" />
+                Delete
+              </Button>
             </div>
             <Separator />
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-96 w-full rounded-md bg-muted/60" />
           </div>
         ) : previewEmail ? (
           <div className="p-5">
@@ -278,7 +298,7 @@ export const MailboxView = ({
                 No email selected
               </p>
               <p className="text-xs text-muted-foreground/70">
-                Choose a message from the list to preview
+                Choose an email from the list to preview
               </p>
             </div>
           </div>

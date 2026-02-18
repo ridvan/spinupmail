@@ -109,6 +109,11 @@ export const MailboxPage = () => {
   ]);
 
   const emailDetailQuery = useMailboxEmailDetailQuery(resolvedSelectedEmailId);
+  const previewEmail = resolvedSelectedEmailId
+    ? (emailDetailQuery.data ?? null)
+    : null;
+  const previewEmailLoading =
+    Boolean(resolvedSelectedEmailId) && emailDetailQuery.isLoading;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
@@ -133,8 +138,8 @@ export const MailboxPage = () => {
         addressesLoading={addressesQuery.isLoading}
         emails={emailsQuery.data?.items ?? []}
         emailsLoading={emailsQuery.isLoading}
-        previewEmail={emailDetailQuery.data ?? null}
-        previewEmailLoading={emailDetailQuery.isLoading}
+        previewEmail={previewEmail}
+        previewEmailLoading={previewEmailLoading}
         onSelectAddress={addressId => {
           setPreferredAddressId(addressId);
           const nextPath = buildMailboxPath(addressId);
