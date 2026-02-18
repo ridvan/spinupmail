@@ -41,27 +41,28 @@ const formatRelativeDate = (value: string | null) => {
 
   const date = new Date(value);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const dateDayKey = Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+  const nowDayKey = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const calendarDayDiff = Math.floor(
+    (nowDayKey - dateDayKey) / (1000 * 60 * 60 * 24)
+  );
   const formattedTime = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(date);
 
-  const isToday = date.toDateString() === now.toDateString();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-
-  if (isToday) {
+  if (calendarDayDiff === 0) {
     return `Today, ${formattedTime}`;
   }
 
-  if (isYesterday) return `Yesterday, ${formattedTime}`;
+  if (calendarDayDiff === 1) return `Yesterday, ${formattedTime}`;
 
-  if (diffDays < 7) {
+  if (calendarDayDiff > 1 && calendarDayDiff < 7) {
     const weekday = new Intl.DateTimeFormat(undefined, {
       weekday: "long",
     }).format(date);
