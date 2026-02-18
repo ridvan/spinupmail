@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,14 +11,27 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeftIcon,
+  type ArrowLeftIconHandle,
+} from "@/components/ui/arrow-left";
+import {
+  ArrowRightIcon,
+  type ArrowRightIconHandle,
+} from "@/components/ui/arrow-right";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  SquarePenIcon,
+  type SquarePenIconHandle,
+} from "@/components/ui/square-pen";
 import {
   Table,
   TableBody,
@@ -41,14 +55,89 @@ const PAGE_SIZE = 10;
 const ALLOWED_SENDER_VISIBLE_COUNT = 2;
 const allowedSenderBadgeClass =
   "h-6 rounded-md border border-border/70 bg-muted/80 px-2 text-xs dark:bg-muted/60";
+const placeholderTextClass =
+  "inline-flex min-w-6 justify-center text-muted-foreground";
+const currentYearDateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+const otherYearDateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+type AddressRowActionsProps = {
+  address: EmailAddress;
+  isDeletePending: boolean;
+  onEdit: (address: EmailAddress) => void;
+  onDelete: (address: EmailAddress) => void;
+};
+
+const AddressRowActions = ({
+  address,
+  isDeletePending,
+  onEdit,
+  onDelete,
+}: AddressRowActionsProps) => {
+  const editIconRef = React.useRef<SquarePenIconHandle>(null);
+  const deleteIconRef = React.useRef<DeleteIconHandle>(null);
+
+  return (
+    <TableCell className="space-x-2 text-right">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="cursor-pointer"
+        onMouseEnter={() => {
+          editIconRef.current?.startAnimation();
+        }}
+        onMouseLeave={() => {
+          editIconRef.current?.stopAnimation();
+        }}
+        onClick={() => onEdit(address)}
+      >
+        <SquarePenIcon ref={editIconRef} size={16} aria-hidden="true" />
+        Edit
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={isDeletePending}
+        className="cursor-pointer"
+        onMouseEnter={() => {
+          deleteIconRef.current?.startAnimation();
+        }}
+        onMouseLeave={() => {
+          deleteIconRef.current?.stopAnimation();
+        }}
+        onClick={() => onDelete(address)}
+      >
+        <DeleteIcon ref={deleteIconRef} size={16} aria-hidden="true" />
+        Delete
+      </Button>
+    </TableCell>
+  );
+};
 
 const formatDate = (value: string | null) => {
   if (!value) return "Never";
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Never";
+
+  const isCurrentYear = parsed.getFullYear() === new Date().getFullYear();
+  return (
+    isCurrentYear ? currentYearDateFormatter : otherYearDateFormatter
+  ).format(parsed);
 };
 
 const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
@@ -56,7 +145,10 @@ const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
 
   if (allowedDomains.length === 0) {
     return (
-      <Badge variant="secondary" className={allowedSenderBadgeClass}>
+      <Badge
+        variant="secondary"
+        className={`${allowedSenderBadgeClass} min-w-24 justify-center text-muted-foreground`}
+      >
         Any domain
       </Badge>
     );
@@ -124,6 +216,9 @@ export const AddressList = ({ domains }: AddressListProps) => {
     React.useState<EmailAddress | null>(null);
   const [editingAddress, setEditingAddress] =
     React.useState<EmailAddress | null>(null);
+  const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
+  const previousPageIconRef = React.useRef<ArrowLeftIconHandle>(null);
+  const nextPageIconRef = React.useRef<ArrowRightIconHandle>(null);
 
   const addressesQuery = useAddressesQuery({
     page,
@@ -134,16 +229,15 @@ export const AddressList = ({ domains }: AddressListProps) => {
 
   const handleSort = (column: EmailAddressSortBy) => {
     setPage(1);
-    setSortBy(previous => {
-      if (previous !== column) {
-        setSortDirection("asc");
-        return column;
-      }
-      setSortDirection(previousDirection =>
-        previousDirection === "asc" ? "desc" : "asc"
-      );
-      return previous;
-    });
+    if (sortBy !== column) {
+      setSortBy(column);
+      setSortDirection("asc");
+      return;
+    }
+
+    setSortDirection(previousDirection =>
+      previousDirection === "asc" ? "desc" : "asc"
+    );
   };
 
   const sortLabel = (column: EmailAddressSortBy) => {
@@ -157,12 +251,17 @@ export const AddressList = ({ domains }: AddressListProps) => {
     try {
       await deleteMutation.mutateAsync(pendingDeleteAddress.id);
       if (editingAddress?.id === pendingDeleteAddress.id) {
+        setIsEditSheetOpen(false);
         setEditingAddress(null);
       }
       setPendingDeleteAddress(null);
     } catch {
       // Error shown from mutation state.
     }
+  };
+
+  const handleEditSheetOpenChange = (isOpen: boolean) => {
+    setIsEditSheetOpen(isOpen);
   };
 
   const addresses = addressesQuery.data?.items ?? [];
@@ -227,48 +326,53 @@ export const AddressList = ({ domains }: AddressListProps) => {
               {addresses.map(address => (
                 <TableRow key={address.id}>
                   <TableCell className="max-w-56 truncate font-medium">
-                    {address.address}
+                    <Link
+                      className="block truncate font-mono text-xs sm:text-sm hover:underline"
+                      to={`/mailbox/${encodeURIComponent(address.id)}`}
+                    >
+                      {address.address}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     {address.tag ? (
                       <Badge variant="secondary">{address.tag}</Badge>
                     ) : (
-                      "-"
+                      <span className={placeholderTextClass}>-</span>
                     )}
                   </TableCell>
                   <TableCell>{formatDate(address.createdAt)}</TableCell>
-                  <TableCell>{formatDate(address.lastReceivedAt)}</TableCell>
+                  <TableCell
+                    className={
+                      address.lastReceivedAt
+                        ? undefined
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {formatDate(address.lastReceivedAt)}
+                  </TableCell>
                   <TableCell className="max-w-72">
                     <AllowedSendersBadges
                       domains={address.allowedFromDomains}
                     />
                   </TableCell>
-                  <TableCell className="space-x-2 text-right">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingAddress(address)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => setPendingDeleteAddress(address)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
+                  <AddressRowActions
+                    address={address}
+                    isDeletePending={deleteMutation.isPending}
+                    onEdit={value => {
+                      setEditingAddress(value);
+                      setIsEditSheetOpen(true);
+                    }}
+                    onDelete={value => {
+                      setPendingDeleteAddress(value);
+                    }}
+                  />
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
           <p className="text-sm text-muted-foreground">
             {addressesQuery.isLoading
               ? "Loading addresses..."
@@ -280,8 +384,21 @@ export const AddressList = ({ domains }: AddressListProps) => {
               variant="outline"
               size="sm"
               disabled={addressesQuery.isLoading || currentPage <= 1}
+              className="cursor-pointer"
+              onMouseEnter={() => {
+                previousPageIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                previousPageIconRef.current?.stopAnimation();
+              }}
               onClick={() => setPage(previous => Math.max(1, previous - 1))}
             >
+              <ArrowLeftIcon
+                ref={previousPageIconRef}
+                className="cursor-pointer"
+                size={16}
+                aria-hidden="true"
+              />
               Previous
             </Button>
             <Button
@@ -289,11 +406,24 @@ export const AddressList = ({ domains }: AddressListProps) => {
               variant="outline"
               size="sm"
               disabled={addressesQuery.isLoading || currentPage >= totalPages}
+              className="cursor-pointer"
+              onMouseEnter={() => {
+                nextPageIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                nextPageIconRef.current?.stopAnimation();
+              }}
               onClick={() =>
                 setPage(previous => Math.min(totalPages, previous + 1))
               }
             >
               Next
+              <ArrowRightIcon
+                ref={nextPageIconRef}
+                className="cursor-pointer"
+                size={16}
+                aria-hidden="true"
+              />
             </Button>
           </div>
         </div>
@@ -354,10 +484,8 @@ export const AddressList = ({ domains }: AddressListProps) => {
         key={editingAddress?.id ?? "edit-address-sheet"}
         address={editingAddress}
         domains={domains}
-        open={Boolean(editingAddress)}
-        onOpenChange={isOpen => {
-          if (!isOpen) setEditingAddress(null);
-        }}
+        open={isEditSheetOpen}
+        onOpenChange={handleEditSheetOpenChange}
       />
     </Card>
   );

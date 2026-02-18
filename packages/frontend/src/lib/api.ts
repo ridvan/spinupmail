@@ -192,12 +192,19 @@ export const listAllEmailAddresses = async (options?: {
   signal?: AbortSignal;
   organizationId?: string | null;
 }) => {
+  const MAX_ADDRESS_PAGES = 200;
   const pageSize = 50;
   let page = 1;
   let totalPages = 1;
   const items: EmailAddress[] = [];
 
   while (page <= totalPages) {
+    if (page > MAX_ADDRESS_PAGES) {
+      throw new Error(
+        `Address pagination exceeded ${MAX_ADDRESS_PAGES} pages. Aborting request.`
+      );
+    }
+
     const response = await listEmailAddresses({
       page,
       pageSize,
@@ -209,6 +216,13 @@ export const listAllEmailAddresses = async (options?: {
 
     items.push(...response.items);
     totalPages = response.totalPages;
+
+    if (totalPages > MAX_ADDRESS_PAGES) {
+      throw new Error(
+        `Address pagination reported ${totalPages} pages, over safety limit ${MAX_ADDRESS_PAGES}.`
+      );
+    }
+
     page += 1;
   }
 

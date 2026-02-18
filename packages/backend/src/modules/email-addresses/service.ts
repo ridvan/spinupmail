@@ -5,6 +5,7 @@ import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
 import {
   buildAddressMetaForStorage,
   getAllowedFromDomainsFromMeta,
+  hasReservedLocalPartKeyword,
   isValidDomain,
   normalizeAddress,
   normalizeAllowedFromDomains,
@@ -13,6 +14,10 @@ import {
 } from "@/shared/validation";
 import { clampNumber } from "@/shared/utils/dates";
 import {
+  ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH,
+  ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
+  ADDRESS_LOCAL_PART_MAX_LENGTH,
+  ADDRESS_TTL_MAX_MINUTES,
   createEmailAddressBodySchema,
   listEmailAddressesQuerySchema,
   listRecentAddressActivityQuerySchema,
@@ -49,7 +54,7 @@ const RECENT_ACTIVITY_CURSOR_SEPARATOR = ":";
 
 const parseCreateBody = (payload: unknown): CreateEmailAddressBody => {
   const parsed = createEmailAddressBodySchema.safeParse(payload);
-  if (!parsed.success) return { acceptedRiskNotice: false };
+  if (!parsed.success) return { localPart: "", acceptedRiskNotice: false };
   return parsed.data;
 };
 
@@ -254,6 +259,28 @@ export const createEmailAddress = async ({
     };
   }
 
+  if (allowedFromDomains.length > ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `allowedFromDomains must contain at most ${ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS} items`,
+      },
+    };
+  }
+
+  if (
+    allowedFromDomains.some(
+      domainValue => domainValue.length > ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH
+    )
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `allowedFromDomains items must be ${ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
+
   if (!allowedFromDomains.every(isValidDomain)) {
     return {
       status: 400 as const,
@@ -263,6 +290,17 @@ export const createEmailAddress = async ({
 
   const providedLocalPart =
     typeof body.localPart === "string" ? body.localPart : "";
+  const trimmedLocalPart = providedLocalPart.trim();
+
+  if (trimmedLocalPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
+
   const localPart = sanitizeLocalPart(providedLocalPart);
 
   if (!localPart) {
@@ -275,10 +313,32 @@ export const createEmailAddress = async ({
     };
   }
 
+  if (hasReservedLocalPartKeyword(localPart)) {
+    return {
+      status: 400 as const,
+      body: { error: "localPart is reserved and cannot be used" },
+    };
+  }
+
   const address = normalizeAddress(`${localPart}@${domain}`);
   const now = Date.now();
   const ttlMinutes =
     typeof body.ttlMinutes === "number" ? body.ttlMinutes : undefined;
+
+  if (
+    ttlMinutes !== undefined &&
+    (!Number.isInteger(ttlMinutes) ||
+      ttlMinutes <= 0 ||
+      ttlMinutes > ADDRESS_TTL_MAX_MINUTES)
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `ttlMinutes must be a whole number between 1 and ${ADDRESS_TTL_MAX_MINUTES}`,
+      },
+    };
+  }
+
   const expiresAtMs =
     ttlMinutes && ttlMinutes > 0 ? now + ttlMinutes * 60 * 1000 : undefined;
   const expiresAt = expiresAtMs ? new Date(expiresAtMs) : undefined;
@@ -318,7 +378,7 @@ export const createEmailAddress = async ({
     return {
       status: 409 as const,
       body: {
-        error: "address already exists",
+        error: "Address already exists",
         address,
         ...(existing?.id ? { id: existing.id } : {}),
       },
@@ -458,6 +518,15 @@ export const updateEmailAddress = async ({
 
   const localPartSource =
     typeof body.localPart === "string" ? body.localPart : existing.localPart;
+  const trimmedLocalPart = localPartSource.trim();
+  if (trimmedLocalPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
   const localPart = sanitizeLocalPart(localPartSource);
 
   if (!localPart) {
@@ -470,12 +539,41 @@ export const updateEmailAddress = async ({
     };
   }
 
+  if (hasReservedLocalPartKeyword(localPart)) {
+    return {
+      status: 400 as const,
+      body: { error: "localPart is reserved and cannot be used" },
+    };
+  }
+
   const address = normalizeAddress(`${localPart}@${domainFromBody}`);
   const existingMeta = parseAddressMeta(existing.meta);
   const allowedFromDomains =
     body.allowedFromDomains !== undefined
       ? normalizeAllowedFromDomains(body.allowedFromDomains)
       : getAllowedFromDomainsFromMeta(existingMeta);
+
+  if (allowedFromDomains.length > ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `allowedFromDomains must contain at most ${ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS} items`,
+      },
+    };
+  }
+
+  if (
+    allowedFromDomains.some(
+      domainValue => domainValue.length > ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH
+    )
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `allowedFromDomains items must be ${ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
 
   if (!allowedFromDomains.every(isValidDomain)) {
     return {
@@ -485,10 +583,16 @@ export const updateEmailAddress = async ({
   }
 
   if (body.ttlMinutes !== undefined && body.ttlMinutes !== null) {
-    if (!Number.isFinite(body.ttlMinutes) || body.ttlMinutes <= 0) {
+    if (
+      !Number.isInteger(body.ttlMinutes) ||
+      body.ttlMinutes <= 0 ||
+      body.ttlMinutes > ADDRESS_TTL_MAX_MINUTES
+    ) {
       return {
         status: 400 as const,
-        body: { error: "ttlMinutes must be a positive number" },
+        body: {
+          error: `ttlMinutes must be a whole number between 1 and ${ADDRESS_TTL_MAX_MINUTES}`,
+        },
       };
     }
   }
@@ -548,7 +652,7 @@ export const updateEmailAddress = async ({
     return {
       status: 409 as const,
       body: {
-        error: "address already exists",
+        error: "Address already exists",
         address,
         ...(conflict?.id ? { id: conflict.id } : {}),
       },

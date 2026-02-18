@@ -1,13 +1,45 @@
 import { z } from "zod";
 
+export const ADDRESS_LOCAL_PART_MAX_LENGTH = 30;
+export const ADDRESS_TAG_MAX_LENGTH = 20;
+export const ADDRESS_TTL_MAX_MINUTES = 43_200;
+export const ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
+export const ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
+const ADDRESS_LOCAL_PART_REGEX = /^[a-z0-9._+-]+$/i;
+const DOMAIN_HOSTNAME_REGEX =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+
+const allowedFromDomainsSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH)
+      .regex(DOMAIN_HOSTNAME_REGEX, "Invalid domain hostname")
+  )
+  .max(ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS);
+
 export const createEmailAddressBodySchema = z
   .object({
-    localPart: z.string().optional(),
-    tag: z.string().max(30).optional(),
-    ttlMinutes: z.number().optional(),
+    localPart: z
+      .string()
+      .trim()
+      .min(1)
+      .max(ADDRESS_LOCAL_PART_MAX_LENGTH)
+      .regex(ADDRESS_LOCAL_PART_REGEX),
+    tag: z.string().trim().max(ADDRESS_TAG_MAX_LENGTH).optional(),
+    ttlMinutes: z
+      .number()
+      .int()
+      .positive()
+      .max(ADDRESS_TTL_MAX_MINUTES)
+      .optional(),
     meta: z.unknown().optional(),
     domain: z.string().optional(),
-    allowedFromDomains: z.union([z.array(z.string()), z.string()]).optional(),
+    allowedFromDomains: z
+      .union([allowedFromDomainsSchema, z.string()])
+      .optional(),
     acceptedRiskNotice: z.boolean().refine(value => value, {
       message: "acceptedRiskNotice must be true",
     }),
@@ -25,12 +57,26 @@ export const listEmailAddressesQuerySchema = z
 
 export const updateEmailAddressBodySchema = z
   .object({
-    localPart: z.string().optional(),
-    tag: z.string().max(30).nullish(),
-    ttlMinutes: z.number().nullable().optional(),
+    localPart: z
+      .string()
+      .trim()
+      .min(1)
+      .max(ADDRESS_LOCAL_PART_MAX_LENGTH)
+      .regex(ADDRESS_LOCAL_PART_REGEX)
+      .optional(),
+    tag: z.string().trim().max(ADDRESS_TAG_MAX_LENGTH).nullish(),
+    ttlMinutes: z
+      .number()
+      .int()
+      .positive()
+      .max(ADDRESS_TTL_MAX_MINUTES)
+      .nullable()
+      .optional(),
     meta: z.unknown().optional(),
     domain: z.string().optional(),
-    allowedFromDomains: z.union([z.array(z.string()), z.string()]).optional(),
+    allowedFromDomains: z
+      .union([allowedFromDomainsSchema, z.string()])
+      .optional(),
   })
   .passthrough();
 

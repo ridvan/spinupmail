@@ -2,6 +2,7 @@ import {
   buildAddressMetaForStorage,
   extractSenderDomain,
   getAllowedFromDomainsFromMeta,
+  hasReservedLocalPartKeyword,
   isSenderDomainAllowed,
   normalizeAllowedFromDomains,
   parseAddressMeta,
@@ -44,5 +45,15 @@ describe("shared validation helpers", () => {
   it("rejects non-object string metadata when allow-list is present", () => {
     const stored = buildAddressMetaForStorage("[]", ["foo.com"]);
     expect(stored).toBeNull();
+  });
+
+  it("flags reserved local-part keywords", () => {
+    expect(hasReservedLocalPartKeyword("admin")).toBe(true);
+    expect(hasReservedLocalPartKeyword("team.owner")).toBe(true);
+    expect(hasReservedLocalPartKeyword("no-reply")).toBe(true);
+    expect(hasReservedLocalPartKeyword("mailer-daemon")).toBe(true);
+    expect(hasReservedLocalPartKeyword("postmaster")).toBe(true);
+    expect(hasReservedLocalPartKeyword("support")).toBe(true);
+    expect(hasReservedLocalPartKeyword("customer-success")).toBe(false);
   });
 });

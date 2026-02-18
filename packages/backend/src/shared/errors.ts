@@ -4,21 +4,32 @@ const getUnknownProperty = (value: unknown, key: string): unknown => {
   return record[key];
 };
 
-const getErrorMessage = (error: unknown) => {
+const collectErrorMessages = (
+  error: unknown,
+  messages: string[],
+  depth = 0
+) => {
+  if (depth > 5 || typeof error !== "object" || !error) return;
+
   const messageRaw = getUnknownProperty(error, "message");
-  if (typeof messageRaw === "string") return messageRaw;
+  if (typeof messageRaw === "string" && messageRaw.length > 0) {
+    messages.push(messageRaw);
+  }
 
   const cause = getUnknownProperty(error, "cause");
-  const causeMessage = getUnknownProperty(cause, "message");
-  if (typeof causeMessage === "string") return causeMessage;
-
-  return "";
+  if (cause) {
+    collectErrorMessages(cause, messages, depth + 1);
+  }
 };
 
 export const isAddressConflictError = (error: unknown) =>
-  /unique constraint failed:\s*email_addresses\.address/i.test(
-    getErrorMessage(error)
-  );
+  (() => {
+    const messages: string[] = [];
+    collectErrorMessages(error, messages);
+    return messages.some(message =>
+      /unique constraint failed:\s*email_addresses\.address/i.test(message)
+    );
+  })();
 
 export const getAuthFailureResponse = (
   error: unknown

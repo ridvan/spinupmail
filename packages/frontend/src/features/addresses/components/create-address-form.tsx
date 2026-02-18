@@ -1,8 +1,10 @@
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Link } from "react-router";
+import { useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldDescription,
@@ -11,6 +13,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
 import {
   Select,
   SelectContent,
@@ -18,14 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
 import {
-  DomainTagsInput,
-  TagTokenInput,
-} from "@/features/addresses/components/address-form-fields";
-import {
+  ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_TAG_MAX_LENGTH,
+  ADDRESS_TTL_MAX_MINUTES,
+  ALLOWED_FROM_DOMAIN_MAX_LENGTH,
+  ALLOWED_FROM_DOMAINS_MAX_ITEMS,
   addressPartRegex,
   domainRegex,
+  hasReservedLocalPartKeyword,
+  normalizeDomainToken,
   uniqueDomains,
 } from "@/features/addresses/schemas/address-form";
 import { useCreateAddressMutation } from "@/features/addresses/hooks/use-addresses";
@@ -35,44 +41,72 @@ type CreateAddressFormProps = {
   domains: string[];
 };
 
-const createAddressSchema = z.object({
-  localPart: z
-    .string()
-    .trim()
-    .min(1, "Address prefix is required")
-    .max(64, "Address prefix must be 64 characters or fewer")
-    .refine(value => addressPartRegex.test(value), {
+const createAddressSchema = (availableDomains: string[]) =>
+  z.object({
+    localPart: z
+      .string()
+      .trim()
+      .min(1, "Address prefix is required")
+      .max(ADDRESS_LOCAL_PART_MAX_LENGTH, {
+        message: `Address prefix must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      })
+      .refine(value => addressPartRegex.test(value), {
+        message:
+          "Address prefix can contain letters, numbers, dot, underscore, plus, and dash",
+      })
+      .refine(value => !hasReservedLocalPartKeyword(value), {
+        message: "This address prefix is reserved and cannot be used",
+      }),
+    ttlMinutes: z.union([
+      z
+        .number()
+        .int({ message: "TTL must be a whole number" })
+        .positive({ message: "TTL must be a positive number" })
+        .max(ADDRESS_TTL_MAX_MINUTES, {
+          message: `TTL must be ${ADDRESS_TTL_MAX_MINUTES} minutes or less`,
+        }),
+      z.undefined(),
+    ]),
+    domain: z
+      .string()
+      .trim()
+      .min(1, "Domain is required")
+      .refine(
+        value => availableDomains.includes(normalizeDomainToken(value)),
+        "Select one of the available domains"
+      ),
+    tag: z
+      .string()
+      .trim()
+      .max(ADDRESS_TAG_MAX_LENGTH, {
+        message: `Tag must be ${ADDRESS_TAG_MAX_LENGTH} characters or fewer`,
+      }),
+    allowedFromDomains: z
+      .array(z.string().trim())
+      .max(ALLOWED_FROM_DOMAINS_MAX_ITEMS, {
+        message: `You can add up to ${ALLOWED_FROM_DOMAINS_MAX_ITEMS} allowed sender domains`,
+      })
+      .refine(
+        values =>
+          values.every(
+            domain => domain.length <= ALLOWED_FROM_DOMAIN_MAX_LENGTH
+          ),
+        `Each allowed sender domain must be ${ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`
+      )
+      .refine(
+        values => values.every(domain => domainRegex.test(domain)),
+        "Use valid hostnames like `example.com`"
+      ),
+    acceptedRiskNotice: z.boolean().refine(value => value, {
       message:
-        "Address prefix can contain letters, numbers, dot, underscore, plus, and dash",
+        "You must accept the Terms and Privacy Policy to create an address",
     }),
-  ttlMinutes: z.union([
-    z
-      .number()
-      .int({ message: "TTL must be a whole number" })
-      .positive({ message: "TTL must be a positive number" }),
-    z.undefined(),
-  ]),
-  domain: z.string().trim().min(1, "Domain is required"),
-  tag: z
-    .string()
-    .trim()
-    .max(ADDRESS_TAG_MAX_LENGTH, {
-      message: `Tag must be ${ADDRESS_TAG_MAX_LENGTH} characters or fewer`,
-    }),
-  allowedFromDomains: z
-    .array(z.string().trim())
-    .refine(
-      values => values.every(domain => domainRegex.test(domain)),
-      "Use valid domains like `example.com`"
-    ),
-  acceptedRiskNotice: z.boolean().refine(value => value, {
-    message:
-      "You must accept the Terms and Privacy Policy to create an address",
-  }),
-});
+  });
 
 export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
   const createMutation = useCreateAddressMutation();
+  const plusIconRef = useRef<PlusIconHandle>(null);
+  const availableDomains = useMemo(() => uniqueDomains(domains), [domains]);
 
   const form = useForm({
     defaultValues: {
@@ -84,7 +118,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
       acceptedRiskNotice: false,
     },
     validators: {
-      onSubmit: createAddressSchema,
+      onSubmit: createAddressSchema(availableDomains),
     },
     onSubmit: async ({ value }) => {
       const selectedDomain = value.domain?.trim() || domains[0] || undefined;
@@ -130,7 +164,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
           }}
         >
           <FieldGroup>
-            <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1fr)]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
               <form.Field
                 name="localPart"
                 children={field => {
@@ -146,6 +180,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                         id="address-local-part"
                         name={field.name}
                         value={field.state.value}
+                        maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
                         onBlur={field.handleBlur}
                         onChange={event =>
                           field.handleChange(event.target.value)
@@ -166,16 +201,19 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
               <form.Field
                 name="domain"
                 children={field => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
                   const selectedValue = field.state.value || domains[0] || "";
 
                   return (
-                    <Field>
+                    <Field data-invalid={isInvalid}>
                       <FieldLabel htmlFor="address-domain">Domain</FieldLabel>
                       {domains.length <= 1 ? (
                         <Input
                           id="address-domain"
                           disabled
                           value={domains[0] ?? ""}
+                          aria-invalid={isInvalid}
                         />
                       ) : (
                         <Select
@@ -188,7 +226,8 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                             id="address-domain"
                             name={field.name}
                             onBlur={field.handleBlur}
-                            className="h-10 w-full"
+                            className="h-10 w-full cursor-pointer"
+                            aria-invalid={isInvalid}
                           >
                             <SelectValue placeholder="Select domain" />
                           </SelectTrigger>
@@ -205,6 +244,11 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                         <FieldDescription>
                           No domains configured on the backend.
                         </FieldDescription>
+                      ) : null}
+                      {isInvalid ? (
+                        <FieldError
+                          errors={toFieldErrors(field.state.meta.errors)}
+                        />
                       ) : null}
                     </Field>
                   );
@@ -227,6 +271,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                         name={field.name}
                         type="number"
                         min={1}
+                        max={ADDRESS_TTL_MAX_MINUTES}
                         step={1}
                         value={field.state.value ?? ""}
                         onBlur={field.handleBlur}
@@ -236,7 +281,38 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                             value === "" ? undefined : Number(value)
                           );
                         }}
-                        placeholder="60"
+                        placeholder="Leave empty for no expiration"
+                        aria-invalid={isInvalid}
+                      />
+                      {isInvalid ? (
+                        <FieldError
+                          errors={toFieldErrors(field.state.meta.errors)}
+                        />
+                      ) : null}
+                    </Field>
+                  );
+                }}
+              />
+
+              <form.Field
+                name="tag"
+                children={field => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
+
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor="address-tag">Tag</FieldLabel>
+                      <Input
+                        id="address-tag"
+                        name={field.name}
+                        value={field.state.value}
+                        maxLength={ADDRESS_TAG_MAX_LENGTH}
+                        onBlur={field.handleBlur}
+                        onChange={event =>
+                          field.handleChange(event.target.value)
+                        }
+                        placeholder="e.g., test-automation"
                         aria-invalid={isInvalid}
                       />
                       {isInvalid ? (
@@ -268,10 +344,11 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                         onChange={field.handleChange}
                         onBlur={field.handleBlur}
                         isInvalid={isInvalid}
+                        placeholder="e.g., gmail.com (accept only from Gmail)"
                       />
                       <FieldDescription>
-                        Optional. Type a domain and press Enter or comma to add
-                        a tag. Only matching sender domains will be stored.
+                        Up to {ALLOWED_FROM_DOMAINS_MAX_ITEMS} hostnames, each
+                        up to {ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters.
                       </FieldDescription>
                       {isInvalid ? (
                         <FieldError
@@ -283,36 +360,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                 }}
               />
 
-              <form.Field
-                name="tag"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor="address-tag">Tag</FieldLabel>
-                      <TagTokenInput
-                        id="address-tag"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        isInvalid={isInvalid}
-                        maxLength={ADDRESS_TAG_MAX_LENGTH}
-                      />
-                      <FieldDescription>
-                        Optional. One tag, up to {ADDRESS_TAG_MAX_LENGTH} chars.
-                      </FieldDescription>
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
+              <div aria-hidden className="hidden md:block" />
               <div aria-hidden className="hidden md:block" />
             </div>
           </FieldGroup>
@@ -332,16 +380,14 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
               return (
                 <Field data-invalid={isInvalid}>
                   <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <input
+                    <Checkbox
                       checked={field.state.value}
-                      className="mt-0.5 h-4 w-4 rounded border-border"
+                      className="mt-0.5 cursor-pointer"
                       id="address-legal-acknowledgement"
                       name={field.name}
                       onBlur={field.handleBlur}
-                      onChange={event =>
-                        field.handleChange(event.target.checked)
-                      }
-                      type="checkbox"
+                      onCheckedChange={checked => field.handleChange(checked)}
+                      aria-invalid={isInvalid}
                     />
                     <span>
                       I agree to the{" "}
@@ -372,7 +418,18 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
             }}
           />
 
-          <Button disabled={createMutation.isPending} type="submit">
+          <Button
+            disabled={createMutation.isPending}
+            type="submit"
+            className="cursor-pointer"
+            onMouseEnter={() => {
+              plusIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => {
+              plusIconRef.current?.stopAnimation();
+            }}
+          >
+            <PlusIcon ref={plusIconRef} size={16} aria-hidden="true" />
             {createMutation.isPending ? "Creating..." : "Create address"}
           </Button>
         </form>

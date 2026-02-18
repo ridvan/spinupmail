@@ -2,6 +2,8 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   ADDRESS_TAG_MAX_LENGTH,
+  ALLOWED_FROM_DOMAIN_MAX_LENGTH,
+  ALLOWED_FROM_DOMAINS_MAX_ITEMS,
   domainRegex,
   normalizeDomainToken,
   uniqueDomains,
@@ -13,6 +15,7 @@ type DomainTagsInputProps = {
   onChange: (next: string[]) => void;
   onBlur: () => void;
   isInvalid: boolean;
+  placeholder?: string;
 };
 
 export const DomainTagsInput = ({
@@ -21,6 +24,7 @@ export const DomainTagsInput = ({
   onChange,
   onBlur,
   isInvalid,
+  placeholder = "example.com",
 }: DomainTagsInputProps) => {
   const [draft, setDraft] = React.useState("");
 
@@ -30,9 +34,15 @@ export const DomainTagsInput = ({
         .split(/[\s,]+/)
         .map(normalizeDomainToken)
         .filter(Boolean)
+        .filter(domain => domain.length <= ALLOWED_FROM_DOMAIN_MAX_LENGTH)
         .filter(domain => domainRegex.test(domain));
       if (parsed.length === 0) return;
-      onChange(uniqueDomains([...value, ...parsed]));
+      onChange(
+        uniqueDomains([...value, ...parsed]).slice(
+          0,
+          ALLOWED_FROM_DOMAINS_MAX_ITEMS
+        )
+      );
     },
     [onChange, value]
   );
@@ -45,7 +55,7 @@ export const DomainTagsInput = ({
 
   return (
     <div
-      className="dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 flex min-h-10 flex-wrap items-center gap-1 rounded-lg border bg-transparent px-2 py-1 text-sm transition-colors focus-within:ring-3 aria-invalid:ring-3"
+      className="dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 flex min-h-8 flex-wrap items-center gap-1 rounded-lg border bg-transparent px-2 py-1 text-sm transition-colors focus-within:ring-3 aria-invalid:ring-3"
       aria-invalid={isInvalid}
     >
       {value.map(domain => (
@@ -68,6 +78,7 @@ export const DomainTagsInput = ({
       <input
         id={id}
         value={draft}
+        maxLength={ALLOWED_FROM_DOMAIN_MAX_LENGTH}
         onChange={event => setDraft(event.target.value)}
         onBlur={() => {
           commitDraft();
@@ -94,13 +105,14 @@ export const DomainTagsInput = ({
             .split(/[\s,]+/)
             .map(normalizeDomainToken)
             .filter(Boolean)
+            .filter(domain => domain.length <= ALLOWED_FROM_DOMAIN_MAX_LENGTH)
             .filter(domain => domainRegex.test(domain));
           if (parsed.length === 0) return;
 
           event.preventDefault();
           addDomains(pasted);
         }}
-        placeholder={value.length === 0 ? "example.com" : ""}
+        placeholder={value.length === 0 ? placeholder : ""}
         className="placeholder:text-muted-foreground min-w-[9rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm outline-none"
         aria-label="Add allowed sender domain"
         aria-invalid={isInvalid}
@@ -137,7 +149,7 @@ export const TagTokenInput = ({
 
   return (
     <div
-      className="dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 flex min-h-10 flex-wrap items-center gap-1 rounded-lg border bg-transparent px-2 py-1 text-sm transition-colors focus-within:ring-3 aria-invalid:ring-3"
+      className="dark:bg-input/30 border-input focus-within:border-ring focus-within:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 flex min-h-8 flex-wrap items-center gap-1 rounded-lg border bg-transparent px-2 py-1 text-sm transition-colors focus-within:ring-3 aria-invalid:ring-3"
       aria-invalid={isInvalid}
     >
       {value ? (

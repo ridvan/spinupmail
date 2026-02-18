@@ -19,6 +19,55 @@ export const sanitizeLocalPart = (value: string) => {
   return cleaned.replace(/^\.+|\.+$/g, "").slice(0, 64);
 };
 
+export const RESERVED_LOCAL_PART_KEYWORDS = [
+  "abuse",
+  "admin",
+  "administrator",
+  "api",
+  "billing",
+  "compliance",
+  "contact",
+  "devops",
+  "do-not-reply",
+  "donotreply",
+  "help",
+  "hostmaster",
+  "info",
+  "legal",
+  "mailer-daemon",
+  "mailerdaemon",
+  "noreply",
+  "no-reply",
+  "ops",
+  "owner",
+  "postmaster",
+  "root",
+  "sales",
+  "security",
+  "support",
+  "superadmin",
+  "sysadmin",
+  "webmaster",
+] as const;
+const reservedLocalPartKeywordSet: ReadonlySet<string> = new Set(
+  RESERVED_LOCAL_PART_KEYWORDS
+);
+
+export const hasReservedLocalPartKeyword = (value: string) => {
+  const normalized = sanitizeLocalPart(value);
+  if (!normalized) return false;
+  const collapsed = normalized.replace(/[._+-]+/g, "");
+
+  if (reservedLocalPartKeywordSet.has(collapsed)) {
+    return true;
+  }
+
+  return normalized
+    .split(/[._+-]+/)
+    .filter(Boolean)
+    .some(token => reservedLocalPartKeywordSet.has(token));
+};
+
 export const parseAddressMeta = (meta: string | null | undefined): unknown => {
   if (!meta) return null;
   try {
