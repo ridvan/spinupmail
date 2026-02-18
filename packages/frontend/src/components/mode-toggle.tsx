@@ -20,10 +20,6 @@ export function ModeToggle() {
   const triggerMoonRef = useRef<MoonIconHandle>(null);
   const triggerContrastRef = useRef<ContrastIconHandle>(null);
 
-  const staticSunRef = useRef<SunIconHandle>(null);
-  const staticMoonRef = useRef<MoonIconHandle>(null);
-  const staticContrastRef = useRef<ContrastIconHandle>(null);
-
   const getActiveTriggerRef = useCallback(() => {
     if (theme === "light") return triggerSunRef;
     if (theme === "dark") return triggerMoonRef;
@@ -86,29 +82,21 @@ export function ModeToggle() {
           onClick={() => setTheme("light")}
           className="gap-2 cursor-pointer"
         >
-          <SunIcon ref={staticSunRef} size={16} className="h-4 w-4 shrink-0" />
+          <SunIcon size={16} className="h-4 w-4 shrink-0" />
           Light
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => setTheme("dark")}
           className="gap-2 cursor-pointer"
         >
-          <MoonIcon
-            ref={staticMoonRef}
-            size={16}
-            className="h-4 w-4 shrink-0"
-          />
+          <MoonIcon size={16} className="h-4 w-4 shrink-0" />
           Dark
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => setTheme("system")}
           className="gap-2 cursor-pointer"
         >
-          <ContrastIcon
-            ref={staticContrastRef}
-            size={16}
-            className="h-4 w-4 shrink-0"
-          />
+          <ContrastIcon size={16} className="h-4 w-4 shrink-0" />
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

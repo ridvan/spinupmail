@@ -1,13 +1,10 @@
 import * as React from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getSortedRowModel,
-  type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
@@ -80,21 +77,12 @@ const getLifecycleBadge = (expiresAt: string | null) => {
   return <Badge variant="outline">Expires {formatDateTime(expiresAt)}</Badge>;
 };
 
-const getSortIcon = (direction: false | "asc" | "desc") => {
-  if (direction === "asc") return <ArrowUp className="size-3.5" />;
-  if (direction === "desc") return <ArrowDown className="size-3.5" />;
-  return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-};
-
 export const RecentAddressActivityCard = () => {
   const { activeOrganizationId } = useAuth();
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [cursorHistory, setCursorHistory] = React.useState<
     Array<string | null>
   >([]);
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "recentActivityMs", desc: true },
-  ]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -116,23 +104,6 @@ export const RecentAddressActivityCard = () => {
   const nextCursor = recentAddressActivityQuery.data?.nextCursor ?? null;
   const pageNumber = cursorHistory.length + 1;
   const canGoPrevious = cursorHistory.length > 0;
-
-  const cycleSorting = React.useCallback(
-    (columnId: string, direction: false | "asc" | "desc") => {
-      if (direction === false) {
-        setSorting([{ id: columnId, desc: false }]);
-        return;
-      }
-
-      if (direction === "asc") {
-        setSorting([{ id: columnId, desc: true }]);
-        return;
-      }
-
-      setSorting([]);
-    },
-    []
-  );
 
   const recentRows = React.useMemo<ActivityRow[]>(() => {
     return (addresses ?? []).map(address => {
@@ -161,25 +132,7 @@ export const RecentAddressActivityCard = () => {
     () => [
       {
         accessorKey: "address",
-        header: ({ column }) => {
-          const sortDirection = column.getIsSorted();
-          return (
-            <Button
-              className={cn(
-                "justify-start",
-                sortDirection
-                  ? "bg-muted hover:bg-muted"
-                  : "text-muted-foreground"
-              )}
-              size="sm"
-              variant="ghost"
-              onClick={() => cycleSorting(column.id, sortDirection)}
-            >
-              Address
-              {getSortIcon(sortDirection)}
-            </Button>
-          );
-        },
+        header: () => <span className="pl-3">Address</span>,
         cell: ({ row }) => (
           <Link
             className="block w-[260px] pl-3 truncate font-mono text-xs sm:text-sm hover:underline"
@@ -192,25 +145,7 @@ export const RecentAddressActivityCard = () => {
       {
         accessorFn: row => row.recentActivityMs,
         id: "recentActivityMs",
-        header: ({ column }) => {
-          const sortDirection = column.getIsSorted();
-          return (
-            <Button
-              className={cn(
-                "-ml-2",
-                sortDirection
-                  ? "bg-muted hover:bg-muted"
-                  : "text-muted-foreground"
-              )}
-              size="sm"
-              variant="ghost"
-              onClick={() => cycleSorting(column.id, sortDirection)}
-            >
-              Last Activity
-              {getSortIcon(sortDirection)}
-            </Button>
-          );
-        },
+        header: "Last Activity",
         cell: ({ row }) =>
           row.original.lastReceivedAt ? (
             formatDateTime(row.original.lastReceivedAt)
@@ -222,25 +157,7 @@ export const RecentAddressActivityCard = () => {
       },
       {
         accessorKey: "createdAtMs",
-        header: ({ column }) => {
-          const sortDirection = column.getIsSorted();
-          return (
-            <Button
-              className={cn(
-                "-ml-2",
-                sortDirection
-                  ? "bg-muted hover:bg-muted"
-                  : "text-muted-foreground"
-              )}
-              size="sm"
-              variant="ghost"
-              onClick={() => cycleSorting(column.id, sortDirection)}
-            >
-              Created
-              {getSortIcon(sortDirection)}
-            </Button>
-          );
-        },
+        header: "Created",
         cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
       {
@@ -249,7 +166,7 @@ export const RecentAddressActivityCard = () => {
         cell: ({ row }) => getLifecycleBadge(row.original.expiresAt),
       },
     ],
-    [cycleSorting]
+    []
   );
 
   const table = useReactTable({
@@ -257,18 +174,16 @@ export const RecentAddressActivityCard = () => {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
-    onSortingChange: setSorting,
     state: {
       columnFilters,
-      sorting,
     },
   });
 
   const addressFilterValue =
     (table.getColumn("address")?.getFilterValue() as string) ?? "";
-  const isTableLoading = isLoading || isPlaceholderData;
+  const isTableLoading = isLoading;
+  const isPageTransitioning = isFetching && isPlaceholderData;
   const filteredRows = table.getRowModel().rows;
 
   const handleNextPage = React.useCallback(() => {
@@ -315,11 +230,18 @@ export const RecentAddressActivityCard = () => {
               ? errorMessage
               : isTableLoading
                 ? "Loading activity..."
-                : `Showing ${filteredRows.length} of ${recentRows.length} addresses on page ${pageNumber}`}
+                : isPageTransitioning
+                  ? `Updating page ${pageNumber}...`
+                  : `Showing ${filteredRows.length} of ${recentRows.length} addresses on page ${pageNumber}`}
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border/70">
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border border-border/70 transition-opacity",
+            isPageTransitioning && "opacity-75"
+          )}
+        >
           <Table className="min-w-[640px]">
             <TableHeader>
               {table.getHeaderGroups().map(headerGroup => (
