@@ -6,10 +6,13 @@ import {
   deleteEmailAddress,
   listEmailAddresses,
   listRecentAddressActivity,
+  updateEmailAddress,
 } from "./service";
 import {
   createEmailAddressBodySchema,
+  listEmailAddressesQuerySchema,
   listRecentAddressActivityQuerySchema,
+  updateEmailAddressBodySchema,
 } from "./schemas";
 
 export const createEmailAddressesRouter = () => {
@@ -33,11 +36,20 @@ export const createEmailAddressesRouter = () => {
     }
   );
 
-  router.get("/email-addresses", async c => {
-    const organizationId = c.get("organizationId");
-    const result = await listEmailAddresses(c.env, organizationId);
-    return c.json(result, 200, { "Cache-Control": "private, max-age=15" });
-  });
+  router.get(
+    "/email-addresses",
+    zValidator("query", listEmailAddressesQuerySchema),
+    async c => {
+      const organizationId = c.get("organizationId");
+      const query = c.req.valid("query");
+      const result = await listEmailAddresses({
+        env: c.env,
+        organizationId,
+        queryPayload: query,
+      });
+      return c.json(result, 200, { "Cache-Control": "private, max-age=15" });
+    }
+  );
 
   router.post(
     "/email-addresses",
@@ -77,6 +89,30 @@ export const createEmailAddressesRouter = () => {
 
     return c.json(result.body, result.status);
   });
+
+  router.patch(
+    "/email-addresses/:id",
+    zValidator("json", updateEmailAddressBodySchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: "invalid request body" }, 400);
+      }
+      return undefined;
+    }),
+    async c => {
+      const organizationId = c.get("organizationId");
+      const addressId = c.req.param("id");
+      const payload = c.req.valid("json");
+
+      const result = await updateEmailAddress({
+        env: c.env,
+        organizationId,
+        addressId,
+        payload,
+      });
+
+      return c.json(result.body, result.status);
+    }
+  );
 
   return router;
 };

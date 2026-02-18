@@ -4,6 +4,7 @@ import { isAddressConflictError } from "@/shared/errors";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
 import {
   buildAddressMetaForStorage,
+  getAllowedFromDomainsFromMeta,
   isValidDomain,
   normalizeAddress,
   normalizeAllowedFromDomains,
@@ -13,20 +14,34 @@ import {
 import { clampNumber } from "@/shared/utils/dates";
 import {
   createEmailAddressBodySchema,
+  listEmailAddressesQuerySchema,
   listRecentAddressActivityQuerySchema,
+  updateEmailAddressBodySchema,
   type CreateEmailAddressBody,
+  type ListEmailAddressesQuery,
   type ListRecentAddressActivityQuery,
+  type UpdateEmailAddressBody,
 } from "./schemas";
 import {
+  countAddressesByOrganization,
   deleteAddressByIdAndOrganization,
   findAddressByIdAndOrganization,
   findAddressByValue,
   insertAddress,
+  type AddressListSortBy,
+  type AddressListSortDirection,
   listAddressesByOrganization,
   listRecentAddressActivityPage,
+  updateAddressByIdAndOrganization,
 } from "./repo";
 import { toEmailAddressListItem } from "./dto";
 import type { AppHonoEnv } from "@/app/types";
+
+const ADDRESS_LIST_PAGE_DEFAULT = 1;
+const ADDRESS_LIST_PAGE_SIZE_DEFAULT = 10;
+const ADDRESS_LIST_PAGE_SIZE_MAX = 50;
+const ADDRESS_LIST_SORT_BY_DEFAULT: AddressListSortBy = "createdAt";
+const ADDRESS_LIST_SORT_DIRECTION_DEFAULT: AddressListSortDirection = "desc";
 
 const RECENT_ACTIVITY_PAGE_LIMIT_DEFAULT = 10;
 const RECENT_ACTIVITY_PAGE_LIMIT_MAX = 50;
@@ -42,6 +57,20 @@ const parseRecentAddressActivityQuery = (
   payload: unknown
 ): ListRecentAddressActivityQuery => {
   const parsed = listRecentAddressActivityQuerySchema.safeParse(payload);
+  if (!parsed.success) return {};
+  return parsed.data;
+};
+
+const parseListEmailAddressesQuery = (
+  payload: unknown
+): ListEmailAddressesQuery => {
+  const parsed = listEmailAddressesQuerySchema.safeParse(payload);
+  if (!parsed.success) return {};
+  return parsed.data;
+};
+
+const parseUpdateBody = (payload: unknown): UpdateEmailAddressBody => {
+  const parsed = updateEmailAddressBodySchema.safeParse(payload);
   if (!parsed.success) return {};
   return parsed.data;
 };
@@ -66,13 +95,57 @@ const decodeRecentAddressActivityCursor = (value: string) => {
   return { recentActivityMs, id };
 };
 
-export const listEmailAddresses = async (
-  env: CloudflareBindings,
-  organizationId: string
-) => {
+export const listEmailAddresses = async ({
+  env,
+  organizationId,
+  queryPayload,
+}: {
+  env: CloudflareBindings;
+  organizationId: string;
+  queryPayload: unknown;
+}) => {
+  const query = parseListEmailAddressesQuery(queryPayload);
+  const page = clampNumber(
+    query.page ?? null,
+    1,
+    Number.MAX_SAFE_INTEGER,
+    ADDRESS_LIST_PAGE_DEFAULT
+  );
+  const pageSize = clampNumber(
+    query.pageSize ?? null,
+    1,
+    ADDRESS_LIST_PAGE_SIZE_MAX,
+    ADDRESS_LIST_PAGE_SIZE_DEFAULT
+  );
+  const sortBy = (query.sortBy ??
+    ADDRESS_LIST_SORT_BY_DEFAULT) as AddressListSortBy;
+  const sortDirection = (query.sortDirection ??
+    ADDRESS_LIST_SORT_DIRECTION_DEFAULT) as AddressListSortDirection;
+
   const db = getDb(env);
-  const rows = await listAddressesByOrganization(db, organizationId);
-  return { items: rows.map(toEmailAddressListItem) };
+  const countRow = await countAddressesByOrganization(db, organizationId);
+  const totalItems = Number(countRow?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = page;
+
+  const rows = await listAddressesByOrganization({
+    db,
+    organizationId,
+    page: currentPage,
+    pageSize,
+    sortBy,
+    sortDirection,
+  });
+
+  return {
+    items: rows.map(toEmailAddressListItem),
+    page: currentPage,
+    pageSize,
+    totalItems,
+    totalPages,
+    sortBy,
+    sortDirection,
+  };
 };
 
 export const listRecentAddressActivity = async ({
@@ -327,5 +400,171 @@ export const deleteEmailAddress = async ({
       address: addressRow.address,
       deleted: true,
     },
+  };
+};
+
+export const updateEmailAddress = async ({
+  env,
+  organizationId,
+  addressId,
+  payload,
+}: {
+  env: CloudflareBindings;
+  organizationId: string;
+  addressId: string;
+  payload: unknown;
+}) => {
+  const body = parseUpdateBody(payload);
+  const db = getDb(env);
+  const existing = await findAddressByIdAndOrganization(
+    db,
+    addressId,
+    organizationId
+  );
+
+  if (!existing) {
+    return {
+      status: 404 as const,
+      body: { error: "address not found" },
+    };
+  }
+
+  const allowedDomains = getAllowedDomains(env);
+  if (allowedDomains.length === 0) {
+    return {
+      status: 400 as const,
+      body: { error: "EMAIL_DOMAIN is not configured" },
+    };
+  }
+
+  const domainFromBody =
+    typeof body.domain === "string" && body.domain.trim().length > 0
+      ? body.domain.trim().toLowerCase()
+      : existing.domain;
+
+  if (domainFromBody.includes("@") || !isValidDomain(domainFromBody)) {
+    return {
+      status: 400 as const,
+      body: { error: "domain is invalid" },
+    };
+  }
+
+  if (!allowedDomains.includes(domainFromBody)) {
+    return {
+      status: 400 as const,
+      body: { error: "domain is not allowed" },
+    };
+  }
+
+  const localPartSource =
+    typeof body.localPart === "string" ? body.localPart : existing.localPart;
+  const localPart = sanitizeLocalPart(localPartSource);
+
+  if (!localPart) {
+    return {
+      status: 400 as const,
+      body: {
+        error:
+          "localPart is required and may only contain letters, numbers, dot, underscore, plus, and dash",
+      },
+    };
+  }
+
+  const address = normalizeAddress(`${localPart}@${domainFromBody}`);
+  const existingMeta = parseAddressMeta(existing.meta);
+  const allowedFromDomains =
+    body.allowedFromDomains !== undefined
+      ? normalizeAllowedFromDomains(body.allowedFromDomains)
+      : getAllowedFromDomainsFromMeta(existingMeta);
+
+  if (!allowedFromDomains.every(isValidDomain)) {
+    return {
+      status: 400 as const,
+      body: { error: "allowedFromDomains contains invalid domain(s)" },
+    };
+  }
+
+  if (body.ttlMinutes !== undefined && body.ttlMinutes !== null) {
+    if (!Number.isFinite(body.ttlMinutes) || body.ttlMinutes <= 0) {
+      return {
+        status: 400 as const,
+        body: { error: "ttlMinutes must be a positive number" },
+      };
+    }
+  }
+
+  const expiresAt =
+    body.ttlMinutes === undefined
+      ? existing.expiresAt
+      : body.ttlMinutes === null
+        ? null
+        : new Date(Date.now() + body.ttlMinutes * 60 * 1000);
+
+  const tag =
+    body.tag === undefined
+      ? existing.tag
+      : typeof body.tag === "string" && body.tag.trim().length > 0
+        ? body.tag.trim()
+        : null;
+
+  let metaForStorage = existing.meta;
+  if (body.meta !== undefined || body.allowedFromDomains !== undefined) {
+    const metaBase = body.meta !== undefined ? body.meta : existingMeta;
+    if (metaBase === null && allowedFromDomains.length === 0) {
+      metaForStorage = null;
+    } else {
+      const nextMeta = buildAddressMetaForStorage(metaBase, allowedFromDomains);
+      if (nextMeta === null) {
+        return {
+          status: 400 as const,
+          body: {
+            error:
+              "allowedFromDomains requires meta to be an object (or JSON object string)",
+          },
+        };
+      }
+      metaForStorage = nextMeta ?? null;
+    }
+  }
+
+  try {
+    await updateAddressByIdAndOrganization({
+      db,
+      addressId: existing.id,
+      organizationId,
+      values: {
+        address,
+        localPart,
+        domain: domainFromBody,
+        tag,
+        meta: metaForStorage,
+        expiresAt,
+      },
+    });
+  } catch (error) {
+    if (!isAddressConflictError(error)) throw error;
+
+    const conflict = await findAddressByValue(db, address);
+    return {
+      status: 409 as const,
+      body: {
+        error: "address already exists",
+        address,
+        ...(conflict?.id ? { id: conflict.id } : {}),
+      },
+    };
+  }
+
+  return {
+    status: 200 as const,
+    body: toEmailAddressListItem({
+      ...existing,
+      address,
+      localPart,
+      domain: domainFromBody,
+      tag,
+      meta: metaForStorage,
+      expiresAt,
+    }),
   };
 };

@@ -9,7 +9,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
+import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 
 const chartConfig = {
   total: {
@@ -29,7 +29,7 @@ const formatTickDate = (dateStr: string) => {
 };
 
 export const InboxGrowthChart = () => {
-  const { data: addresses, isLoading } = useAddressesQuery();
+  const { data: addresses, isLoading } = useAllAddressesQuery();
 
   const chartData = React.useMemo(() => {
     if (!addresses?.length) return [];

@@ -93,6 +93,19 @@ export type EmailAddress = {
   lastReceivedAtMs: number | null;
 };
 
+export type EmailAddressSortBy = "createdAt" | "address" | "lastReceivedAt";
+export type SortDirection = "asc" | "desc";
+
+export type EmailAddressListResponse = {
+  items: EmailAddress[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  sortBy: EmailAddressSortBy;
+  sortDirection: SortDirection;
+};
+
 export type EmailAttachment = {
   id: string;
   filename: string;
@@ -152,17 +165,54 @@ export type OrganizationStatsItem = {
 };
 
 export const listEmailAddresses = async (options?: {
+  page?: number;
+  pageSize?: number;
+  sortBy?: EmailAddressSortBy;
+  sortDirection?: SortDirection;
   signal?: AbortSignal;
   organizationId?: string | null;
 }) => {
-  const data = await apiFetch<{ items: EmailAddress[] }>(
-    "/api/email-addresses",
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.sortBy) query.set("sortBy", options.sortBy);
+  if (options?.sortDirection) query.set("sortDirection", options.sortDirection);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+
+  return apiFetch<EmailAddressListResponse>(
+    `/api/email-addresses${suffix}`,
     {
       signal: options?.signal,
     },
     options?.organizationId
   );
-  return data.items;
+};
+
+export const listAllEmailAddresses = async (options?: {
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) => {
+  const pageSize = 50;
+  let page = 1;
+  let totalPages = 1;
+  const items: EmailAddress[] = [];
+
+  while (page <= totalPages) {
+    const response = await listEmailAddresses({
+      page,
+      pageSize,
+      sortBy: "createdAt",
+      sortDirection: "desc",
+      signal: options?.signal,
+      organizationId: options?.organizationId,
+    });
+
+    items.push(...response.items);
+    totalPages = response.totalPages;
+    page += 1;
+  }
+
+  return items;
 };
 
 export const listRecentAddressActivity = async (options?: {
@@ -289,6 +339,28 @@ export const deleteEmailAddress = async (
     `/api/email-addresses/${encodeURIComponent(addressId)}`,
     {
       method: "DELETE",
+    },
+    options?.organizationId
+  );
+};
+
+export const updateEmailAddress = async (
+  addressId: string,
+  payload: {
+    localPart?: string;
+    tag?: string | null;
+    ttlMinutes?: number | null;
+    meta?: unknown;
+    domain?: string;
+    allowedFromDomains?: string[];
+  },
+  options?: { organizationId?: string | null }
+) => {
+  return apiFetch<EmailAddress>(
+    `/api/email-addresses/${encodeURIComponent(addressId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     },
     options?.organizationId
   );
