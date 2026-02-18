@@ -217,6 +217,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
   const [editingAddress, setEditingAddress] =
     React.useState<EmailAddress | null>(null);
   const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
+  const [editSheetSession, setEditSheetSession] = React.useState(0);
   const previousPageIconRef = React.useRef<ArrowLeftIconHandle>(null);
   const nextPageIconRef = React.useRef<ArrowRightIconHandle>(null);
 
@@ -359,6 +360,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
                     address={address}
                     isDeletePending={deleteMutation.isPending}
                     onEdit={value => {
+                      setEditSheetSession(previous => previous + 1);
                       setEditingAddress(value);
                       setIsEditSheetOpen(true);
                     }}
@@ -481,7 +483,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
       </AlertDialog>
 
       <EditAddressSheet
-        key={editingAddress?.id ?? "edit-address-sheet"}
+        key={`${editingAddress?.id ?? "edit-address-sheet"}:${editSheetSession}`}
         address={editingAddress}
         domains={domains}
         open={isEditSheetOpen}
