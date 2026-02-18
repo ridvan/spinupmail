@@ -19,7 +19,7 @@ export const registerCorsMiddleware = (app: Hono<AppHonoEnv>) => {
         "X-Org-Id",
         "X-Captcha-Response",
       ],
-      allowMethods: ["POST", "GET", "OPTIONS", "DELETE"],
+      allowMethods: ["POST", "GET", "OPTIONS", "DELETE", "PATCH"],
       exposeHeaders: ["Content-Length", "Content-Disposition", "Content-Type"],
       maxAge: 600,
       credentials: true,

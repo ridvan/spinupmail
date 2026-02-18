@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useNavigate, useParams } from "react-router";
-import { useAddressesQuery } from "@/features/addresses/hooks/use-addresses";
+import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { MailboxView } from "@/features/mailbox/components/mailbox-view";
@@ -21,7 +21,7 @@ export const MailboxPage = () => {
   const routeAddressId = params.addressId ?? null;
   const routeMailId = params.mailId ?? null;
   const { activeOrganizationId } = useAuth();
-  const addressesQuery = useAddressesQuery();
+  const addressesQuery = useAllAddressesQuery();
   const [preferredAddressId, setPreferredAddressId] = useLocalStorage<
     string | null
   >(`mailbox:address:${activeOrganizationId ?? "none"}`, null);

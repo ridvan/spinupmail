@@ -1,26 +1,81 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { emailAddresses } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 
-export const listAddressesByOrganization = (
+const addressListSelect = {
+  id: emailAddresses.id,
+  address: emailAddresses.address,
+  localPart: emailAddresses.localPart,
+  domain: emailAddresses.domain,
+  tag: emailAddresses.tag,
+  meta: emailAddresses.meta,
+  createdAt: emailAddresses.createdAt,
+  expiresAt: emailAddresses.expiresAt,
+  lastReceivedAt: emailAddresses.lastReceivedAt,
+};
+
+export type AddressListSortBy = "createdAt" | "address" | "lastReceivedAt";
+export type AddressListSortDirection = "asc" | "desc";
+
+export const listAddressesByOrganization = ({
+  db,
+  organizationId,
+  page,
+  pageSize,
+  sortBy,
+  sortDirection,
+}: {
+  db: AppDb;
+  organizationId: string;
+  page: number;
+  pageSize: number;
+  sortBy: AddressListSortBy;
+  sortDirection: AddressListSortDirection;
+}) => {
+  const order =
+    sortDirection === "asc"
+      ? {
+          createdAt: asc(emailAddresses.createdAt),
+          address: asc(emailAddresses.address),
+          recentActivity: asc(
+            sql<number>`coalesce(${emailAddresses.lastReceivedAt}, ${emailAddresses.createdAt})`
+          ),
+          id: asc(emailAddresses.id),
+        }
+      : {
+          createdAt: desc(emailAddresses.createdAt),
+          address: desc(emailAddresses.address),
+          recentActivity: desc(
+            sql<number>`coalesce(${emailAddresses.lastReceivedAt}, ${emailAddresses.createdAt})`
+          ),
+          id: desc(emailAddresses.id),
+        };
+
+  const primaryOrder =
+    sortBy === "address"
+      ? order.address
+      : sortBy === "lastReceivedAt"
+        ? order.recentActivity
+        : order.createdAt;
+
+  return db
+    .select(addressListSelect)
+    .from(emailAddresses)
+    .where(eq(emailAddresses.organizationId, organizationId))
+    .orderBy(primaryOrder, order.id)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+};
+
+export const countAddressesByOrganization = (
   db: AppDb,
   organizationId: string
 ) =>
   db
-    .select({
-      id: emailAddresses.id,
-      address: emailAddresses.address,
-      localPart: emailAddresses.localPart,
-      domain: emailAddresses.domain,
-      tag: emailAddresses.tag,
-      meta: emailAddresses.meta,
-      createdAt: emailAddresses.createdAt,
-      expiresAt: emailAddresses.expiresAt,
-      lastReceivedAt: emailAddresses.lastReceivedAt,
-    })
+    .select({ count: sql<number>`count(*)` })
     .from(emailAddresses)
     .where(eq(emailAddresses.organizationId, organizationId))
-    .orderBy(desc(emailAddresses.createdAt));
+    .get();
 
 export type RecentAddressActivityCursor = {
   recentActivityMs: number;
@@ -48,15 +103,7 @@ export const listRecentAddressActivityPage = ({
 
   return db
     .select({
-      id: emailAddresses.id,
-      address: emailAddresses.address,
-      localPart: emailAddresses.localPart,
-      domain: emailAddresses.domain,
-      tag: emailAddresses.tag,
-      meta: emailAddresses.meta,
-      createdAt: emailAddresses.createdAt,
-      expiresAt: emailAddresses.expiresAt,
-      lastReceivedAt: emailAddresses.lastReceivedAt,
+      ...addressListSelect,
       recentActivityMs: recentActivityExpr,
     })
     .from(emailAddresses)
@@ -71,10 +118,7 @@ export const findAddressByIdAndOrganization = (
   organizationId: string
 ) =>
   db
-    .select({
-      id: emailAddresses.id,
-      address: emailAddresses.address,
-    })
+    .select(addressListSelect)
     .from(emailAddresses)
     .where(
       and(
@@ -111,6 +155,35 @@ export const insertAddress = (
       ...values,
       autoCreated: false,
     })
+    .run();
+
+export const updateAddressByIdAndOrganization = ({
+  db,
+  addressId,
+  organizationId,
+  values,
+}: {
+  db: AppDb;
+  addressId: string;
+  organizationId: string;
+  values: {
+    address: string;
+    localPart: string;
+    domain: string;
+    tag: string | null;
+    meta: string | null;
+    expiresAt: Date | null;
+  };
+}) =>
+  db
+    .update(emailAddresses)
+    .set(values)
+    .where(
+      and(
+        eq(emailAddresses.id, addressId),
+        eq(emailAddresses.organizationId, organizationId)
+      )
+    )
     .run();
 
 export const deleteAddressByIdAndOrganization = (
