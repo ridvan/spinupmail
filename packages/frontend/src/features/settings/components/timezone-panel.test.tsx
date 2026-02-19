@@ -1,4 +1,3 @@
-import * as React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { TimezonePanel } from "@/features/settings/components/timezone-panel";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";

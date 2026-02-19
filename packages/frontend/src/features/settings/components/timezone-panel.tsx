@@ -28,6 +28,13 @@ const describeSource = (source: string) => {
   }
 };
 
+const normalizeTimezoneSearchValue = (value: string) =>
+  value
+    .toLowerCase()
+    .replaceAll(/[_/.-]+/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+
 export const TimezonePanel = () => {
   const {
     effectiveTimeZone,
@@ -54,9 +61,9 @@ export const TimezonePanel = () => {
 
   const filteredTimeZones = React.useMemo(() => {
     if (!searchValue.trim()) return supportedTimeZones;
-    const query = searchValue.trim().toLowerCase();
+    const query = normalizeTimezoneSearchValue(searchValue);
     return supportedTimeZones.filter(timeZone =>
-      timeZone.toLowerCase().includes(query)
+      normalizeTimezoneSearchValue(timeZone).includes(query)
     );
   }, [searchValue, supportedTimeZones]);
 
@@ -113,6 +120,7 @@ export const TimezonePanel = () => {
 
         <label className="flex items-start gap-3 text-sm">
           <Checkbox
+            className="mt-0.5"
             checked={manualMode}
             onCheckedChange={checked => {
               setLocalError(null);
@@ -129,7 +137,10 @@ export const TimezonePanel = () => {
 
         {manualMode ? (
           <div className="space-y-2">
-            <Command className="border border-border/70 bg-card">
+            <Command
+              className="border border-border/70 bg-card"
+              shouldFilter={false}
+            >
               <CommandInput
                 placeholder="Search timezone (e.g. America/New_York)"
                 value={searchValue}

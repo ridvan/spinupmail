@@ -159,6 +159,9 @@ function createAuth(
           },
         },
         user: {
+          changeEmail: {
+            enabled: true,
+          },
           additionalFields: {
             timezone: {
               type: "string",

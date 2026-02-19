@@ -8,12 +8,13 @@ const EMAIL_TEXT_COLOR = "#f5f5f5";
 const EMAIL_MUTED_TEXT_COLOR = "#9d9da6";
 const EMAIL_BUTTON_BG_COLOR = "#2c2c31";
 const EMAIL_BUTTON_TEXT_COLOR = "#f3f4f6";
-const AUTH_EMAIL_SEND_LIMIT_PER_HOUR = 2;
+const AUTH_EMAIL_SEND_LIMIT_PER_HOUR = 10;
 const AUTH_EMAIL_SEND_WINDOW_SECONDS = 60 * 60;
 
 type VerificationEmailData = {
   user: { email: string };
   url: string;
+  token?: string;
 };
 
 type ResetPasswordEmailData = {
@@ -60,6 +61,31 @@ const parseCounter = (value: string | null) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return parsed;
+};
+
+const parseJwtPayload = (token?: string) => {
+  if (!token) return null;
+
+  const encodedPayload = token.split(".")[1];
+  if (!encodedPayload) return null;
+
+  const base64 = encodedPayload.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+
+  try {
+    const decoded = atob(padded);
+    const parsed = JSON.parse(decoded);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const getVerificationRequestType = (token?: string) => {
+  const payload = parseJwtPayload(token);
+  const requestType = payload?.requestType;
+  return typeof requestType === "string" ? requestType : null;
 };
 
 const hashForRateLimitKey = async (value: string) => {
@@ -312,6 +338,86 @@ const buildVerificationEmailText = (verificationUrl: string) =>
     "If you did not create this account, you can ignore this email.",
   ].join("\n");
 
+const buildChangeEmailVerificationHtml = (
+  verificationUrl: string,
+  newEmail: string,
+  logoUrl: string | null
+) => {
+  const safeUrl = escapeHtml(verificationUrl);
+  const safeEmail = escapeHtml(newEmail);
+  const logoMarkup = buildEmailLogoMarkup(logoUrl);
+
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    "  <head>",
+    '    <meta charset="UTF-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    `    <title>Confirm your new ${APP_NAME} email</title>`,
+    "  </head>",
+    `  <body style="margin:0;padding:0;background:${EMAIL_BG_COLOR};font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${EMAIL_TEXT_COLOR};">`,
+    '    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">',
+    `      Confirm your new email address for ${APP_NAME}.`,
+    "    </div>",
+    `    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${EMAIL_BG_COLOR};padding:24px 12px;">`,
+    "      <tr>",
+    '        <td align="center">',
+    `          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:680px;border:1px solid ${EMAIL_BORDER_COLOR};background:${EMAIL_BG_COLOR};">`,
+    "            <tr>",
+    '              <td align="center" style="padding:72px 24px 32px 24px;">',
+    `                ${logoMarkup}`,
+    "              </td>",
+    "            </tr>",
+    "            <tr>",
+    '              <td align="center" style="padding:0 24px 0 24px;">',
+    `                <div style="font-size:42px;line-height:1.12;font-weight:500;color:${EMAIL_TEXT_COLOR};letter-spacing:-0.02em;">Confirm Email Change</div>`,
+    "              </td>",
+    "            </tr>",
+    "            <tr>",
+    '              <td align="center" style="padding:24px 24px 0 24px;">',
+    `                <div style="max-width:520px;margin:0 auto;font-size:16px;line-height:1.55;color:${EMAIL_MUTED_TEXT_COLOR};">You requested to change your ${APP_NAME} login email to <strong style="color:${EMAIL_TEXT_COLOR};">${safeEmail}</strong>. Confirm this change by clicking the button below.</div>`,
+    "              </td>",
+    "            </tr>",
+    "            <tr>",
+    '              <td align="center" style="padding:38px 24px 0 24px;">',
+    `                <a href="${safeUrl}" style="display:inline-block;background:${EMAIL_BUTTON_BG_COLOR};color:${EMAIL_BUTTON_TEXT_COLOR};text-decoration:none;font-weight:700;font-size:16px;line-height:1;padding:12px 26px;border-radius:999px;">Confirm New Email</a>`,
+    "              </td>",
+    "            </tr>",
+    "            <tr>",
+    `              <td align="center" style="padding:48px 24px 0 24px;font-size:14px;line-height:1.65;color:${EMAIL_MUTED_TEXT_COLOR};">`,
+    "                If the button does not work, paste this link into your browser:",
+    "              </td>",
+    "            </tr>",
+    "            <tr>",
+    `              <td align="center" style="padding:8px 24px 72px 24px;font-size:14px;line-height:1.6;word-break:break-all;color:${EMAIL_MUTED_TEXT_COLOR};">`,
+    `                <a href="${safeUrl}" style="color:${EMAIL_MUTED_TEXT_COLOR};text-decoration:none;">${safeUrl}</a>`,
+    "              </td>",
+    "            </tr>",
+    "          </table>",
+    `          <p style="margin:28px 0 0 0;font-size:12px;line-height:1.6;color:${EMAIL_MUTED_TEXT_COLOR};">If you did not request this change, you can ignore this email.</p>`,
+    "        </td>",
+    "      </tr>",
+    "    </table>",
+    "  </body>",
+    "</html>",
+  ].join("\n");
+};
+
+const buildChangeEmailVerificationText = (
+  verificationUrl: string,
+  newEmail: string
+) =>
+  [
+    `Confirm your new ${APP_NAME} email`,
+    "",
+    `You requested to change your ${APP_NAME} login email to ${newEmail}.`,
+    "Confirm this change by opening the link below:",
+    "",
+    verificationUrl,
+    "",
+    "If you did not request this change, you can ignore this email.",
+  ].join("\n");
+
 const buildResetPasswordEmailHtml = (
   resetUrl: string,
   logoUrl: string | null
@@ -387,7 +493,10 @@ const buildResetPasswordEmailText = (resetUrl: string) =>
   ].join("\n");
 
 export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
-  return async ({ user, url }: VerificationEmailData, request?: unknown) => {
+  return async (
+    { user, url, token }: VerificationEmailData,
+    request?: unknown
+  ) => {
     if (!env?.RESEND_API_KEY) {
       console.error(
         "[auth] RESEND_API_KEY is not configured. Cannot send verification email."
@@ -417,13 +526,22 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
 
     const resend = new Resend(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
+    const isChangeEmailVerification =
+      getVerificationRequestType(token) === "change-email-verification";
+
     try {
       await resend.emails.send({
         from: env.RESEND_FROM_EMAIL,
         to: user.email,
-        subject: `Verify your ${APP_NAME} email`,
-        text: buildVerificationEmailText(url),
-        html: buildVerificationEmailHtml(url, logoUrl),
+        subject: isChangeEmailVerification
+          ? `Confirm your new ${APP_NAME} email`
+          : `Verify your ${APP_NAME} email`,
+        text: isChangeEmailVerification
+          ? buildChangeEmailVerificationText(url, user.email)
+          : buildVerificationEmailText(url),
+        html: isChangeEmailVerification
+          ? buildChangeEmailVerificationHtml(url, user.email, logoUrl)
+          : buildVerificationEmailHtml(url, logoUrl),
       });
     } catch (error) {
       console.error("[auth] Failed to send verification email via Resend", {
