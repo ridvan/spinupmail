@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
 import {
   downloadEmailAttachment,
@@ -23,24 +24,31 @@ import {
   type EmailDetail,
 } from "@/lib/api";
 import { buildEmailPreview } from "@/features/mailbox/utils/build-email-preview";
+import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
 type EmailPreviewProps = {
   email: EmailDetail | null;
   isLoading?: boolean;
 };
 
-const formatDate = (value: string | null) => {
+const formatDate = (value: string | null, timeZone: string) => {
   if (!value) return "Unknown time";
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
+  return formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options: {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    },
+    locale: "en-US",
+    fallback: "Unknown time",
+  });
 };
 
 const formatBytes = (bytes: number) => {
@@ -54,6 +62,7 @@ export const EmailPreview = ({
   isLoading = false,
 }: EmailPreviewProps) => {
   const { theme } = useTheme();
+  const { effectiveTimeZone } = useTimezone();
   const { activeOrganizationId } = useAuth();
   const deleteMutation = useDeleteEmailMutation(email?.addressId ?? null);
   const deleteIconRef = React.useRef<DeleteIconHandle>(null);
@@ -137,7 +146,7 @@ export const EmailPreview = ({
           </p>
           <p className="text-xs text-muted-foreground">From {email.from}</p>
           <p className="text-xs text-muted-foreground">
-            {formatDate(email.receivedAt)}
+            {formatDate(email.receivedAt, effectiveTimeZone)}
           </p>
         </div>
         <Button

@@ -32,9 +32,14 @@ export const createOrganizationsRouter = () => {
       env: c.env,
       organizationId,
       daysRaw: query.get("days"),
+      timezoneRaw: query.get("timezone"),
     });
 
-    return c.json(result, 200, {
+    if (result.status !== 200) {
+      return c.json(result.body, result.status);
+    }
+
+    return c.json(result.body, result.status, {
       "Cache-Control": "private, max-age=60",
     });
   });

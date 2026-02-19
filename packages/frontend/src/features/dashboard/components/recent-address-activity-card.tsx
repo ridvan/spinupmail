@@ -23,21 +23,25 @@ import {
 import { Link } from "react-router";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useRecentAddressActivityQuery } from "@/features/dashboard/hooks/use-recent-address-activity";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 import { cn } from "@/lib/utils";
 
 const RECENT_ACTIVITY_PAGE_SIZE = 10;
 const LOADING_SKELETON_ROW_COUNT = 3;
 
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-const formatDateTime = (value: string | null) => {
+const formatDateTime = (value: string | null, timeZone: string) => {
   if (!value) return "Never";
   return (
     <span className="w-[185px]">
-      {dateTimeFormatter.format(new Date(value))}
+      {formatDateTimeInTimeZone({
+        value,
+        timeZone,
+        options: {
+          dateStyle: "medium",
+          timeStyle: "short",
+        },
+      })}
     </span>
   );
 };
@@ -60,7 +64,7 @@ const toTimestamp = (value: string | null, fallback: number | null) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-const getLifecycleBadge = (expiresAt: string | null) => {
+const getLifecycleBadge = (expiresAt: string | null, timeZone: string) => {
   if (!expiresAt) {
     return <Badge variant="secondary">Active</Badge>;
   }
@@ -74,11 +78,16 @@ const getLifecycleBadge = (expiresAt: string | null) => {
     return <Badge variant="destructive">Expired</Badge>;
   }
 
-  return <Badge variant="outline">Expires {formatDateTime(expiresAt)}</Badge>;
+  return (
+    <Badge variant="outline">
+      Expires {formatDateTime(expiresAt, timeZone)}
+    </Badge>
+  );
 };
 
 export const RecentAddressActivityCard = () => {
   const { activeOrganizationId } = useAuth();
+  const { effectiveTimeZone } = useTimezone();
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [cursorHistory, setCursorHistory] = React.useState<
     Array<string | null>
@@ -148,7 +157,7 @@ export const RecentAddressActivityCard = () => {
         header: "Last Activity",
         cell: ({ row }) =>
           row.original.lastReceivedAt ? (
-            formatDateTime(row.original.lastReceivedAt)
+            formatDateTime(row.original.lastReceivedAt, effectiveTimeZone)
           ) : (
             <span className="text-muted-foreground w-[130px]">
               No activity yet
@@ -158,15 +167,17 @@ export const RecentAddressActivityCard = () => {
       {
         accessorKey: "createdAtMs",
         header: "Created",
-        cell: ({ row }) => formatDateTime(row.original.createdAt),
+        cell: ({ row }) =>
+          formatDateTime(row.original.createdAt, effectiveTimeZone),
       },
       {
         accessorKey: "expiresAt",
         header: "Status",
-        cell: ({ row }) => getLifecycleBadge(row.original.expiresAt),
+        cell: ({ row }) =>
+          getLifecycleBadge(row.original.expiresAt, effectiveTimeZone),
       },
     ],
-    []
+    [effectiveTimeZone]
   );
 
   const table = useReactTable({

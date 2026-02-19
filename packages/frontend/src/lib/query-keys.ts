@@ -1,7 +1,13 @@
 export const queryKeys = {
   organizationStats: ["app", "organization-stats"] as const,
-  emailActivity: (organizationId: string | null) =>
-    ["app", "organizations", organizationId, "email-activity"] as const,
+  emailActivity: (organizationId: string | null, timezone: string) =>
+    [
+      "app",
+      "organizations",
+      organizationId,
+      "email-activity",
+      timezone,
+    ] as const,
   emailSummary: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "email-summary"] as const,
   recentAddressActivity: (

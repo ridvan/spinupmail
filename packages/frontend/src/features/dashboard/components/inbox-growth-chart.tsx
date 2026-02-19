@@ -10,6 +10,12 @@ import {
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import {
+  formatDayKey,
+  getDayKey,
+  getRecentDayKeys,
+} from "@/features/timezone/lib/date-format";
 
 const chartConfig = {
   total: {
@@ -19,58 +25,58 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const formatShortDate = (dateStr: string) => {
-  const date = new Date(dateStr + "T00:00:00");
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDayKey({
+    dayKey: dateStr,
+    options: { month: "short", day: "numeric" },
+  });
 };
 
 const formatTickDate = (dateStr: string) => {
-  const date = new Date(dateStr + "T00:00:00");
-  return String(date.getDate());
+  const day = dateStr.split("-")[2] ?? "";
+  return day.replace(/^0/, "") || dateStr;
 };
 
 export const InboxGrowthChart = () => {
   const { data: addresses, isLoading } = useAllAddressesQuery();
+  const { effectiveTimeZone } = useTimezone();
 
   const chartData = React.useMemo(() => {
     if (!addresses?.length) return [];
+    const dayKeys = getRecentDayKeys({
+      days: 14,
+      timeZone: effectiveTimeZone,
+    });
+    if (!dayKeys.length) return [];
 
-    const now = new Date();
-    const cutoff = new Date(now);
-    cutoff.setUTCDate(cutoff.getUTCDate() - 13);
-    cutoff.setUTCHours(0, 0, 0, 0);
-
-    // Count addresses created before the chart window (baseline)
-    const cutoffMs = cutoff.getTime();
+    const chartDaySet = new Set(dayKeys);
+    const earliestDayKey = dayKeys[0];
     let baseline = 0;
-    const createdByDate = new Map<string, number>();
+    const createdByDayKey = new Map<string, number>();
 
     for (const addr of addresses) {
       const createdMs = addr.createdAtMs;
       if (!createdMs) continue;
+      const dayKey = getDayKey(createdMs, effectiveTimeZone);
+      if (!dayKey) continue;
 
-      if (createdMs < cutoffMs) {
+      if (dayKey < earliestDayKey) {
         baseline++;
-      } else {
-        const dateKey = new Date(createdMs).toISOString().slice(0, 10);
-        createdByDate.set(dateKey, (createdByDate.get(dateKey) ?? 0) + 1);
+        continue;
       }
+      if (!chartDaySet.has(dayKey)) continue;
+      createdByDayKey.set(dayKey, (createdByDayKey.get(dayKey) ?? 0) + 1);
     }
 
     const data: { date: string; total: number }[] = [];
-    const cursor = new Date(cutoff);
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
     let cumulative = baseline;
 
-    while (cursor <= today) {
-      const dateKey = cursor.toISOString().slice(0, 10);
-      cumulative += createdByDate.get(dateKey) ?? 0;
-      data.push({ date: dateKey, total: cumulative });
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    for (const dayKey of dayKeys) {
+      cumulative += createdByDayKey.get(dayKey) ?? 0;
+      data.push({ date: dayKey, total: cumulative });
     }
 
     return data;
-  }, [addresses]);
+  }, [addresses, effectiveTimeZone]);
 
   const totalInboxes = addresses?.length ?? 0;
 

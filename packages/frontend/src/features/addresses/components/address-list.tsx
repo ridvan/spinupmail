@@ -46,6 +46,11 @@ import {
   useAddressesQuery,
   useDeleteAddressMutation,
 } from "@/features/addresses/hooks/use-addresses";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import {
+  formatDateTimeInTimeZone,
+  getDayKey,
+} from "@/features/timezone/lib/date-format";
 import type { EmailAddress, EmailAddressSortBy } from "@/lib/api";
 
 type AddressListProps = {
@@ -59,21 +64,21 @@ const allowedSenderBadgeClass =
   "h-6 rounded-md border border-border/70 bg-muted/80 px-2 text-xs dark:bg-muted/60";
 const placeholderTextClass =
   "inline-flex min-w-6 justify-center text-muted-foreground";
-const currentYearDateFormatter = new Intl.DateTimeFormat(undefined, {
+const currentYearDateOptions: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
-});
-const otherYearDateFormatter = new Intl.DateTimeFormat(undefined, {
+};
+const otherYearDateOptions: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
-});
+};
 
 type AddressRowActionsProps = {
   address: EmailAddress;
@@ -133,16 +138,21 @@ const AddressRowActions = ({
   );
 };
 
-const formatDate = (value: string | null) => {
+const formatDate = (value: string | null, timeZone: string) => {
   if (!value) return "Never";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Never";
-
-  const isCurrentYear = parsed.getFullYear() === new Date().getFullYear();
-  return (
-    isCurrentYear ? currentYearDateFormatter : otherYearDateFormatter
-  ).format(parsed);
+  const dateDayKey = getDayKey(value, timeZone);
+  const nowDayKey = getDayKey(new Date(), timeZone);
+  if (!dateDayKey || !nowDayKey) return "Never";
+  const options =
+    dateDayKey.slice(0, 4) === nowDayKey.slice(0, 4)
+      ? currentYearDateOptions
+      : otherYearDateOptions;
+  return formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options,
+    fallback: "Never",
+  });
 };
 
 const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
@@ -220,6 +230,7 @@ const AllowedSendersBadgeSkeleton = () => (
 );
 
 export const AddressList = ({ domains }: AddressListProps) => {
+  const { effectiveTimeZone } = useTimezone();
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<EmailAddressSortBy>("createdAt");
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
@@ -401,7 +412,9 @@ export const AddressList = ({ domains }: AddressListProps) => {
                           <span className={placeholderTextClass}>-</span>
                         )}
                       </TableCell>
-                      <TableCell>{formatDate(address.createdAt)}</TableCell>
+                      <TableCell>
+                        {formatDate(address.createdAt, effectiveTimeZone)}
+                      </TableCell>
                       <TableCell
                         className={
                           address.lastReceivedAt
@@ -409,7 +422,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
                             : "text-muted-foreground"
                         }
                       >
-                        {formatDate(address.lastReceivedAt)}
+                        {formatDate(address.lastReceivedAt, effectiveTimeZone)}
                       </TableCell>
                       <TableCell className="max-w-72">
                         <AllowedSendersBadges

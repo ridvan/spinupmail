@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { emailAddresses, emailAttachments, emails, members } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 
@@ -57,11 +57,14 @@ export const findOrganizationCounts = async (
 export const findEmailActivity = async (
   db: AppDb,
   organizationId: string,
-  cutoff: Date
+  fromInclusive: Date,
+  toExclusive: Date
 ) => {
+  const minuteBucketExpr = sql<number>`cast(${emails.receivedAt} / 60000 as integer) * 60000`;
+
   return db
     .select({
-      date: sql<string>`date(${emails.receivedAt} / 1000, 'unixepoch')`,
+      minuteStartMs: minuteBucketExpr,
       count: sql<number>`count(*)`,
     })
     .from(emails)
@@ -69,11 +72,12 @@ export const findEmailActivity = async (
     .where(
       and(
         eq(emailAddresses.organizationId, organizationId),
-        gte(emails.receivedAt, cutoff)
+        gte(emails.receivedAt, fromInclusive),
+        lt(emails.receivedAt, toExclusive)
       )
     )
-    .groupBy(sql`date(${emails.receivedAt} / 1000, 'unixepoch')`)
-    .orderBy(asc(sql`date(${emails.receivedAt} / 1000, 'unixepoch')`));
+    .groupBy(minuteBucketExpr)
+    .orderBy(asc(minuteBucketExpr));
 };
 
 export const findEmailSummary = async (db: AppDb, organizationId: string) => {

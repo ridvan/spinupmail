@@ -158,6 +158,16 @@ function createAuth(
             maxAge: 60,
           },
         },
+        user: {
+          additionalFields: {
+            timezone: {
+              type: "string",
+              required: false,
+              input: true,
+              returned: true,
+            },
+          },
+        },
         plugins: [
           captcha({
             provider: "cloudflare-turnstile",

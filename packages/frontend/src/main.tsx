@@ -17,6 +17,7 @@ import {
   redirectIfAuthenticatedLoader,
 } from "@/features/auth/hooks/route-loaders";
 import { AuthProvider } from "@/features/auth/hooks/use-auth";
+import { TimezoneProvider } from "@/features/timezone/hooks/use-timezone";
 import { AddressManagementPage } from "@/pages/address-management-page";
 import { HomePage } from "@/pages/home-page";
 import { MailboxPage } from "@/pages/mailbox-page";
@@ -199,7 +200,9 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RouterProvider router={router} />
+          <TimezoneProvider>
+            <RouterProvider router={router} />
+          </TimezoneProvider>
         </AuthProvider>
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>

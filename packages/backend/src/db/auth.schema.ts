@@ -15,6 +15,7 @@ export const users = sqliteTable("users", {
     .default(false)
     .notNull(),
   image: text("image"),
+  timezone: text("timezone"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),

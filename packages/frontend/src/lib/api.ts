@@ -282,20 +282,27 @@ export type EmailActivityDay = {
   count: number;
 };
 
+export type EmailActivityResponse = {
+  timezone: string;
+  daily: EmailActivityDay[];
+};
+
 export const listEmailActivity = async (options?: {
   days?: number;
+  timezone?: string;
   signal?: AbortSignal;
   organizationId?: string | null;
 }) => {
   const query = new URLSearchParams();
   if (options?.days) query.set("days", String(options.days));
+  if (options?.timezone) query.set("timezone", options.timezone);
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
-  const data = await apiFetch<{ daily: EmailActivityDay[] }>(
+  const data = await apiFetch<EmailActivityResponse>(
     `/api/organizations/stats/email-activity${suffix}`,
     { signal: options?.signal },
     options?.organizationId
   );
-  return data.daily;
+  return data;
 };
 
 export type EmailSummary = {

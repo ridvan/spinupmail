@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEmailActivityQuery } from "@/features/dashboard/hooks/use-email-activity";
+import { formatDayKey } from "@/features/timezone/lib/date-format";
 
 const chartConfig = {
   count: {
@@ -18,17 +19,20 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const formatShortDate = (dateStr: string) => {
-  const date = new Date(dateStr + "T00:00:00");
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDayKey({
+    dayKey: dateStr,
+    options: { month: "short", day: "numeric" },
+  });
 };
 
 const formatTickDate = (dateStr: string) => {
-  const date = new Date(dateStr + "T00:00:00");
-  return String(date.getDate());
+  const day = dateStr.split("-")[2] ?? "";
+  return day.replace(/^0/, "") || dateStr;
 };
 
 export const ReceivedEmailsChart = () => {
-  const { data: daily, isLoading } = useEmailActivityQuery(14);
+  const { data: emailActivity, isLoading } = useEmailActivityQuery(14);
+  const daily = emailActivity?.daily;
 
   const total = daily?.reduce((sum, d) => sum + d.count, 0) ?? 0;
 

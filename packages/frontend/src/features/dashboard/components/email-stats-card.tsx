@@ -17,6 +17,8 @@ import {
 import { HardDrive, Inbox, Mail, Mailbox, Paperclip, Send } from "lucide-react";
 import { Link } from "react-router";
 import { useEmailSummaryQuery } from "@/features/dashboard/hooks/use-email-summary";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return "0 B";
@@ -29,14 +31,17 @@ const formatBytes = (bytes: number) => {
 const getAddressLocalPart = (address: string) =>
   address.includes("@") ? address.split("@")[0] : address;
 
-const formatDormantCreatedAt = (createdAt: string | null) => {
+const formatDormantCreatedAt = (createdAt: string | null, timeZone: string) => {
   if (!createdAt) return "Created date unavailable";
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return "Created date unavailable";
-  return `Created: ${date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+  return `Created: ${formatDateTimeInTimeZone({
+    value: createdAt,
+    timeZone,
+    options: {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    },
+    fallback: "date unavailable",
   })}`;
 };
 
@@ -81,6 +86,7 @@ const StatValueSkeleton = ({
 
 export const EmailStatsCard = () => {
   const { data, isLoading } = useEmailSummaryQuery();
+  const { effectiveTimeZone } = useTimezone();
   const busiestInboxes = data?.busiestInboxes ?? [];
   const topDomains = data?.topDomains ?? [];
   const dormantInboxes = data?.dormantInboxes ?? [];
@@ -362,7 +368,8 @@ export const EmailStatsCard = () => {
                             {dormantInboxes[0].address}
                             <span className="block text-muted-foreground">
                               {formatDormantCreatedAt(
-                                dormantInboxes[0].createdAt
+                                dormantInboxes[0].createdAt,
+                                effectiveTimeZone
                               )}
                             </span>
                           </TooltipContent>
@@ -418,7 +425,8 @@ export const EmailStatsCard = () => {
                                             {address}
                                             <span className="block text-muted-foreground">
                                               {formatDormantCreatedAt(
-                                                createdAt
+                                                createdAt,
+                                                effectiveTimeZone
                                               )}
                                             </span>
                                           </TooltipContent>

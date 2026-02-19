@@ -19,21 +19,29 @@ import {
   useCreateApiKeyMutation,
   useDeleteApiKeyMutation,
 } from "@/features/settings/hooks/use-api-keys";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
 const createApiKeySchema = z.object({
   name: z.string().trim().max(80, "Key label must be 80 characters or less"),
 });
 
-const formatDate = (value: string | null) => {
+const formatDate = (value: string | null, timeZone: string) => {
   if (!value) return "-";
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options: {
+      dateStyle: "medium",
+      timeStyle: "short",
+    },
+    fallback: "-",
+  });
 };
 
 export const ApiKeysPanel = () => {
+  const { effectiveTimeZone } = useTimezone();
   const apiKeysQuery = useApiKeysQuery();
   const createMutation = useCreateApiKeyMutation();
   const deleteMutation = useDeleteApiKeyMutation();
@@ -160,7 +168,9 @@ export const ApiKeysPanel = () => {
                     {item.start ?? ""}
                     {item.prefix || item.start ? "..." : "-"}
                   </TableCell>
-                  <TableCell>{formatDate(item.createdAt)}</TableCell>
+                  <TableCell>
+                    {formatDate(item.createdAt, effectiveTimeZone)}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       disabled={deleteMutation.isPending}

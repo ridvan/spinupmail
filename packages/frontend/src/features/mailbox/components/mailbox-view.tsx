@@ -22,6 +22,12 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { EmailAddress, EmailDetail, EmailListItem } from "@/lib/api";
 import { EmailPreview } from "@/features/mailbox/components/email-preview";
+import { useTimezone } from "@/features/timezone/hooks/use-timezone";
+import {
+  formatDateTimeInTimeZone,
+  getCalendarDayDiff,
+  getDayKey,
+} from "@/features/timezone/lib/date-format";
 
 type MailboxViewProps = {
   addresses: EmailAddress[];
@@ -36,25 +42,23 @@ type MailboxViewProps = {
   previewEmailLoading: boolean;
 };
 
-const formatRelativeDate = (value: string | null) => {
+const formatRelativeDate = (value: string | null, timeZone: string) => {
   if (!value) return "";
 
-  const date = new Date(value);
-  const now = new Date();
-  const dateDayKey = Date.UTC(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  );
-  const nowDayKey = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const calendarDayDiff = Math.floor(
-    (nowDayKey - dateDayKey) / (1000 * 60 * 60 * 24)
-  );
-  const formattedTime = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
+  const calendarDayDiff = getCalendarDayDiff({
+    value,
+    timeZone,
+  });
+  const formattedTime = formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options: {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    },
+    fallback: "",
+  });
 
   if (calendarDayDiff === 0) {
     return `Today, ${formattedTime}`;
@@ -62,26 +66,47 @@ const formatRelativeDate = (value: string | null) => {
 
   if (calendarDayDiff === 1) return `Yesterday, ${formattedTime}`;
 
-  if (calendarDayDiff > 1 && calendarDayDiff < 7) {
-    const weekday = new Intl.DateTimeFormat(undefined, {
-      weekday: "long",
-    }).format(date);
+  if ((calendarDayDiff ?? -1) > 1 && (calendarDayDiff ?? 0) < 7) {
+    const weekday = formatDateTimeInTimeZone({
+      value,
+      timeZone,
+      options: {
+        weekday: "long",
+      },
+      fallback: "",
+    });
     return `${weekday}, ${formattedTime}`;
   }
 
-  if (date.getFullYear() === now.getFullYear()) {
-    const shortDate = new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-    }).format(date);
+  const nowDayKey = getDayKey(new Date(), timeZone);
+  const dateDayKey = getDayKey(value, timeZone);
+  const isCurrentYear = Boolean(
+    nowDayKey && dateDayKey && nowDayKey.slice(0, 4) === dateDayKey.slice(0, 4)
+  );
+
+  if (isCurrentYear) {
+    const shortDate = formatDateTimeInTimeZone({
+      value,
+      timeZone,
+      options: {
+        month: "short",
+        day: "numeric",
+      },
+      fallback: "",
+    });
     return `${shortDate}, ${formattedTime}`;
   }
 
-  const fullDate = new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
+  const fullDate = formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options: {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    },
+    fallback: "",
+  });
   return `${fullDate}, ${formattedTime}`;
 };
 
@@ -97,6 +122,7 @@ export const MailboxView = ({
   previewEmail,
   previewEmailLoading,
 }: MailboxViewProps) => {
+  const { effectiveTimeZone } = useTimezone();
   const [addressCommandOpen, setAddressCommandOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -249,7 +275,7 @@ export const MailboxView = ({
                       {email.from}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatRelativeDate(email.receivedAt)}
+                      {formatRelativeDate(email.receivedAt, effectiveTimeZone)}
                     </span>
                   </div>
                 </button>
