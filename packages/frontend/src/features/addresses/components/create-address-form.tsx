@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ import { toFieldErrors } from "@/features/form-utils/to-field-errors";
 
 type CreateAddressFormProps = {
   domains: string[];
+  isDomainsLoading?: boolean;
 };
 
 const createAddressSchema = (availableDomains: string[]) =>
@@ -103,7 +105,10 @@ const createAddressSchema = (availableDomains: string[]) =>
     }),
   });
 
-export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
+export const CreateAddressForm = ({
+  domains,
+  isDomainsLoading = false,
+}: CreateAddressFormProps) => {
   const createMutation = useCreateAddressMutation();
   const plusIconRef = useRef<PlusIconHandle>(null);
   const availableDomains = useMemo(() => uniqueDomains(domains), [domains]);
@@ -204,11 +209,24 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                   const isInvalid =
                     field.state.meta.isTouched && !field.state.meta.isValid;
                   const selectedValue = field.state.value || domains[0] || "";
+                  const isDomainSelectDisabled =
+                    isDomainsLoading || domains.length === 0;
 
                   return (
                     <Field data-invalid={isInvalid}>
                       <FieldLabel htmlFor="address-domain">Domain</FieldLabel>
-                      {domains.length <= 1 ? (
+                      {isDomainsLoading ? (
+                        <Select disabled value="">
+                          <SelectTrigger
+                            id="address-domain"
+                            name={field.name}
+                            className="h-10 w-full cursor-not-allowed"
+                            aria-invalid={isInvalid}
+                          >
+                            <Skeleton className="h-4 w-2/3 rounded-sm" />
+                          </SelectTrigger>
+                        </Select>
+                      ) : domains.length <= 1 ? (
                         <Input
                           id="address-domain"
                           disabled
@@ -217,6 +235,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                         />
                       ) : (
                         <Select
+                          disabled={isDomainSelectDisabled}
                           value={selectedValue}
                           onValueChange={value =>
                             field.handleChange(value ?? "")
@@ -226,7 +245,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                             id="address-domain"
                             name={field.name}
                             onBlur={field.handleBlur}
-                            className="h-10 w-full cursor-pointer"
+                            className="h-10 w-full cursor-pointer disabled:cursor-not-allowed"
                             aria-invalid={isInvalid}
                           >
                             <SelectValue placeholder="Select domain" />
@@ -240,7 +259,7 @@ export const CreateAddressForm = ({ domains }: CreateAddressFormProps) => {
                           </SelectContent>
                         </Select>
                       )}
-                      {domains.length === 0 ? (
+                      {domains.length === 0 && !isDomainsLoading ? (
                         <FieldDescription>
                           No domains configured on the backend.
                         </FieldDescription>

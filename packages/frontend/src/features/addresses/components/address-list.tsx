@@ -28,6 +28,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   SquarePenIcon,
   type SquarePenIconHandle,
@@ -53,6 +54,7 @@ type AddressListProps = {
 
 const PAGE_SIZE = 10;
 const ALLOWED_SENDER_VISIBLE_COUNT = 2;
+const LOADING_SKELETON_ROW_COUNT = 3;
 const allowedSenderBadgeClass =
   "h-6 rounded-md border border-border/70 bg-muted/80 px-2 text-xs dark:bg-muted/60";
 const placeholderTextClass =
@@ -76,6 +78,7 @@ const otherYearDateFormatter = new Intl.DateTimeFormat(undefined, {
 type AddressRowActionsProps = {
   address: EmailAddress;
   isDeletePending: boolean;
+  disabled?: boolean;
   onEdit: (address: EmailAddress) => void;
   onDelete: (address: EmailAddress) => void;
 };
@@ -83,6 +86,7 @@ type AddressRowActionsProps = {
 const AddressRowActions = ({
   address,
   isDeletePending,
+  disabled = false,
   onEdit,
   onDelete,
 }: AddressRowActionsProps) => {
@@ -95,7 +99,8 @@ const AddressRowActions = ({
         type="button"
         variant="outline"
         size="sm"
-        className="cursor-pointer"
+        disabled={disabled}
+        className="cursor-pointer disabled:cursor-not-allowed"
         onMouseEnter={() => {
           editIconRef.current?.startAnimation();
         }}
@@ -111,8 +116,8 @@ const AddressRowActions = ({
         type="button"
         variant="outline"
         size="sm"
-        disabled={isDeletePending}
-        className="cursor-pointer"
+        disabled={disabled || isDeletePending}
+        className="cursor-pointer disabled:cursor-not-allowed"
         onMouseEnter={() => {
           deleteIconRef.current?.startAnimation();
         }}
@@ -205,6 +210,15 @@ const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
   );
 };
 
+const AllowedSendersBadgeSkeleton = () => (
+  <Badge
+    variant="secondary"
+    className={`${allowedSenderBadgeClass} min-w-24 justify-center`}
+  >
+    <Skeleton className="h-3 w-16 rounded-sm" />
+  </Badge>
+);
+
 export const AddressList = ({ domains }: AddressListProps) => {
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<EmailAddressSortBy>("createdAt");
@@ -266,10 +280,11 @@ export const AddressList = ({ domains }: AddressListProps) => {
   };
 
   const addresses = addressesQuery.data?.items ?? [];
+  const isTableLoading = addressesQuery.isLoading;
   const currentPage = addressesQuery.data?.page ?? page;
   const totalItems = addressesQuery.data?.totalItems ?? 0;
   const totalPages = addressesQuery.data?.totalPages ?? 1;
-  const showEmptyState = !addressesQuery.isLoading && addresses.length === 0;
+  const showEmptyState = !isTableLoading && addresses.length === 0;
 
   return (
     <Card className="border-border/70 bg-card/60">
@@ -290,6 +305,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
                     type="button"
                     variant="ghost"
                     size="sm"
+                    disabled={isTableLoading}
                     onClick={() => handleSort("address")}
                     className="-ml-2"
                   >
@@ -302,6 +318,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
                     type="button"
                     variant="ghost"
                     size="sm"
+                    disabled={isTableLoading}
                     onClick={() => handleSort("createdAt")}
                     className="-ml-2"
                   >
@@ -313,6 +330,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
                     type="button"
                     variant="ghost"
                     size="sm"
+                    disabled={isTableLoading}
                     onClick={() => handleSort("lastReceivedAt")}
                     className="-ml-2"
                   >
@@ -324,52 +342,95 @@ export const AddressList = ({ domains }: AddressListProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {addresses.map(address => (
-                <TableRow key={address.id}>
-                  <TableCell className="max-w-56 truncate font-medium">
-                    <Link
-                      className="block truncate font-mono text-xs sm:text-sm hover:underline"
-                      to={`/mailbox/${encodeURIComponent(address.id)}`}
-                    >
-                      {address.address}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {address.tag ? (
-                      <Badge variant="secondary">{address.tag}</Badge>
-                    ) : (
-                      <span className={placeholderTextClass}>-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatDate(address.createdAt)}</TableCell>
-                  <TableCell
-                    className={
-                      address.lastReceivedAt
-                        ? undefined
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {formatDate(address.lastReceivedAt)}
-                  </TableCell>
-                  <TableCell className="max-w-72">
-                    <AllowedSendersBadges
-                      domains={address.allowedFromDomains}
-                    />
-                  </TableCell>
-                  <AddressRowActions
-                    address={address}
-                    isDeletePending={deleteMutation.isPending}
-                    onEdit={value => {
-                      setEditSheetSession(previous => previous + 1);
-                      setEditingAddress(value);
-                      setIsEditSheetOpen(true);
-                    }}
-                    onDelete={value => {
-                      setPendingDeleteAddress(value);
-                    }}
-                  />
-                </TableRow>
-              ))}
+              {isTableLoading
+                ? Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
+                    (_, index) => (
+                      <TableRow key={`address-table-skeleton-row-${index}`}>
+                        <TableCell className="max-w-38 truncate font-medium">
+                          <Skeleton className="h-4 w-36 rounded-sm" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-12 rounded-sm" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-28 rounded-sm" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-32 rounded-sm" />
+                        </TableCell>
+                        <TableCell className="max-w-72">
+                          <AllowedSendersBadgeSkeleton />
+                        </TableCell>
+                        <TableCell className="space-x-2 text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="cursor-not-allowed"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="cursor-not-allowed"
+                          >
+                            Delete
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  )
+                : addresses.map(address => (
+                    <TableRow key={address.id}>
+                      <TableCell className="max-w-56 truncate font-medium">
+                        <Link
+                          className="block truncate font-mono text-xs sm:text-sm hover:underline"
+                          to={`/mailbox/${encodeURIComponent(address.id)}`}
+                        >
+                          {address.address}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {address.tag ? (
+                          <Badge variant="secondary">{address.tag}</Badge>
+                        ) : (
+                          <span className={placeholderTextClass}>-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(address.createdAt)}</TableCell>
+                      <TableCell
+                        className={
+                          address.lastReceivedAt
+                            ? undefined
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {formatDate(address.lastReceivedAt)}
+                      </TableCell>
+                      <TableCell className="max-w-72">
+                        <AllowedSendersBadges
+                          domains={address.allowedFromDomains}
+                        />
+                      </TableCell>
+                      <AddressRowActions
+                        address={address}
+                        isDeletePending={deleteMutation.isPending}
+                        disabled={isTableLoading}
+                        onEdit={value => {
+                          setEditSheetSession(previous => previous + 1);
+                          setEditingAddress(value);
+                          setIsEditSheetOpen(true);
+                        }}
+                        onDelete={value => {
+                          setPendingDeleteAddress(value);
+                        }}
+                      />
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         )}
@@ -385,7 +446,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
               type="button"
               variant="outline"
               size="sm"
-              disabled={addressesQuery.isLoading || currentPage <= 1}
+              disabled={isTableLoading || currentPage <= 1}
               className="cursor-pointer"
               onMouseEnter={() => {
                 previousPageIconRef.current?.startAnimation();
@@ -407,7 +468,7 @@ export const AddressList = ({ domains }: AddressListProps) => {
               type="button"
               variant="outline"
               size="sm"
-              disabled={addressesQuery.isLoading || currentPage >= totalPages}
+              disabled={isTableLoading || currentPage >= totalPages}
               className="cursor-pointer"
               onMouseEnter={() => {
                 nextPageIconRef.current?.startAnimation();

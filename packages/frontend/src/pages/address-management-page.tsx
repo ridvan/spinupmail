@@ -11,7 +11,10 @@ export const AddressManagementPage = () => {
         <p className="text-sm text-destructive">{domainsQuery.error.message}</p>
       ) : null}
 
-      <CreateAddressForm domains={domainsQuery.data?.items ?? []} />
+      <CreateAddressForm
+        domains={domainsQuery.data?.items ?? []}
+        isDomainsLoading={domainsQuery.isLoading}
+      />
       <AddressList domains={domainsQuery.data?.items ?? []} />
     </div>
   );
