@@ -1,4 +1,6 @@
 import * as React from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Link } from "react-router";
 import {
   AlertDialog,
@@ -33,6 +35,12 @@ import {
   SquarePenIcon,
   type SquarePenIconHandle,
 } from "@/components/ui/square-pen";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -138,10 +146,13 @@ const AddressRowActions = ({
   );
 };
 
-const formatDate = (value: string | null, timeZone: string) => {
+const formatDate = (
+  value: string | null,
+  timeZone: string,
+  nowDayKey: string | null
+) => {
   if (!value) return "Never";
   const dateDayKey = getDayKey(value, timeZone);
-  const nowDayKey = getDayKey(new Date(), timeZone);
   if (!dateDayKey || !nowDayKey) return "Never";
   const options =
     dateDayKey.slice(0, 4) === nowDayKey.slice(0, 4)
@@ -229,6 +240,118 @@ const AllowedSendersBadgeSkeleton = () => (
   </Badge>
 );
 
+type AddressTableRowProps = {
+  address: EmailAddress;
+  timeZone: string;
+  nowDayKey: string | null;
+  isDeletePending: boolean;
+  onEdit: (address: EmailAddress) => void;
+  onDelete: (address: EmailAddress) => void;
+};
+
+const AddressTableRow = React.memo(
+  ({
+    address,
+    timeZone,
+    nowDayKey,
+    isDeletePending,
+    onEdit,
+    onDelete,
+  }: AddressTableRowProps) => {
+    const [didCopyAddress, setDidCopyAddress] = React.useState(false);
+    const copyResetTimeoutRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+      return () => {
+        if (copyResetTimeoutRef.current !== null) {
+          window.clearTimeout(copyResetTimeoutRef.current);
+        }
+      };
+    }, []);
+
+    const handleCopyAddress = React.useCallback(async () => {
+      if (!navigator.clipboard?.writeText) return;
+
+      try {
+        await navigator.clipboard.writeText(address.address);
+        setDidCopyAddress(true);
+
+        if (copyResetTimeoutRef.current !== null) {
+          window.clearTimeout(copyResetTimeoutRef.current);
+        }
+
+        copyResetTimeoutRef.current = window.setTimeout(() => {
+          setDidCopyAddress(false);
+        }, 1600);
+      } catch {
+        // Ignore copy failures silently.
+      }
+    }, [address.address]);
+
+    return (
+      <TableRow>
+        <TableCell className="max-w-56 font-medium">
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="cursor-pointer text-muted-foreground hover:text-foreground"
+                    aria-label="Copy address"
+                    onClick={() => void handleCopyAddress()}
+                  />
+                }
+              >
+                <HugeiconsIcon
+                  icon={didCopyAddress ? Tick02Icon : Copy01Icon}
+                  strokeWidth={2}
+                  className="size-3.5"
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top">Copy address</TooltipContent>
+            </Tooltip>
+            <Link
+              className="block min-w-0 flex-1 truncate font-mono text-xs sm:text-sm hover:underline"
+              to={`/mailbox/${encodeURIComponent(address.id)}`}
+            >
+              {address.address}
+            </Link>
+          </div>
+        </TableCell>
+        <TableCell>
+          {address.tag ? (
+            <Badge variant="secondary">{address.tag}</Badge>
+          ) : (
+            <span className={placeholderTextClass}>-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {formatDate(address.createdAt, timeZone, nowDayKey)}
+        </TableCell>
+        <TableCell
+          className={
+            address.lastReceivedAt ? undefined : "text-muted-foreground"
+          }
+        >
+          {formatDate(address.lastReceivedAt, timeZone, nowDayKey)}
+        </TableCell>
+        <TableCell className="max-w-72">
+          <AllowedSendersBadges domains={address.allowedFromDomains} />
+        </TableCell>
+        <AddressRowActions
+          address={address}
+          isDeletePending={isDeletePending}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </TableRow>
+    );
+  }
+);
+
 export const AddressList = ({ domains }: AddressListProps) => {
   const { effectiveTimeZone } = useTimezone();
   const [page, setPage] = React.useState(1);
@@ -290,12 +413,26 @@ export const AddressList = ({ domains }: AddressListProps) => {
     setIsEditSheetOpen(isOpen);
   };
 
+  const handleEditAddress = React.useCallback((address: EmailAddress) => {
+    setEditSheetSession(previous => previous + 1);
+    setEditingAddress(address);
+    setIsEditSheetOpen(true);
+  }, []);
+
+  const handleDeleteAddress = React.useCallback((address: EmailAddress) => {
+    setPendingDeleteAddress(address);
+  }, []);
+
   const addresses = addressesQuery.data?.items ?? [];
   const isTableLoading = addressesQuery.isLoading;
   const currentPage = addressesQuery.data?.page ?? page;
   const totalItems = addressesQuery.data?.totalItems ?? 0;
   const totalPages = addressesQuery.data?.totalPages ?? 1;
   const showEmptyState = !isTableLoading && addresses.length === 0;
+  const nowDayKey = React.useMemo(
+    () => getDayKey(new Date(), effectiveTimeZone),
+    [effectiveTimeZone]
+  );
 
   return (
     <Card className="border-border/70 bg-card/60">
@@ -308,144 +445,117 @@ export const AddressList = ({ domains }: AddressListProps) => {
             No addresses created yet.
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isTableLoading}
-                    onClick={() => handleSort("address")}
-                    className="-ml-2"
-                  >
-                    Address {sortLabel("address")}
-                  </Button>
-                </TableHead>
-                <TableHead>Tag</TableHead>
-                <TableHead>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isTableLoading}
-                    onClick={() => handleSort("createdAt")}
-                    className="-ml-2"
-                  >
-                    Created {sortLabel("createdAt")}
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isTableLoading}
-                    onClick={() => handleSort("lastReceivedAt")}
-                    className="-ml-2"
-                  >
-                    Last Received {sortLabel("lastReceivedAt")}
-                  </Button>
-                </TableHead>
-                <TableHead>Allowed Senders</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isTableLoading
-                ? Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
-                    (_, index) => (
-                      <TableRow key={`address-table-skeleton-row-${index}`}>
-                        <TableCell className="max-w-38 truncate font-medium">
-                          <Skeleton className="h-4 w-36 rounded-sm" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-12 rounded-sm" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-28 rounded-sm" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-32 rounded-sm" />
-                        </TableCell>
-                        <TableCell className="max-w-72">
-                          <AllowedSendersBadgeSkeleton />
-                        </TableCell>
-                        <TableCell className="space-x-2 text-right">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            className="cursor-not-allowed"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            className="cursor-not-allowed"
-                          >
-                            Delete
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+          <TooltipProvider delay={120}>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isTableLoading}
+                      onClick={() => handleSort("address")}
+                      className="-ml-2"
+                    >
+                      Address {sortLabel("address")}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Tag</TableHead>
+                  <TableHead>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isTableLoading}
+                      onClick={() => handleSort("createdAt")}
+                      className="-ml-2"
+                    >
+                      Created {sortLabel("createdAt")}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isTableLoading}
+                      onClick={() => handleSort("lastReceivedAt")}
+                      className="-ml-2"
+                    >
+                      Last Received {sortLabel("lastReceivedAt")}
+                    </Button>
+                  </TableHead>
+                  <TableHead>Allowed Senders</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isTableLoading
+                  ? Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
+                      (_, index) => (
+                        <TableRow key={`address-table-skeleton-row-${index}`}>
+                          <TableCell className="max-w-38 truncate font-medium">
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground">
+                                <HugeiconsIcon
+                                  icon={Copy01Icon}
+                                  strokeWidth={2}
+                                  className="size-3.5"
+                                />
+                              </span>
+                              <Skeleton className="h-4 w-36 rounded-sm" />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-5 w-12 rounded-sm" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-28 rounded-sm" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-32 rounded-sm" />
+                          </TableCell>
+                          <TableCell className="max-w-72">
+                            <AllowedSendersBadgeSkeleton />
+                          </TableCell>
+                          <TableCell className="space-x-2 text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled
+                              className="cursor-not-allowed"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled
+                              className="cursor-not-allowed"
+                            >
+                              Delete
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
                     )
-                  )
-                : addresses.map(address => (
-                    <TableRow key={address.id}>
-                      <TableCell className="max-w-56 truncate font-medium">
-                        <Link
-                          className="block truncate font-mono text-xs sm:text-sm hover:underline"
-                          to={`/mailbox/${encodeURIComponent(address.id)}`}
-                        >
-                          {address.address}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {address.tag ? (
-                          <Badge variant="secondary">{address.tag}</Badge>
-                        ) : (
-                          <span className={placeholderTextClass}>-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {formatDate(address.createdAt, effectiveTimeZone)}
-                      </TableCell>
-                      <TableCell
-                        className={
-                          address.lastReceivedAt
-                            ? undefined
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {formatDate(address.lastReceivedAt, effectiveTimeZone)}
-                      </TableCell>
-                      <TableCell className="max-w-72">
-                        <AllowedSendersBadges
-                          domains={address.allowedFromDomains}
-                        />
-                      </TableCell>
-                      <AddressRowActions
+                  : addresses.map(address => (
+                      <AddressTableRow
+                        key={address.id}
                         address={address}
+                        timeZone={effectiveTimeZone}
+                        nowDayKey={nowDayKey}
                         isDeletePending={deleteMutation.isPending}
-                        disabled={isTableLoading}
-                        onEdit={value => {
-                          setEditSheetSession(previous => previous + 1);
-                          setEditingAddress(value);
-                          setIsEditSheetOpen(true);
-                        }}
-                        onDelete={value => {
-                          setPendingDeleteAddress(value);
-                        }}
+                        onEdit={handleEditAddress}
+                        onDelete={handleDeleteAddress}
                       />
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
+                    ))}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-2">
