@@ -8,8 +8,9 @@ const EMAIL_TEXT_COLOR = "#f5f5f5";
 const EMAIL_MUTED_TEXT_COLOR = "#9d9da6";
 const EMAIL_BUTTON_BG_COLOR = "#2c2c31";
 const EMAIL_BUTTON_TEXT_COLOR = "#f3f4f6";
-const AUTH_EMAIL_SEND_LIMIT_PER_HOUR = 10;
 const AUTH_EMAIL_SEND_WINDOW_SECONDS = 60 * 60;
+const AUTH_VERIFICATION_SIGNUP_SEND_LIMIT_PER_HOUR = 2;
+const AUTH_RESET_PASSWORD_SEND_LIMIT_PER_HOUR = 2;
 
 type VerificationEmailData = {
   user: { email: string };
@@ -36,6 +37,8 @@ type EmailSenderEnv = Pick<
   | "CORS_ORIGIN"
   | "SUM_KV"
 >;
+
+type AuthEmailRateLimitScope = "verification-signup" | "password-reset";
 
 const escapeHtml = (value: string) =>
   value
@@ -153,10 +156,14 @@ const canSendAuthEmail = async ({
   env,
   recipientEmail,
   request,
+  scope,
+  limitPerHour,
 }: {
   env: EmailSenderEnv;
   recipientEmail: string;
   request: unknown;
+  scope: AuthEmailRateLimitScope;
+  limitPerHour: number;
 }) => {
   const normalizedEmail = recipientEmail.trim().toLowerCase();
   if (!normalizedEmail) {
@@ -166,10 +173,10 @@ const canSendAuthEmail = async ({
   const nowSeconds = Math.floor(Date.now() / 1000);
   const hourSlot = Math.floor(nowSeconds / AUTH_EMAIL_SEND_WINDOW_SECONDS);
   const recipientHash = await hashForRateLimitKey(normalizedEmail);
-  const recipientKey = `auth:email:recipient:${recipientHash}:slot:${hourSlot}`;
+  const recipientKey = `auth:email:${scope}:recipient:${recipientHash}:slot:${hourSlot}`;
 
   const recipientCount = await readHourlyCounter(env, recipientKey);
-  if (recipientCount >= AUTH_EMAIL_SEND_LIMIT_PER_HOUR) {
+  if (recipientCount >= limitPerHour) {
     return { allowed: false as const, reason: "recipient-hourly-limit" };
   }
 
@@ -180,9 +187,9 @@ const canSendAuthEmail = async ({
   }
 
   const ipHash = await hashForRateLimitKey(ip);
-  const ipKey = `auth:email:ip:${ipHash}:slot:${hourSlot}`;
+  const ipKey = `auth:email:${scope}:ip:${ipHash}:slot:${hourSlot}`;
   const ipCount = await readHourlyCounter(env, ipKey);
-  if (ipCount >= AUTH_EMAIL_SEND_LIMIT_PER_HOUR) {
+  if (ipCount >= limitPerHour) {
     return { allowed: false as const, reason: "ip-hourly-limit" };
   }
 
@@ -497,6 +504,9 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
     { user, url, token }: VerificationEmailData,
     request?: unknown
   ) => {
+    const isChangeEmailVerification =
+      getVerificationRequestType(token) === "change-email-verification";
+
     if (!env?.RESEND_API_KEY) {
       console.error(
         "[auth] RESEND_API_KEY is not configured. Cannot send verification email."
@@ -511,23 +521,26 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
       return;
     }
 
-    const rateLimitResult = await canSendAuthEmail({
-      env,
-      recipientEmail: user.email,
-      request,
-    });
-    if (!rateLimitResult.allowed) {
-      console.warn("[auth] Verification email skipped due to hourly limit", {
-        recipient: maskEmailForLogs(user.email),
-        reason: rateLimitResult.reason,
+    if (!isChangeEmailVerification) {
+      const rateLimitResult = await canSendAuthEmail({
+        env,
+        recipientEmail: user.email,
+        request,
+        scope: "verification-signup",
+        limitPerHour: AUTH_VERIFICATION_SIGNUP_SEND_LIMIT_PER_HOUR,
       });
-      return;
+      if (!rateLimitResult.allowed) {
+        console.warn("[auth] Verification email skipped due to hourly limit", {
+          recipient: maskEmailForLogs(user.email),
+          flow: "signup",
+          reason: rateLimitResult.reason,
+        });
+        return;
+      }
     }
 
     const resend = new Resend(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
-    const isChangeEmailVerification =
-      getVerificationRequestType(token) === "change-email-verification";
 
     try {
       await resend.emails.send({
@@ -546,9 +559,9 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
     } catch (error) {
       console.error("[auth] Failed to send verification email via Resend", {
         recipient: maskEmailForLogs(user.email),
+        flow: isChangeEmailVerification ? "change-email" : "signup",
         error,
       });
-      throw error;
     }
   };
 };
@@ -573,6 +586,8 @@ export const createResendResetPasswordEmailSender = (env?: EmailSenderEnv) => {
       env,
       recipientEmail: user.email,
       request,
+      scope: "password-reset",
+      limitPerHour: AUTH_RESET_PASSWORD_SEND_LIMIT_PER_HOUR,
     });
     if (!rateLimitResult.allowed) {
       console.warn("[auth] Reset password email skipped due to hourly limit", {

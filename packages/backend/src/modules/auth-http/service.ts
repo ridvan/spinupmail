@@ -19,6 +19,11 @@ const parseResendBody = (payload: unknown): ResendVerificationInput => {
   return parsed.data;
 };
 
+const getWindowRetryAfterSeconds = (
+  nowSeconds: number,
+  windowSeconds: number
+) => Math.max(1, windowSeconds - (nowSeconds % windowSeconds));
+
 export const resendVerificationEmail = async (
   c: Context<AppHonoEnv>,
   payload: unknown
@@ -48,10 +53,9 @@ export const resendVerificationEmail = async (
     Number.isFinite(ipCount) &&
     ipCount >= AUTH_VERIFICATION_RESEND_IP_MAX_ATTEMPTS
   ) {
-    const retryAfterSeconds = Math.max(
-      1,
-      AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS -
-        (nowSeconds % AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS)
+    const retryAfterSeconds = getWindowRetryAfterSeconds(
+      nowSeconds,
+      AUTH_VERIFICATION_RESEND_IP_WINDOW_SECONDS
     );
     c.status(429);
     c.header("Retry-After", String(retryAfterSeconds));

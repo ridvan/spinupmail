@@ -199,6 +199,14 @@ function createAuth(
         rateLimit: {
           enabled: true,
           window: 60,
+          customRules: {
+            // It's here to prevent abuse,
+            // you might not need this based on your service provider's limits.
+            "/change-email": {
+              window: 60 * 60,
+              max: 2,
+            },
+          },
         },
       }
     ),

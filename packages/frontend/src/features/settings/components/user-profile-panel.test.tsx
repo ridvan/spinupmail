@@ -41,6 +41,16 @@ const mockedUseTimezone = vi.mocked(useTimezone);
 const mockedUpdateUser = vi.mocked(authClient.updateUser);
 const mockedChangeEmail = vi.mocked(authClient.changeEmail);
 const mockedToastPromise = vi.mocked(toast.promise);
+
+const resolveToastPromise = <T,>(
+  promise: Parameters<typeof toast.promise>[0]
+): Promise<T> => {
+  if (typeof promise === "function") {
+    return promise() as Promise<T>;
+  }
+  return promise as Promise<T>;
+};
+
 const buildMockUser = (name: string) => ({
   id: "user-1",
   name,
@@ -166,6 +176,41 @@ describe("UserProfilePanel", () => {
     expect(editableEmailInput.value).toBe("");
     expect(editableEmailInput.placeholder).toBe("Enter new address...");
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+  });
+
+  it("shows a retry-later message when change-email verification cannot be sent", async () => {
+    mockedUseAuth.mockReturnValue(buildAuthenticatedAuthState());
+    mockedToastPromise.mockImplementation(((
+      promise: Parameters<typeof toast.promise>[0]
+    ) => {
+      void resolveToastPromise(promise).catch(() => undefined);
+      return "toast-id" as ReturnType<typeof toast.promise>;
+    }) as typeof toast.promise);
+    mockedChangeEmail.mockResolvedValue({
+      error: {
+        message: "request failed",
+        status: 429,
+      },
+    });
+
+    renderUserProfilePanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change email" }));
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mockedToastPromise).toHaveBeenCalled());
+    const savePromise = mockedToastPromise.mock.calls[0]?.[0];
+    expect(savePromise).toBeTruthy();
+    const saveError = await resolveToastPromise<unknown>(savePromise!).catch(
+      error => error
+    );
+    expect(saveError).toBeInstanceOf(Error);
+    expect((saveError as Error).message).toBe(
+      "Unable to send verification email right now. Please try again later."
+    );
   });
 
   it("finds and selects a timezone with space-separated search text", async () => {

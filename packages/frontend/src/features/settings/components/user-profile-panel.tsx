@@ -93,6 +93,57 @@ const getChangeEmailCallbackURL = () => {
   return new URL("/settings", window.location.origin).toString();
 };
 
+const CHANGE_EMAIL_RETRY_LATER_MESSAGE =
+  "Unable to send verification email right now. Please try again later.";
+
+const getErrorStatusCode = (error: unknown) => {
+  if (typeof error !== "object" || !error) return null;
+
+  const directStatus =
+    (error as { status?: unknown }).status ??
+    (error as { statusCode?: unknown }).statusCode;
+  if (typeof directStatus === "number" && Number.isFinite(directStatus)) {
+    return directStatus;
+  }
+
+  const nestedStatus = (error as { response?: { status?: unknown } }).response
+    ?.status;
+  if (typeof nestedStatus === "number" && Number.isFinite(nestedStatus)) {
+    return nestedStatus;
+  }
+
+  return null;
+};
+
+const getChangeEmailErrorMessage = (error: unknown) => {
+  if (typeof error !== "object" || !error) {
+    return "Unable to change email";
+  }
+
+  const statusCode = getErrorStatusCode(error);
+  if (statusCode === 429) {
+    return CHANGE_EMAIL_RETRY_LATER_MESSAGE;
+  }
+
+  const message =
+    typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message.trim()
+      : "";
+
+  if (!message) return "Unable to change email";
+
+  const normalizedMessage = message.toLowerCase();
+  if (
+    normalizedMessage.includes("try again later") ||
+    normalizedMessage.includes("rate limit") ||
+    normalizedMessage.includes("too many")
+  ) {
+    return CHANGE_EMAIL_RETRY_LATER_MESSAGE;
+  }
+
+  return message;
+};
+
 const UserProfilePanelBody = ({
   initialName,
   currentName,
@@ -328,7 +379,7 @@ const UserProfilePanelBody = ({
                 Timezone
               </FieldLabel>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">Current:</span>{" "}
+                <span>Current:</span>{" "}
                 <Badge variant="secondary">{effectiveTimeZone}</Badge>
                 <Badge variant="outline">{describeSource(source)}</Badge>
               </div>
@@ -498,7 +549,7 @@ export const UserProfilePanel = () => {
         callbackURL: getChangeEmailCallbackURL(),
       });
       if (result.error) {
-        throw new Error(result.error.message || "Unable to change email");
+        throw new Error(getChangeEmailErrorMessage(result.error));
       }
       await refreshSession();
     },
