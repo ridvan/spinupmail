@@ -11,6 +11,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,8 @@ import {
 import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
+  ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
+  ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TAG_MAX_LENGTH,
   ADDRESS_TTL_MAX_MINUTES,
   ALLOWED_FROM_DOMAIN_MAX_LENGTH,
@@ -106,6 +109,17 @@ const editAddressSchema = (availableDomains: string[]) =>
         values => values.every(domain => domainRegex.test(domain)),
         "Use valid hostnames like `example.com`"
       ),
+    maxReceivedEmailCount: z.union([
+      z
+        .number()
+        .int({ message: "Max received emails must be a whole number" })
+        .positive({ message: "Max received emails must be a positive number" })
+        .max(ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX, {
+          message: `Max received emails must be ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX} or less`,
+        }),
+      z.undefined(),
+    ]),
+    maxReceivedEmailAction: z.enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS),
   });
 
 const deriveTtlMinutes = (expiresAt: string | null) => {
@@ -138,6 +152,8 @@ export const EditAddressSheet = ({
         | number
         | undefined,
       allowedFromDomains: address?.allowedFromDomains ?? ([] as string[]),
+      maxReceivedEmailCount: address?.maxReceivedEmailCount ?? undefined,
+      maxReceivedEmailAction: address?.maxReceivedEmailAction ?? "cleanAll",
     }),
     [address, domains]
   );
@@ -159,6 +175,11 @@ export const EditAddressSheet = ({
             tag: value.tag.trim() || null,
             ttlMinutes: value.ttlMinutes ?? null,
             allowedFromDomains: uniqueDomains(value.allowedFromDomains),
+            maxReceivedEmailCount: value.maxReceivedEmailCount ?? null,
+            maxReceivedEmailAction:
+              value.maxReceivedEmailCount !== undefined
+                ? value.maxReceivedEmailAction
+                : undefined,
           },
         }),
         {
@@ -393,6 +414,100 @@ export const EditAddressSheet = ({
                 );
               }}
             />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.Field
+                name="maxReceivedEmailCount"
+                children={field => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
+
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor="edit-address-max-received-email-count">
+                        Max received emails
+                      </FieldLabel>
+                      <Input
+                        id="edit-address-max-received-email-count"
+                        name={field.name}
+                        type="number"
+                        min={1}
+                        max={ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}
+                        step={1}
+                        value={field.state.value ?? ""}
+                        onBlur={field.handleBlur}
+                        onChange={event => {
+                          const nextValue = event.target.value;
+                          field.handleChange(
+                            nextValue === "" ? undefined : Number(nextValue)
+                          );
+                        }}
+                        placeholder="Leave empty for unlimited"
+                        aria-invalid={isInvalid}
+                      />
+                      <FieldDescription>
+                        Auto-action runs when this inbox reaches the count.
+                      </FieldDescription>
+                      {isInvalid ? (
+                        <FieldError
+                          errors={toFieldErrors(field.state.meta.errors)}
+                        />
+                      ) : null}
+                    </Field>
+                  );
+                }}
+              />
+
+              <form.Field
+                name="maxReceivedEmailAction"
+                children={field => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
+
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel>When max is reached</FieldLabel>
+                      <RadioGroup
+                        value={field.state.value}
+                        onValueChange={value =>
+                          field.handleChange(
+                            (value ?? "cleanAll") as "cleanAll" | "rejectNew"
+                          )
+                        }
+                        onBlur={() => field.handleBlur()}
+                        aria-invalid={isInvalid}
+                      >
+                        <label
+                          htmlFor="edit-address-max-received-action-clean-all"
+                          className="flex cursor-pointer items-center gap-2"
+                        >
+                          <RadioGroupItem
+                            id="edit-address-max-received-action-clean-all"
+                            value="cleanAll"
+                          />
+                          <span className="text-sm">Clean all</span>
+                        </label>
+                        <label
+                          htmlFor="edit-address-max-received-action-reject-new"
+                          className="flex cursor-pointer items-center gap-2"
+                        >
+                          <RadioGroupItem
+                            id="edit-address-max-received-action-reject-new"
+                            value="rejectNew"
+                          />
+                          <span className="text-sm">Reject new emails</span>
+                        </label>
+                      </RadioGroup>
+                      {isInvalid ? (
+                        <FieldError
+                          errors={toFieldErrors(field.state.meta.errors)}
+                        />
+                      ) : null}
+                    </Field>
+                  );
+                }}
+              />
+            </div>
           </FieldGroup>
 
           <SheetFooter className="p-0">

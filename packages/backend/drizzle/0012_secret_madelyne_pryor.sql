@@ -1,0 +1,1 @@
+ALTER TABLE `email_addresses` ADD `email_count` integer DEFAULT 0 NOT NULL;

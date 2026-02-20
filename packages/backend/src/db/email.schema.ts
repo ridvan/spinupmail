@@ -17,6 +17,7 @@ export const emailAddresses = sqliteTable(
     domain: text("domain").notNull(),
     tag: text("tag"),
     meta: text("meta"),
+    emailCount: integer("email_count").default(0).notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),

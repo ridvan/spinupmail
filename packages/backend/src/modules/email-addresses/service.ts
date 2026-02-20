@@ -6,8 +6,11 @@ import {
 import { isAddressConflictError } from "@/shared/errors";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
 import {
+  applyMaxReceivedEmailLimitToMeta,
   buildAddressMetaForStorage,
   getAllowedFromDomainsFromMeta,
+  getMaxReceivedEmailActionFromMeta,
+  getMaxReceivedEmailCountFromMeta,
   hasReservedLocalPartKeyword,
   isValidDomain,
   normalizeAddress,
@@ -20,6 +23,7 @@ import {
   ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
   ADDRESS_LOCAL_PART_MAX_LENGTH,
+  ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TTL_MAX_MINUTES,
   createEmailAddressBodySchema,
   listEmailAddressesQuerySchema,
@@ -82,6 +86,9 @@ const parseUpdateBody = (payload: unknown): UpdateEmailAddressBody => {
   if (!parsed.success) return {};
   return parsed.data;
 };
+
+const normalizeMaxReceivedEmailAction = (value: unknown) =>
+  value === "rejectNew" ? "rejectNew" : "cleanAll";
 
 const encodeRecentAddressActivityCursor = (value: {
   recentActivityMs: number;
@@ -344,12 +351,33 @@ export const createEmailAddress = async ({
     };
   }
 
+  const maxReceivedEmailCount =
+    typeof body.maxReceivedEmailCount === "number"
+      ? body.maxReceivedEmailCount
+      : undefined;
+  if (
+    maxReceivedEmailCount !== undefined &&
+    (!Number.isInteger(maxReceivedEmailCount) ||
+      maxReceivedEmailCount <= 0 ||
+      maxReceivedEmailCount > ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `maxReceivedEmailCount must be a whole number between 1 and ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}`,
+      },
+    };
+  }
+  const maxReceivedEmailAction = normalizeMaxReceivedEmailAction(
+    body.maxReceivedEmailAction
+  );
+
   const expiresAtMs =
     ttlMinutes && ttlMinutes > 0 ? now + ttlMinutes * 60 * 1000 : undefined;
   const expiresAt = expiresAtMs ? new Date(expiresAtMs) : undefined;
 
-  const meta = buildAddressMetaForStorage(body.meta, allowedFromDomains);
-  if (meta === null) {
+  const baseMeta = buildAddressMetaForStorage(body.meta, allowedFromDomains);
+  if (baseMeta === null) {
     return {
       status: 400 as const,
       body: {
@@ -358,8 +386,31 @@ export const createEmailAddress = async ({
       },
     };
   }
+  const meta =
+    maxReceivedEmailCount === undefined
+      ? baseMeta
+      : applyMaxReceivedEmailLimitToMeta({
+          meta: baseMeta,
+          maxReceivedEmailCount,
+          maxReceivedEmailAction,
+        });
+  if (meta === null) {
+    return {
+      status: 400 as const,
+      body: {
+        error:
+          "maxReceivedEmailCount requires meta to be an object (or JSON object string)",
+      },
+    };
+  }
 
   const responseMeta = meta !== undefined ? parseAddressMeta(meta) : undefined;
+  const responseMaxReceivedEmailCount =
+    getMaxReceivedEmailCountFromMeta(responseMeta);
+  const responseMaxReceivedEmailAction =
+    responseMaxReceivedEmailCount === null
+      ? null
+      : getMaxReceivedEmailActionFromMeta(responseMeta);
 
   const db = getDb(env);
   const addressLimit = getMaxAddressesPerOrganization(env);
@@ -413,6 +464,8 @@ export const createEmailAddress = async ({
       tag: typeof body.tag === "string" ? body.tag : undefined,
       meta: responseMeta,
       allowedFromDomains,
+      maxReceivedEmailCount: responseMaxReceivedEmailCount,
+      maxReceivedEmailAction: responseMaxReceivedEmailAction,
       createdAt: new Date(now).toISOString(),
       createdAtMs: now,
       expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
@@ -600,6 +653,34 @@ export const updateEmailAddress = async ({
     };
   }
 
+  const existingMaxReceivedEmailCount =
+    getMaxReceivedEmailCountFromMeta(existingMeta);
+  const existingMaxReceivedEmailAction =
+    existingMaxReceivedEmailCount === null
+      ? "cleanAll"
+      : getMaxReceivedEmailActionFromMeta(existingMeta);
+  const nextMaxReceivedEmailCount =
+    body.maxReceivedEmailCount === undefined
+      ? existingMaxReceivedEmailCount
+      : body.maxReceivedEmailCount;
+  if (
+    nextMaxReceivedEmailCount !== null &&
+    (!Number.isInteger(nextMaxReceivedEmailCount) ||
+      nextMaxReceivedEmailCount <= 0 ||
+      nextMaxReceivedEmailCount > ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `maxReceivedEmailCount must be a whole number between 1 and ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}`,
+      },
+    };
+  }
+  const nextMaxReceivedEmailAction =
+    body.maxReceivedEmailAction === undefined
+      ? existingMaxReceivedEmailAction
+      : normalizeMaxReceivedEmailAction(body.maxReceivedEmailAction);
+
   if (body.ttlMinutes !== undefined && body.ttlMinutes !== null) {
     if (
       !Number.isInteger(body.ttlMinutes) ||
@@ -630,9 +711,18 @@ export const updateEmailAddress = async ({
         : null;
 
   let metaForStorage = existing.meta;
-  if (body.meta !== undefined || body.allowedFromDomains !== undefined) {
+  const shouldUpdateMeta =
+    body.meta !== undefined ||
+    body.allowedFromDomains !== undefined ||
+    body.maxReceivedEmailCount !== undefined ||
+    body.maxReceivedEmailAction !== undefined;
+  if (shouldUpdateMeta) {
     const metaBase = body.meta !== undefined ? body.meta : existingMeta;
-    if (metaBase === null && allowedFromDomains.length === 0) {
+    if (
+      metaBase === null &&
+      allowedFromDomains.length === 0 &&
+      nextMaxReceivedEmailCount === null
+    ) {
       metaForStorage = null;
     } else {
       const nextMeta = buildAddressMetaForStorage(metaBase, allowedFromDomains);
@@ -645,7 +735,21 @@ export const updateEmailAddress = async ({
           },
         };
       }
-      metaForStorage = nextMeta ?? null;
+      const nextMetaWithLimit = applyMaxReceivedEmailLimitToMeta({
+        meta: nextMeta,
+        maxReceivedEmailCount: nextMaxReceivedEmailCount,
+        maxReceivedEmailAction: nextMaxReceivedEmailAction,
+      });
+      if (nextMetaWithLimit === null) {
+        return {
+          status: 400 as const,
+          body: {
+            error:
+              "maxReceivedEmailCount requires meta to be an object (or JSON object string)",
+          },
+        };
+      }
+      metaForStorage = nextMetaWithLimit ?? null;
     }
   }
 

@@ -15,6 +15,7 @@ vi.mock("@/platform/db/client", () => ({
 }));
 
 vi.mock("@/modules/emails/repo", () => ({
+  decrementAddressEmailCount: vi.fn(),
   findAddressByIdAndOrganization: vi.fn(),
   findAddressByValueAndOrganization: vi.fn(),
   listEmailsForAddress: vi.fn(),

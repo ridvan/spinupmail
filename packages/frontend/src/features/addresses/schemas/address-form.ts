@@ -6,6 +6,13 @@ export const ADDRESS_TAG_MAX_LENGTH = 20;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
 export const ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
 export const ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
+export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
+export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
+  "cleanAll",
+  "rejectNew",
+] as const;
+export type AddressMaxReceivedEmailAction =
+  (typeof ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)[number];
 export const RESERVED_LOCAL_PART_KEYWORDS = [
   "abuse",
   "admin",

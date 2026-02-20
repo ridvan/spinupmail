@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -26,6 +27,8 @@ import {
 import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
+  ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
+  ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TAG_MAX_LENGTH,
   ADDRESS_TTL_MAX_MINUTES,
   ALLOWED_FROM_DOMAIN_MAX_LENGTH,
@@ -38,6 +41,7 @@ import {
 } from "@/features/addresses/schemas/address-form";
 import { useCreateAddressMutation } from "@/features/addresses/hooks/use-addresses";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
+import { cn } from "@/lib/utils";
 
 type CreateAddressFormProps = {
   domains: string[];
@@ -100,6 +104,17 @@ const createAddressSchema = (availableDomains: string[]) =>
         values => values.every(domain => domainRegex.test(domain)),
         "Use valid hostnames like `example.com`"
       ),
+    maxReceivedEmailCount: z.union([
+      z
+        .number()
+        .int({ message: "Max received emails must be a whole number" })
+        .positive({ message: "Max received emails must be a positive number" })
+        .max(ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX, {
+          message: `Max received emails must be ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX} or less`,
+        }),
+      z.undefined(),
+    ]),
+    maxReceivedEmailAction: z.enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS),
     acceptedRiskNotice: z.boolean().refine(value => value, {
       message:
         "You must accept the Terms and Privacy Policy to create an address",
@@ -121,6 +136,8 @@ export const CreateAddressForm = ({
       domain: domains[0] ?? "",
       tag: "",
       allowedFromDomains: [] as string[],
+      maxReceivedEmailCount: undefined as number | undefined,
+      maxReceivedEmailAction: "cleanAll" as "cleanAll" | "rejectNew",
       acceptedRiskNotice: false,
     },
     validators: {
@@ -137,6 +154,11 @@ export const CreateAddressForm = ({
           tag: value.tag.trim() || undefined,
           allowedFromDomains:
             allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
+          maxReceivedEmailCount: value.maxReceivedEmailCount,
+          maxReceivedEmailAction:
+            value.maxReceivedEmailCount !== undefined
+              ? value.maxReceivedEmailAction
+              : undefined,
           acceptedRiskNotice: value.acceptedRiskNotice,
         }),
         {
@@ -158,6 +180,8 @@ export const CreateAddressForm = ({
         ttlMinutes: undefined,
         tag: "",
         allowedFromDomains: [],
+        maxReceivedEmailCount: undefined,
+        maxReceivedEmailAction: "cleanAll",
       });
     },
   });
@@ -168,7 +192,7 @@ export const CreateAddressForm = ({
         <CardTitle className="text-lg">Create Address</CardTitle>
         <p className="text-sm text-muted-foreground">
           Enter the address prefix, choose TTL and domain, and optionally limit
-          accepted sender domains.
+          accepted sender domains and inbox size.
         </p>
       </CardHeader>
       <CardContent>
@@ -358,43 +382,204 @@ export const CreateAddressForm = ({
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <form.Field
-                name="allowedFromDomains"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
+            <form.Field
+              name="allowedFromDomains"
+              children={field => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
 
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor="address-allowed-from-domains">
-                        Allowed sender domains
-                      </FieldLabel>
-                      <DomainTagsInput
-                        id="address-allowed-from-domains"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        isInvalid={isInvalid}
-                        placeholder="e.g., gmail.com (accept only from Gmail)"
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor="address-allowed-from-domains">
+                      Allowed sender domains
+                    </FieldLabel>
+                    <DomainTagsInput
+                      id="address-allowed-from-domains"
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                      isInvalid={isInvalid}
+                      placeholder="e.g., gmail.com (accept only from Gmail)"
+                    />
+                    <FieldDescription>
+                      Up to {ALLOWED_FROM_DOMAINS_MAX_ITEMS} hostnames, each up
+                      to {ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters.
+                    </FieldDescription>
+                    {isInvalid ? (
+                      <FieldError
+                        errors={toFieldErrors(field.state.meta.errors)}
                       />
-                      <FieldDescription>
-                        Up to {ALLOWED_FROM_DOMAINS_MAX_ITEMS} hostnames, each
-                        up to {ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters.
-                      </FieldDescription>
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
+                    ) : null}
+                  </Field>
+                );
+              }}
+            />
 
-              <div aria-hidden className="hidden md:block" />
-              <div aria-hidden className="hidden md:block" />
-            </div>
+            <form.Subscribe
+              selector={state =>
+                state.values.maxReceivedEmailCount !== undefined
+              }
+            >
+              {isLimitEnabled => (
+                <div
+                  className={cn(
+                    "rounded-xl border p-3 md:p-4",
+                    isLimitEnabled
+                      ? "border-border bg-muted/45"
+                      : "border-border/70 bg-muted/25"
+                  )}
+                >
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">Inbox limit policy</p>
+                      <p className="text-xs text-muted-foreground">
+                        Set a max inbox size and choose the action taken when
+                        that limit is reached.
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "rounded-full border px-2 py-1 text-[11px] font-medium",
+                        isLimitEnabled
+                          ? "border-foreground/20 bg-background/70 text-foreground"
+                          : "border-border/80 text-muted-foreground"
+                      )}
+                    >
+                      {isLimitEnabled ? "Limit enabled" : "Unlimited"}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+                    <form.Field
+                      name="maxReceivedEmailCount"
+                      children={field => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
+
+                        return (
+                          <Field data-invalid={isInvalid}>
+                            <FieldLabel htmlFor="address-max-received-email-count">
+                              Max received emails
+                            </FieldLabel>
+                            <Input
+                              id="address-max-received-email-count"
+                              name={field.name}
+                              type="number"
+                              min={1}
+                              max={ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}
+                              step={1}
+                              value={field.state.value ?? ""}
+                              onBlur={field.handleBlur}
+                              onChange={event => {
+                                const value = event.target.value;
+                                field.handleChange(
+                                  value === "" ? undefined : Number(value)
+                                );
+                              }}
+                              placeholder="Leave empty for unlimited"
+                              aria-invalid={isInvalid}
+                            />
+                            <FieldDescription>
+                              Leave empty to keep all received emails.
+                            </FieldDescription>
+                            {isInvalid ? (
+                              <FieldError
+                                errors={toFieldErrors(field.state.meta.errors)}
+                              />
+                            ) : null}
+                          </Field>
+                        );
+                      }}
+                    />
+
+                    <form.Field
+                      name="maxReceivedEmailAction"
+                      children={field => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
+
+                        return (
+                          <Field data-invalid={isInvalid}>
+                            <FieldLabel>When max is reached</FieldLabel>
+                            <RadioGroup
+                              value={field.state.value}
+                              disabled={!isLimitEnabled}
+                              className="gap-2"
+                              onValueChange={value =>
+                                field.handleChange(
+                                  (value ?? "cleanAll") as
+                                    | "cleanAll"
+                                    | "rejectNew"
+                                )
+                              }
+                              onBlur={() => field.handleBlur()}
+                              aria-invalid={isInvalid}
+                            >
+                              <label
+                                htmlFor="address-max-received-action-clean-all"
+                                className={cn(
+                                  "flex items-start gap-3 rounded-md border border-border/80 bg-background/70 px-3 py-2 transition-colors",
+                                  isLimitEnabled
+                                    ? "cursor-pointer hover:bg-background"
+                                    : "cursor-not-allowed opacity-60"
+                                )}
+                              >
+                                <RadioGroupItem
+                                  id="address-max-received-action-clean-all"
+                                  value="cleanAll"
+                                />
+                                <span className="space-y-0.5">
+                                  <span className="block text-sm font-medium">
+                                    Clean all (recommended)
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    Clear previous emails, then accept new ones.
+                                  </span>
+                                </span>
+                              </label>
+                              <label
+                                htmlFor="address-max-received-action-reject-new"
+                                className={cn(
+                                  "flex items-start gap-3 rounded-md border border-border/80 bg-background/70 px-3 py-2 transition-colors",
+                                  isLimitEnabled
+                                    ? "cursor-pointer hover:bg-background"
+                                    : "cursor-not-allowed opacity-60"
+                                )}
+                              >
+                                <RadioGroupItem
+                                  id="address-max-received-action-reject-new"
+                                  value="rejectNew"
+                                />
+                                <span className="space-y-0.5">
+                                  <span className="block text-sm font-medium">
+                                    Reject new emails
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    Keep existing emails and reject incoming.
+                                  </span>
+                                </span>
+                              </label>
+                            </RadioGroup>
+                            {!isLimitEnabled ? (
+                              <FieldDescription>
+                                Set a max count to enable action selection.
+                              </FieldDescription>
+                            ) : null}
+                            {isInvalid ? (
+                              <FieldError
+                                errors={toFieldErrors(field.state.meta.errors)}
+                              />
+                            ) : null}
+                          </Field>
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </form.Subscribe>
           </FieldGroup>
 
           <form.Field

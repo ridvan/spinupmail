@@ -1,7 +1,10 @@
 import {
+  applyMaxReceivedEmailLimitToMeta,
   buildAddressMetaForStorage,
   extractSenderDomain,
   getAllowedFromDomainsFromMeta,
+  getMaxReceivedEmailActionFromMeta,
+  getMaxReceivedEmailCountFromMeta,
   hasReservedLocalPartKeyword,
   isSenderDomainAllowed,
   normalizeAllowedFromDomains,
@@ -45,6 +48,34 @@ describe("shared validation helpers", () => {
   it("rejects non-object string metadata when allow-list is present", () => {
     const stored = buildAddressMetaForStorage("[]", ["foo.com"]);
     expect(stored).toBeNull();
+  });
+
+  it("stores and reads max received email settings in address meta", () => {
+    const stored = applyMaxReceivedEmailLimitToMeta({
+      meta: JSON.stringify({ hello: "world" }),
+      maxReceivedEmailCount: 20,
+      maxReceivedEmailAction: "rejectNew",
+    });
+    expect(stored).toBeTypeOf("string");
+
+    const parsed = parseAddressMeta(stored as string);
+    expect(getMaxReceivedEmailCountFromMeta(parsed)).toBe(20);
+    expect(getMaxReceivedEmailActionFromMeta(parsed)).toBe("rejectNew");
+  });
+
+  it("removes max received email settings from metadata", () => {
+    const stored = applyMaxReceivedEmailLimitToMeta({
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 20,
+        maxReceivedEmailAction: "rejectNew",
+      }),
+      maxReceivedEmailCount: null,
+    });
+    expect(stored).toBeTypeOf("string");
+
+    const parsed = parseAddressMeta(stored as string);
+    expect(getMaxReceivedEmailCountFromMeta(parsed)).toBeNull();
+    expect(getMaxReceivedEmailActionFromMeta(parsed)).toBe("cleanAll");
   });
 
   it("flags reserved local-part keywords", () => {

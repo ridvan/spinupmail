@@ -8,7 +8,13 @@ import {
   EMAIL_MAX_BYTES_DEFAULT,
 } from "@/shared/constants";
 import { parseBooleanEnv, parsePositiveNumber } from "@/shared/env";
-import { normalizeAddress } from "@/shared/validation";
+import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
+import {
+  getMaxReceivedEmailActionFromMeta,
+  getMaxReceivedEmailCountFromMeta,
+  normalizeAddress,
+  parseAddressMeta,
+} from "@/shared/validation";
 import { toStoredHeadersJson } from "./dto";
 import {
   capTextForStorage,
@@ -17,8 +23,13 @@ import {
   sanitizeEmailHtml,
 } from "./parser";
 import {
+  decrementAddressEmailCount,
+  deleteEmailsForAddress,
   findAddressByRecipient,
+  incrementAddressEmailCount,
   insertInboundEmail,
+  reserveInboxSlot,
+  resetAddressEmailCount,
   updateAddressLastReceivedAt,
 } from "./repo";
 import { persistAttachments, persistRawEmailToR2 } from "./storage";
@@ -32,6 +43,9 @@ export const handleIncomingEmail = async (
   env: CloudflareBindings,
   ctx: ExecutionContext
 ) => {
+  let reservedAddressId: string | null = null;
+  let reservedOrganizationId: string | null = null;
+
   try {
     const recipient = normalizeAddress(message.to);
     const atIndex = recipient.lastIndexOf("@");
@@ -54,6 +68,7 @@ export const handleIncomingEmail = async (
       message.setReject(availability.reason);
       return;
     }
+    const organizationId = addressRow.organizationId!;
 
     const senderRaw = message.from ?? message.headers.get("from");
     const senderPolicy = shouldAcceptSenderDomain({
@@ -70,6 +85,70 @@ export const handleIncomingEmail = async (
       });
       return;
     }
+
+    const addressMeta = parseAddressMeta(addressRow.meta);
+    const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(addressMeta);
+    let inboxSlotReserved = false;
+    if (maxReceivedEmailCount === null) {
+      await incrementAddressEmailCount(db, addressRow.id);
+      inboxSlotReserved = true;
+    } else {
+      const maxReceivedEmailAction =
+        getMaxReceivedEmailActionFromMeta(addressMeta);
+      inboxSlotReserved = await reserveInboxSlot({
+        db,
+        addressId: addressRow.id,
+        maxReceivedEmailCount,
+      });
+
+      if (!inboxSlotReserved && maxReceivedEmailAction === "rejectNew") {
+        message.setReject("Address inbox limit reached");
+        return;
+      }
+
+      if (!inboxSlotReserved && maxReceivedEmailAction === "cleanAll") {
+        if (env.R2_BUCKET) {
+          try {
+            await Promise.all([
+              deleteR2ObjectsByPrefix({
+                bucket: env.R2_BUCKET,
+                prefix: `email-attachments/${organizationId}/${addressRow.id}/`,
+              }),
+              deleteR2ObjectsByPrefix({
+                bucket: env.R2_BUCKET,
+                prefix: `email-raw/${organizationId}/${addressRow.id}/`,
+              }),
+            ]);
+          } catch (error) {
+            console.error(
+              "[email] Failed to clean address files after limit reached",
+              {
+                organizationId,
+                addressId: addressRow.id,
+                error,
+              }
+            );
+            message.setReject("Temporary processing error");
+            return;
+          }
+        }
+
+        await deleteEmailsForAddress(db, addressRow.id);
+        await resetAddressEmailCount(db, addressRow.id);
+        inboxSlotReserved = await reserveInboxSlot({
+          db,
+          addressId: addressRow.id,
+          maxReceivedEmailCount,
+        });
+      }
+    }
+
+    if (!inboxSlotReserved) {
+      message.setReject("Temporary processing error");
+      return;
+    }
+    reservedAddressId = addressRow.id;
+    reservedOrganizationId = organizationId;
 
     const maxBytes =
       parsePositiveNumber(env.EMAIL_MAX_BYTES) ?? EMAIL_MAX_BYTES_DEFAULT;
@@ -113,12 +192,14 @@ export const handleIncomingEmail = async (
       rawTruncated: truncated,
       receivedAt,
     });
+    reservedAddressId = null;
+    reservedOrganizationId = null;
 
     await persistRawEmailToR2({
       env,
       rawBytes,
       emailId,
-      organizationId: addressRow.organizationId!,
+      organizationId,
       addressId: addressRow.id,
     });
 
@@ -127,7 +208,7 @@ export const handleIncomingEmail = async (
       env,
       db,
       emailId,
-      organizationId: addressRow.organizationId!,
+      organizationId,
       addressId: addressRow.id,
       userId: addressRow.userId,
     });
@@ -146,6 +227,20 @@ export const handleIncomingEmail = async (
       );
     }
   } catch (error) {
+    if (reservedAddressId) {
+      try {
+        await decrementAddressEmailCount(getDb(env), reservedAddressId);
+      } catch (decrementError) {
+        console.error(
+          "[email] Failed to rollback address email_count after processing error",
+          {
+            organizationId: reservedOrganizationId,
+            addressId: reservedAddressId,
+            decrementError,
+          }
+        );
+      }
+    }
     console.error("[email] Unhandled processing error", error);
     message.setReject("Temporary processing error");
   }

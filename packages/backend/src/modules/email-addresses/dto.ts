@@ -1,5 +1,7 @@
 import {
   getAllowedFromDomainsFromMeta,
+  getMaxReceivedEmailActionFromMeta,
+  getMaxReceivedEmailCountFromMeta,
   parseAddressMeta,
 } from "@/shared/validation";
 
@@ -16,6 +18,11 @@ export const toEmailAddressListItem = (row: {
 }) => {
   const parsedMeta = parseAddressMeta(row.meta);
   const allowedFromDomains = getAllowedFromDomainsFromMeta(parsedMeta);
+  const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(parsedMeta);
+  const maxReceivedEmailAction =
+    maxReceivedEmailCount === null
+      ? null
+      : getMaxReceivedEmailActionFromMeta(parsedMeta);
 
   return {
     id: row.id,
@@ -25,6 +32,8 @@ export const toEmailAddressListItem = (row: {
     tag: row.tag,
     meta: parsedMeta,
     allowedFromDomains,
+    maxReceivedEmailCount,
+    maxReceivedEmailAction,
     createdAt: row.createdAt ? row.createdAt.toISOString() : null,
     createdAtMs: row.createdAt ? row.createdAt.getTime() : null,
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,

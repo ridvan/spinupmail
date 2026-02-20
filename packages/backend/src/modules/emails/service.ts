@@ -20,6 +20,7 @@ import {
   type ListEmailsQuery,
 } from "./schemas";
 import {
+  decrementAddressEmailCount,
   deleteEmailByIdAndAddress,
   findAddressByIdAndOrganization,
   findAddressByValueAndOrganization,
@@ -205,6 +206,7 @@ export const deleteEmail = async ({
   }
 
   await deleteEmailByIdAndAddress(db, emailRow.id, emailRow.addressId);
+  await decrementAddressEmailCount(db, emailRow.addressId);
 
   return {
     status: 200 as const,

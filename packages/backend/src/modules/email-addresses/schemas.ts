@@ -5,6 +5,11 @@ export const ADDRESS_TAG_MAX_LENGTH = 20;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
 export const ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
 export const ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
+export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
+export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
+  "cleanAll",
+  "rejectNew",
+] as const;
 const ADDRESS_LOCAL_PART_REGEX = /^[a-z0-9._+-]+$/i;
 const DOMAIN_HOSTNAME_REGEX =
   /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
@@ -39,6 +44,15 @@ export const createEmailAddressBodySchema = z
     domain: z.string().optional(),
     allowedFromDomains: z
       .union([allowedFromDomainsSchema, z.string()])
+      .optional(),
+    maxReceivedEmailCount: z
+      .number()
+      .int()
+      .positive()
+      .max(ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
+      .optional(),
+    maxReceivedEmailAction: z
+      .enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)
       .optional(),
     acceptedRiskNotice: z.boolean().refine(value => value, {
       message: "acceptedRiskNotice must be true",
@@ -76,6 +90,16 @@ export const updateEmailAddressBodySchema = z
     domain: z.string().optional(),
     allowedFromDomains: z
       .union([allowedFromDomainsSchema, z.string()])
+      .optional(),
+    maxReceivedEmailCount: z
+      .number()
+      .int()
+      .positive()
+      .max(ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
+      .nullable()
+      .optional(),
+    maxReceivedEmailAction: z
+      .enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)
       .optional(),
   })
   .passthrough();

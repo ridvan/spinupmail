@@ -99,6 +99,92 @@ export const getAllowedFromDomainsFromMeta = (meta: unknown) => {
   return normalizeAllowedFromDomains(meta.allowedFromDomains);
 };
 
+export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
+export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
+  "cleanAll",
+  "rejectNew",
+] as const;
+export type AddressMaxReceivedEmailAction =
+  (typeof ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)[number];
+
+const isAddressMaxReceivedEmailAction = (
+  value: unknown
+): value is AddressMaxReceivedEmailAction =>
+  typeof value === "string" &&
+  (ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS as readonly string[]).includes(value);
+
+export const getMaxReceivedEmailCountFromMeta = (meta: unknown) => {
+  if (!isRecord(meta)) return null;
+
+  const raw = meta.maxReceivedEmailCount;
+  if (
+    typeof raw !== "number" ||
+    !Number.isInteger(raw) ||
+    raw <= 0 ||
+    raw > ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX
+  ) {
+    return null;
+  }
+
+  return raw;
+};
+
+export const getMaxReceivedEmailActionFromMeta = (
+  meta: unknown
+): AddressMaxReceivedEmailAction => {
+  if (!isRecord(meta)) return "cleanAll";
+
+  const raw = meta.maxReceivedEmailAction;
+  return isAddressMaxReceivedEmailAction(raw) ? raw : "cleanAll";
+};
+
+export const applyMaxReceivedEmailLimitToMeta = ({
+  meta,
+  maxReceivedEmailCount,
+  maxReceivedEmailAction,
+}: {
+  meta: string | null | undefined;
+  maxReceivedEmailCount: number | null;
+  maxReceivedEmailAction?: AddressMaxReceivedEmailAction | null;
+}) => {
+  if (maxReceivedEmailCount === null) {
+    if (!meta) return meta;
+
+    try {
+      const parsed = JSON.parse(meta);
+      if (!isRecord(parsed)) return meta;
+
+      const next = { ...parsed };
+      delete next.maxReceivedEmailCount;
+      delete next.maxReceivedEmailAction;
+      return JSON.stringify(next);
+    } catch {
+      return meta;
+    }
+  }
+
+  const action = maxReceivedEmailAction ?? "cleanAll";
+
+  if (!meta) {
+    return JSON.stringify({
+      maxReceivedEmailCount,
+      maxReceivedEmailAction: action,
+    });
+  }
+
+  try {
+    const parsed = JSON.parse(meta);
+    if (!isRecord(parsed)) return null;
+    return JSON.stringify({
+      ...parsed,
+      maxReceivedEmailCount,
+      maxReceivedEmailAction: action,
+    });
+  } catch {
+    return null;
+  }
+};
+
 export const buildAddressMetaForStorage = (
   meta: unknown,
   allowedFromDomains: string[]

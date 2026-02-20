@@ -253,3 +253,12 @@ export const deleteEmailByIdAndAddress = (
     .delete(emails)
     .where(and(eq(emails.id, emailId), eq(emails.addressId, addressId)))
     .run();
+
+export const decrementAddressEmailCount = (db: AppDb, addressId: string) =>
+  db
+    .update(emailAddresses)
+    .set({
+      emailCount: sql`max(${emailAddresses.emailCount} - 1, 0)`,
+    })
+    .where(eq(emailAddresses.id, addressId))
+    .run();

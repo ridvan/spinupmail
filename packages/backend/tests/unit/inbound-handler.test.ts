@@ -2,6 +2,11 @@ import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 
 const mocks = vi.hoisted(() => ({
   findAddressByRecipient: vi.fn(),
+  reserveInboxSlot: vi.fn(),
+  incrementAddressEmailCount: vi.fn(),
+  decrementAddressEmailCount: vi.fn(),
+  resetAddressEmailCount: vi.fn(),
+  deleteEmailsForAddress: vi.fn(),
   insertInboundEmail: vi.fn(),
   updateAddressLastReceivedAt: vi.fn(),
   readRawWithLimit: vi.fn(),
@@ -10,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   capTextForStorage: vi.fn(),
   persistRawEmailToR2: vi.fn(),
   persistAttachments: vi.fn(),
+  deleteR2ObjectsByPrefix: vi.fn(),
   validateAddressAvailability: vi.fn(),
   shouldAcceptSenderDomain: vi.fn(),
   getDb: vi.fn(),
@@ -21,6 +27,11 @@ vi.mock("@/platform/db/client", () => ({
 
 vi.mock("@/modules/inbound-email/repo", () => ({
   findAddressByRecipient: mocks.findAddressByRecipient,
+  reserveInboxSlot: mocks.reserveInboxSlot,
+  incrementAddressEmailCount: mocks.incrementAddressEmailCount,
+  decrementAddressEmailCount: mocks.decrementAddressEmailCount,
+  resetAddressEmailCount: mocks.resetAddressEmailCount,
+  deleteEmailsForAddress: mocks.deleteEmailsForAddress,
   insertInboundEmail: mocks.insertInboundEmail,
   updateAddressLastReceivedAt: mocks.updateAddressLastReceivedAt,
 }));
@@ -35,6 +46,10 @@ vi.mock("@/modules/inbound-email/parser", () => ({
 vi.mock("@/modules/inbound-email/storage", () => ({
   persistRawEmailToR2: mocks.persistRawEmailToR2,
   persistAttachments: mocks.persistAttachments,
+}));
+
+vi.mock("@/shared/utils/r2", () => ({
+  deleteR2ObjectsByPrefix: mocks.deleteR2ObjectsByPrefix,
 }));
 
 vi.mock("@/modules/inbound-email/policy", () => ({
@@ -88,6 +103,12 @@ describe("inbound email handler", () => {
     mocks.capTextForStorage.mockImplementation(value => value);
     mocks.persistRawEmailToR2.mockResolvedValue(undefined);
     mocks.persistAttachments.mockResolvedValue(undefined);
+    mocks.reserveInboxSlot.mockResolvedValue(true);
+    mocks.incrementAddressEmailCount.mockResolvedValue(undefined);
+    mocks.decrementAddressEmailCount.mockResolvedValue(undefined);
+    mocks.resetAddressEmailCount.mockResolvedValue(undefined);
+    mocks.deleteEmailsForAddress.mockResolvedValue(undefined);
+    mocks.deleteR2ObjectsByPrefix.mockResolvedValue(undefined);
     mocks.insertInboundEmail.mockResolvedValue(undefined);
     mocks.shouldAcceptSenderDomain.mockReturnValue({
       allowed: true,
@@ -161,6 +182,65 @@ describe("inbound email handler", () => {
 
     expect(message.setReject).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+  });
+
+  it("rejects incoming mail when inbox limit is reached in reject mode", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 3,
+        maxReceivedEmailAction: "rejectNew",
+      }),
+      expiresAt: null,
+    });
+    mocks.reserveInboxSlot.mockResolvedValue(false);
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(message.setReject).toHaveBeenCalledWith(
+      "Address inbox limit reached"
+    );
+    expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+  });
+
+  it("cleans inbox and accepts new mail when limit is reached in clean mode", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 2,
+        maxReceivedEmailAction: "cleanAll",
+      }),
+      expiresAt: null,
+    });
+    mocks.reserveInboxSlot
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        R2_BUCKET: {} as R2Bucket,
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.deleteR2ObjectsByPrefix).toHaveBeenCalledTimes(2);
+    expect(mocks.deleteEmailsForAddress).toHaveBeenCalledWith({}, "address-1");
+    expect(mocks.resetAddressEmailCount).toHaveBeenCalledWith({}, "address-1");
+    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(1);
   });
 
   it("persists accepted email and schedules post-processing", async () => {

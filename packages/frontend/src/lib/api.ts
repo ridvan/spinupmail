@@ -86,6 +86,8 @@ export type EmailAddress = {
   tag?: string | null;
   meta?: unknown;
   allowedFromDomains?: string[];
+  maxReceivedEmailCount: number | null;
+  maxReceivedEmailAction: "cleanAll" | "rejectNew" | null;
   createdAt: string | null;
   createdAtMs: number | null;
   expiresAt: string | null;
@@ -340,6 +342,8 @@ export const createEmailAddress = async (
     meta?: unknown;
     domain?: string;
     allowedFromDomains?: string[];
+    maxReceivedEmailCount?: number;
+    maxReceivedEmailAction?: "cleanAll" | "rejectNew";
     acceptedRiskNotice: boolean;
   },
   options?: { organizationId?: string | null }
@@ -376,6 +380,8 @@ export const updateEmailAddress = async (
     meta?: unknown;
     domain?: string;
     allowedFromDomains?: string[];
+    maxReceivedEmailCount?: number | null;
+    maxReceivedEmailAction?: "cleanAll" | "rejectNew";
   },
   options?: { organizationId?: string | null }
 ) => {
