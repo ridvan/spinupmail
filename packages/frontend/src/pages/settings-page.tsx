@@ -5,7 +5,7 @@ import { UserProfilePanel } from "@/features/settings/components/user-profile-pa
 
 export const SettingsPage = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 [&_button]:cursor-pointer">
       <div className="grid gap-6 lg:grid-cols-2">
         <UserProfilePanel />
         <ChangePasswordPanel />

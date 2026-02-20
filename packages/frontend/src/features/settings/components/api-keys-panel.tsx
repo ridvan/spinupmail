@@ -1,6 +1,17 @@
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -47,6 +58,19 @@ export const ApiKeysPanel = () => {
   const deleteMutation = useDeleteApiKeyMutation();
 
   const [createdSecret, setCreatedSecret] = React.useState<string | null>(null);
+  const [pendingRevokeKey, setPendingRevokeKey] = React.useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
+  const copyCreatedApiKey = React.useCallback(async (secret: string) => {
+    try {
+      await navigator.clipboard.writeText(secret);
+      toast.success("API key copied.");
+    } catch {
+      toast.error("Could not copy API key. Copy it manually.");
+    }
+  }, []);
 
   const form = useForm({
     defaultValues: {
@@ -57,32 +81,73 @@ export const ApiKeysPanel = () => {
     },
     onSubmit: async ({ value }) => {
       setCreatedSecret(null);
-      const created = await createMutation.mutateAsync(value.name);
+      const createKeyToast = toast.promise(
+        createMutation.mutateAsync(value.name),
+        {
+          loading: "Creating API key...",
+          error: error =>
+            error instanceof Error ? error.message : "Unable to create API key",
+        }
+      );
+      let created: { key?: string } | null;
+      try {
+        created = await createKeyToast.unwrap();
+      } catch {
+        return;
+      }
+
       setCreatedSecret(created?.key ?? null);
+      if (created?.key) {
+        const secret = created.key;
+        toast.success("API key created.", {
+          action: {
+            label: "Copy",
+            onClick: () => {
+              void copyCreatedApiKey(secret);
+            },
+          },
+        });
+      } else {
+        toast.success("API key created.");
+      }
       form.reset();
     },
   });
 
   const handleRevoke = async (keyId: string) => {
     try {
-      await deleteMutation.mutateAsync(keyId);
+      await toast.promise(deleteMutation.mutateAsync(keyId), {
+        loading: "Revoking API key...",
+        success: "API key revoked.",
+        error: error =>
+          error instanceof Error ? error.message : "Unable to revoke API key",
+      });
+      return true;
     } catch {
-      // Error shown from mutation state.
+      // Error is shown in toast.
+      return false;
+    }
+  };
+
+  const handleConfirmRevoke = async () => {
+    if (!pendingRevokeKey) return;
+    const didRevoke = await handleRevoke(pendingRevokeKey.id);
+    if (didRevoke) {
+      setPendingRevokeKey(null);
     }
   };
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader>
+      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <CardTitle className="text-lg">API Keys</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Create keys for automation and integrations. New key secrets are only
-          shown once.
+          Create keys for automation and integrations.
         </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 pt-1">
         <form
-          className="flex flex-col gap-3 sm:flex-row"
+          className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/40 p-4 sm:flex-row sm:items-start"
           noValidate
           onSubmit={event => {
             event.preventDefault();
@@ -120,21 +185,34 @@ export const ApiKeysPanel = () => {
             }}
           />
 
-          <Button disabled={createMutation.isPending} type="submit">
+          <Button
+            className="w-36"
+            disabled={createMutation.isPending}
+            type="submit"
+          >
             {createMutation.isPending ? "Creating..." : "Create key"}
           </Button>
         </form>
 
-        {createMutation.error ? (
-          <p className="text-sm text-destructive">
-            {createMutation.error.message}
-          </p>
-        ) : null}
-
         {createdSecret ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-            <p className="text-sm font-medium">Copy now</p>
-            <p className="break-all font-mono text-xs text-muted-foreground">
+          <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/10 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">New API key</p>
+                <p className="text-xs text-muted-foreground">
+                  New key secrets are only shown once.
+                </p>
+              </div>
+              <Button
+                onClick={() => void copyCreatedApiKey(createdSecret)}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                Copy key
+              </Button>
+            </div>
+            <p className="break-all rounded-md bg-background/80 px-3 py-2 font-mono text-xs text-foreground">
               {createdSecret}
             </p>
           </div>
@@ -151,48 +229,93 @@ export const ApiKeysPanel = () => {
             No API keys created yet.
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Prefix</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {apiKeysQuery.data?.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.name || "Untitled"}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {item.start ?? ""}
-                    {item.prefix || item.start ? "..." : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(item.createdAt, effectiveTimeZone)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      disabled={deleteMutation.isPending}
-                      onClick={() => void handleRevoke(item.id)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      Revoke
-                    </Button>
-                  </TableCell>
+          <div className="overflow-hidden rounded-lg border border-border/70 bg-background/30">
+            <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Prefix</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-36 text-right">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {apiKeysQuery.data?.map(item => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.name || "Untitled"}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {item.start ?? ""}
+                      {item.prefix || item.start ? "..." : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(item.createdAt, effectiveTimeZone)}
+                    </TableCell>
+                    <TableCell className="w-36 text-right">
+                      <Button
+                        className="text-muted-foreground hover:text-destructive -mr-2"
+                        disabled={deleteMutation.isPending}
+                        onClick={() =>
+                          setPendingRevokeKey({
+                            id: item.id,
+                            label:
+                              item.name?.trim() ||
+                              (item.prefix || item.start
+                                ? `${item.start ?? ""}...`
+                                : "this API key"),
+                          })
+                        }
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        Revoke
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
-        {deleteMutation.error ? (
-          <p className="text-sm text-destructive">
-            {deleteMutation.error.message}
-          </p>
-        ) : null}
+        <AlertDialog
+          open={Boolean(pendingRevokeKey)}
+          onOpenChange={isOpen => {
+            if (deleteMutation.isPending) return;
+            if (!isOpen) setPendingRevokeKey(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingRevokeKey ? (
+                  <>
+                    This will immediately revoke <b>{pendingRevokeKey.label}</b>
+                    . Requests using this key will stop working.
+                  </>
+                ) : (
+                  "This action cannot be undone."
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteMutation.isPending}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={deleteMutation.isPending}
+                onClick={event => {
+                  event.preventDefault();
+                  void handleConfirmRevoke();
+                }}
+              >
+                {deleteMutation.isPending ? "Revoking..." : "Revoke key"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );

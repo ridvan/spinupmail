@@ -323,7 +323,7 @@ const UserProfilePanelBody = ({
 
         return (
           <form
-            className="space-y-4 text-sm"
+            className="space-y-5 text-sm"
             noValidate
             onSubmit={event => {
               event.preventDefault();
@@ -374,7 +374,7 @@ const UserProfilePanelBody = ({
               <div className="space-y-2">{emailSection}</div>
             ) : null}
 
-            <div className="space-y-2">
+            <div className="space-y-3 rounded-lg border border-border/60 bg-background/40 p-4">
               <FieldLabel className="text-muted-foreground">
                 Timezone
               </FieldLabel>
@@ -414,103 +414,105 @@ const UserProfilePanelBody = ({
                   </label>
                 )}
               />
-            </div>
 
-            {values.manualTimezone ? (
-              <form.Field
-                name="timezone"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
+              {values.manualTimezone ? (
+                <form.Field
+                  name="timezone"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
 
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel className="text-muted-foreground">
-                        Timezone
-                      </FieldLabel>
-                      <DropdownMenu
-                        open={isTimezoneMenuOpen}
-                        onOpenChange={open => {
-                          setIsTimezoneMenuOpen(open);
-                          if (!open) {
-                            setSearchValue("");
-                          }
-                        }}
-                      >
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full justify-between font-normal"
-                              disabled={
-                                !isAuthenticated ||
-                                updateProfileMutation.isPending
-                              }
-                            />
-                          }
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel className="text-muted-foreground">
+                          Timezone
+                        </FieldLabel>
+                        <DropdownMenu
+                          open={isTimezoneMenuOpen}
+                          onOpenChange={open => {
+                            setIsTimezoneMenuOpen(open);
+                            if (!open) {
+                              setSearchValue("");
+                            }
+                          }}
                         >
-                          <span className="truncate">
-                            {field.state.value || "Select timezone"}
-                          </span>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="p-0">
-                          <Command
-                            className="border-0 bg-card"
-                            shouldFilter={false}
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-between font-normal"
+                                disabled={
+                                  !isAuthenticated ||
+                                  updateProfileMutation.isPending
+                                }
+                              />
+                            }
                           >
-                            <CommandInput
-                              placeholder="Search timezone (e.g. America/New_York)"
-                              value={searchValue}
-                              onValueChange={setSearchValue}
-                              onKeyDown={event => {
-                                if (!shouldStopMenuTypeaheadKey(event.key))
-                                  return;
-                                event.stopPropagation();
-                              }}
-                            />
-                            <CommandList className="max-h-64">
-                              <CommandEmpty>No timezone found.</CommandEmpty>
-                              <CommandGroup>
-                                {visibleTimeZones.map(timeZone => (
-                                  <CommandItem
-                                    key={timeZone}
-                                    value={timeZone}
-                                    data-checked={
-                                      field.state.value === timeZone
-                                        ? true
-                                        : undefined
-                                    }
-                                    onSelect={() => {
-                                      field.handleChange(timeZone);
-                                      setIsTimezoneMenuOpen(false);
-                                      setSearchValue("");
-                                    }}
-                                  >
-                                    <span className="truncate">{timeZone}</span>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-            ) : null}
+                            <span className="truncate">
+                              {field.state.value || "Select timezone"}
+                            </span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="p-0">
+                            <Command
+                              className="border-0 bg-card"
+                              shouldFilter={false}
+                            >
+                              <CommandInput
+                                placeholder="Search timezone (e.g. America/New_York)"
+                                value={searchValue}
+                                onValueChange={setSearchValue}
+                                onKeyDown={event => {
+                                  if (!shouldStopMenuTypeaheadKey(event.key))
+                                    return;
+                                  event.stopPropagation();
+                                }}
+                              />
+                              <CommandList className="max-h-64">
+                                <CommandEmpty>No timezone found.</CommandEmpty>
+                                <CommandGroup>
+                                  {visibleTimeZones.map(timeZone => (
+                                    <CommandItem
+                                      key={timeZone}
+                                      value={timeZone}
+                                      data-checked={
+                                        field.state.value === timeZone
+                                          ? true
+                                          : undefined
+                                      }
+                                      onSelect={() => {
+                                        field.handleChange(timeZone);
+                                        setIsTimezoneMenuOpen(false);
+                                        setSearchValue("");
+                                      }}
+                                    >
+                                      <span className="truncate">
+                                        {timeZone}
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+              ) : null}
 
-            <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
-              <p className="text-xs text-muted-foreground">
-                Current time in selected timezone:
-              </p>
-              <p className="font-medium">{previewValue}</p>
+              <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+                <p className="text-xs text-muted-foreground">
+                  Current time in selected timezone:
+                </p>
+                <p className="font-medium">{previewValue}</p>
+              </div>
             </div>
 
             <div className="flex justify-end">
@@ -582,10 +584,13 @@ export const UserProfilePanel = () => {
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader>
+      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <CardTitle className="text-lg">User Profile</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Manage your account details and timezone preferences.
+        </p>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="pt-1 text-sm">
         <emailForm.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,
@@ -668,6 +673,7 @@ export const UserProfilePanel = () => {
 
                   <Button
                     type="button"
+                    variant={isEditingEmail ? "default" : "outline"}
                     className="sm:self-start sm:mt-6"
                     disabled={
                       !user ||

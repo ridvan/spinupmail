@@ -85,13 +85,13 @@ export const ChangePasswordPanel = () => {
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader>
+      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <CardTitle className="text-lg">Password</CardTitle>
         <p className="text-sm text-muted-foreground">
           Update your password for email/password sign-in.
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-1">
         <form.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,
@@ -100,7 +100,7 @@ export const ChangePasswordPanel = () => {
         >
           {({ canSubmit, isSubmitting }) => (
             <form
-              className="space-y-4"
+              className="space-y-5"
               noValidate
               onSubmit={event => {
                 event.preventDefault();
@@ -214,7 +214,7 @@ export const ChangePasswordPanel = () => {
               <form.Field
                 name="revokeOtherSessions"
                 children={field => (
-                  <label className="flex items-start gap-3 text-sm">
+                  <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
                     <Checkbox
                       checked={field.state.value}
                       onCheckedChange={checked =>

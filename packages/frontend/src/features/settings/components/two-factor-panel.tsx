@@ -2,7 +2,9 @@ import * as React from "react";
 import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
+import { Lock, LockOpen } from "lucide-react";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,10 +73,6 @@ export const TwoFactorPanel = () => {
   >(null);
   const [didCopySetupKey, setDidCopySetupKey] = React.useState(false);
   const [didCopyBackupCodes, setDidCopyBackupCodes] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(
-    null
-  );
   const setupCopyResetTimeoutRef = React.useRef<number | null>(null);
   const backupCopyResetTimeoutRef = React.useRef<number | null>(null);
 
@@ -92,11 +90,6 @@ export const TwoFactorPanel = () => {
     []
   );
 
-  const resetMessages = React.useCallback(() => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  }, []);
-
   const enableForm = useForm({
     defaultValues: {
       password: "",
@@ -105,9 +98,7 @@ export const TwoFactorPanel = () => {
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      resetMessages();
-
-      try {
+      const enablePromise = (async () => {
         const result = await authClient.twoFactor.enable({
           password: value.password,
         });
@@ -129,10 +120,13 @@ export const TwoFactorPanel = () => {
         setDidCopySetupKey(false);
         enableForm.reset();
         verifySetupForm.reset();
-        setSuccessMessage("Setup key created. Verify one code to enable 2FA.");
-      } catch (error) {
-        setErrorMessage(getErrorMessage(error, "Unable to start 2FA setup"));
-      }
+      })();
+
+      await toast.promise(enablePromise, {
+        loading: "Preparing 2FA setup...",
+        success: "Setup key created. Verify one code to enable 2FA.",
+        error: error => getErrorMessage(error, "Unable to start 2FA setup"),
+      });
     },
   });
 
@@ -144,9 +138,7 @@ export const TwoFactorPanel = () => {
       onSubmit: setupCodeSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      resetMessages();
-
-      try {
+      const verifyPromise = (async () => {
         const result = await authClient.twoFactor.verifyTotp({
           code: value.code,
         });
@@ -159,10 +151,13 @@ export const TwoFactorPanel = () => {
         await refreshSession();
         setSetupState(null);
         verifySetupForm.reset();
-        setSuccessMessage("Two-factor authentication is now enabled.");
-      } catch (error) {
-        setErrorMessage(getErrorMessage(error, "Unable to verify setup code"));
-      }
+      })();
+
+      await toast.promise(verifyPromise, {
+        loading: "Verifying setup code...",
+        success: "Two-factor authentication is now enabled.",
+        error: error => getErrorMessage(error, "Unable to verify setup code"),
+      });
     },
   });
 
@@ -174,9 +169,7 @@ export const TwoFactorPanel = () => {
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      resetMessages();
-
-      try {
+      const regeneratePromise = (async () => {
         const result = await authClient.twoFactor.generateBackupCodes({
           password: value.password,
         });
@@ -189,14 +182,14 @@ export const TwoFactorPanel = () => {
 
         setGeneratedBackupCodes(result.data?.backupCodes ?? []);
         regenerateBackupCodesForm.reset();
-        setSuccessMessage(
-          "New backup codes generated. Older codes are revoked."
-        );
-      } catch (error) {
-        setErrorMessage(
-          getErrorMessage(error, "Unable to generate backup codes")
-        );
-      }
+      })();
+
+      await toast.promise(regeneratePromise, {
+        loading: "Generating backup codes...",
+        success: "New backup codes generated. Older codes are revoked.",
+        error: error =>
+          getErrorMessage(error, "Unable to generate backup codes"),
+      });
     },
   });
 
@@ -208,9 +201,7 @@ export const TwoFactorPanel = () => {
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      resetMessages();
-
-      try {
+      const disablePromise = (async () => {
         const result = await authClient.twoFactor.disable({
           password: value.password,
         });
@@ -225,10 +216,13 @@ export const TwoFactorPanel = () => {
         regenerateBackupCodesForm.reset();
         setSetupState(null);
         setGeneratedBackupCodes(null);
-        setSuccessMessage("Two-factor authentication has been disabled.");
-      } catch (error) {
-        setErrorMessage(getErrorMessage(error, "Unable to disable 2FA"));
-      }
+      })();
+
+      await toast.promise(disablePromise, {
+        loading: "Disabling 2FA...",
+        success: "Two-factor authentication has been disabled.",
+        error: error => getErrorMessage(error, "Unable to disable 2FA"),
+      });
     },
   });
 
@@ -250,7 +244,7 @@ export const TwoFactorPanel = () => {
         setDidCopySetupKey(false);
       }, 1600);
     } catch {
-      setErrorMessage("Could not copy setup key. Copy it manually.");
+      toast.error("Could not copy setup key. Copy it manually.");
     }
   };
 
@@ -269,72 +263,84 @@ export const TwoFactorPanel = () => {
         setDidCopyBackupCodes(false);
       }, 1600);
     } catch {
-      setErrorMessage("Could not copy backup codes. Copy them manually.");
+      toast.error("Could not copy backup codes. Copy them manually.");
     }
   };
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader className="flex flex-row items-start justify-between gap-3">
-        <div className="space-y-1">
+      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
+        <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-lg">Two-Factor Authentication</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Add a second verification step with an authenticator app.
-          </p>
-        </div>
-        <Badge variant={twoFactorEnabled ? "default" : "outline"}>
-          {twoFactorEnabled ? "Enabled" : "Disabled"}
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!twoFactorEnabled && !setupState ? (
-          <form
-            className="max-w-md space-y-3"
-            noValidate
-            onSubmit={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              void enableForm.handleSubmit();
-            }}
+          <Badge
+            className="inline-flex items-center gap-1.5"
+            variant={twoFactorEnabled ? "default" : "outline"}
           >
-            <enableForm.Field
-              name="password"
-              children={field => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      Current password
-                    </FieldLabel>
-                    <Input
-                      autoComplete="current-password"
-                      aria-invalid={isInvalid}
-                      id={field.name}
-                      name={field.name}
-                      type="password"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={event => field.handleChange(event.target.value)}
-                    />
-                    {isInvalid ? (
-                      <FieldError
-                        errors={toFieldErrors(field.state.meta.errors)}
-                      />
-                    ) : null}
-                  </Field>
-                );
+            {twoFactorEnabled ? (
+              <Lock className="size-3.5" aria-hidden="true" />
+            ) : (
+              <LockOpen className="size-3.5" aria-hidden="true" />
+            )}
+            {twoFactorEnabled ? "Enabled" : "Disabled"}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Add an additional layer of security to your account.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5 pt-1">
+        {!twoFactorEnabled && !setupState ? (
+          <div className="max-w-md rounded-lg border border-border/70 bg-background/40 p-4">
+            <form
+              className="space-y-3"
+              noValidate
+              onSubmit={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                void enableForm.handleSubmit();
               }}
-            />
-            <Button
-              className="min-w-32"
-              disabled={enableForm.state.isSubmitting}
-              type="submit"
             >
-              {enableForm.state.isSubmitting ? "Preparing..." : "Enable 2FA"}
-            </Button>
-          </form>
+              <enableForm.Field
+                name="password"
+                children={field => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid;
+
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor={field.name}>
+                        Current password
+                      </FieldLabel>
+                      <Input
+                        autoComplete="current-password"
+                        aria-invalid={isInvalid}
+                        id={field.name}
+                        name={field.name}
+                        type="password"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={event =>
+                          field.handleChange(event.target.value)
+                        }
+                      />
+                      {isInvalid ? (
+                        <FieldError
+                          errors={toFieldErrors(field.state.meta.errors)}
+                        />
+                      ) : null}
+                    </Field>
+                  );
+                }}
+              />
+              <Button
+                className="min-w-32"
+                disabled={enableForm.state.isSubmitting}
+                type="submit"
+              >
+                {enableForm.state.isSubmitting ? "Preparing..." : "Enable 2FA"}
+              </Button>
+            </form>
+          </div>
         ) : null}
 
         {setupState ? (
@@ -522,9 +528,7 @@ export const TwoFactorPanel = () => {
                 void disableForm.handleSubmit();
               }}
             >
-              <p className="text-sm font-medium text-destructive">
-                Disable 2FA
-              </p>
+              <p className="text-sm font-medium">Disable 2FA</p>
               <disableForm.Field
                 name="password"
                 children={field => {
@@ -599,15 +603,6 @@ export const TwoFactorPanel = () => {
               ))}
             </div>
           </div>
-        ) : null}
-
-        {errorMessage ? (
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        ) : null}
-        {successMessage ? (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">
-            {successMessage}
-          </p>
         ) : null}
       </CardContent>
     </Card>

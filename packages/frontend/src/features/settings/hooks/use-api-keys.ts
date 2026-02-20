@@ -22,6 +22,13 @@ const normalizeApiKeyRow = (row: {
         : null,
 });
 
+const getCreatedAtTimestamp = (value: string | null) => {
+  if (!value) return Number.NEGATIVE_INFINITY;
+
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+};
+
 export const useApiKeysQuery = () => {
   return useQuery({
     queryKey: queryKeys.apiKeys,
@@ -32,7 +39,13 @@ export const useApiKeysQuery = () => {
         throw new Error(result.error.message || "Unable to load API keys");
       }
 
-      return (result.data ?? []).map(item => normalizeApiKeyRow(item));
+      return (result.data ?? [])
+        .map(item => normalizeApiKeyRow(item))
+        .sort(
+          (a, b) =>
+            getCreatedAtTimestamp(b.createdAt) -
+            getCreatedAtTimestamp(a.createdAt)
+        );
     },
     staleTime: 15_000,
   });
