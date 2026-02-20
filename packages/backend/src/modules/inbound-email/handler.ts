@@ -88,13 +88,45 @@ export const handleIncomingEmail = async (
 
     const addressMeta = parseAddressMeta(addressRow.meta);
     const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(addressMeta);
+    const maxReceivedEmailAction =
+      maxReceivedEmailCount === null
+        ? null
+        : getMaxReceivedEmailActionFromMeta(addressMeta);
+
+    const maxBytes =
+      parsePositiveNumber(env.EMAIL_MAX_BYTES) ?? EMAIL_MAX_BYTES_DEFAULT;
+    const maxBodyBytes =
+      parsePositiveNumber(env.EMAIL_BODY_MAX_BYTES) ??
+      EMAIL_BODY_MAX_BYTES_DEFAULT;
+
+    const { raw, rawBytes, truncated } = await readRawWithLimit(
+      message.raw,
+      maxBytes
+    );
+    const { html, text, attachments } = await extractBodiesFromRaw(rawBytes);
+    const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
+    const bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
+    const bodyText = capTextForStorage(text, maxBodyBytes);
+
+    const storeHeadersInDb = parseBooleanEnv(
+      env.EMAIL_STORE_HEADERS_IN_DB,
+      false
+    );
+    const storeRawInDb = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_DB, false);
+
+    const headersJson = toStoredHeadersJson(message.headers, storeHeadersInDb);
+    const receivedAt = new Date();
+    const emailId = crypto.randomUUID();
+    const fromValue = message.from ?? message.headers.get("from") ?? "unknown";
+    const toValue = message.to || recipient;
+
+    // Reserve count slots as close to insert as possible to minimize drift
+    // if worker execution fails before entering error handling.
     let inboxSlotReserved = false;
     if (maxReceivedEmailCount === null) {
       await incrementAddressEmailCount(db, addressRow.id);
       inboxSlotReserved = true;
     } else {
-      const maxReceivedEmailAction =
-        getMaxReceivedEmailActionFromMeta(addressMeta);
       inboxSlotReserved = await reserveInboxSlot({
         db,
         addressId: addressRow.id,
@@ -135,47 +167,19 @@ export const handleIncomingEmail = async (
 
         await deleteEmailsForAddress(db, addressRow.id);
         await resetAddressEmailCount(db, addressRow.id);
-        inboxSlotReserved = await reserveInboxSlot({
-          db,
-          addressId: addressRow.id,
-          maxReceivedEmailCount,
-        });
+        // Claim the post-cleanup slot directly to avoid rejecting this email
+        // when concurrent requests race after cleanup.
+        await incrementAddressEmailCount(db, addressRow.id);
+        inboxSlotReserved = true;
       }
     }
 
     if (!inboxSlotReserved) {
-      message.setReject("Temporary processing error");
+      message.setReject("Address inbox limit reached");
       return;
     }
     reservedAddressId = addressRow.id;
     reservedOrganizationId = organizationId;
-
-    const maxBytes =
-      parsePositiveNumber(env.EMAIL_MAX_BYTES) ?? EMAIL_MAX_BYTES_DEFAULT;
-    const maxBodyBytes =
-      parsePositiveNumber(env.EMAIL_BODY_MAX_BYTES) ??
-      EMAIL_BODY_MAX_BYTES_DEFAULT;
-
-    const { raw, rawBytes, truncated } = await readRawWithLimit(
-      message.raw,
-      maxBytes
-    );
-    const { html, text, attachments } = await extractBodiesFromRaw(rawBytes);
-    const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
-    const bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
-    const bodyText = capTextForStorage(text, maxBodyBytes);
-
-    const storeHeadersInDb = parseBooleanEnv(
-      env.EMAIL_STORE_HEADERS_IN_DB,
-      false
-    );
-    const storeRawInDb = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_DB, false);
-
-    const headersJson = toStoredHeadersJson(message.headers, storeHeadersInDb);
-    const receivedAt = new Date();
-    const emailId = crypto.randomUUID();
-    const fromValue = message.from ?? message.headers.get("from") ?? "unknown";
-    const toValue = message.to || recipient;
 
     await insertInboundEmail(db, {
       id: emailId,
