@@ -61,7 +61,7 @@ importers:
         version: 4.20260207.0
       '@hono/zod-validator':
         specifier: ^0.7.5
-        version: 0.7.6(hono@4.11.8)(zod@4.3.6)
+        version: 0.7.6(hono@4.12.0)(zod@4.3.6)
       better-auth:
         specifier: ^1.4.18
         version: 1.4.18(drizzle-kit@0.31.8)(drizzle-orm@0.44.7(@cloudflare/workers-types@4.20260207.0)(kysely@0.28.11))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@3.2.4(@types/node@22.19.9)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.30.2)(msw@2.12.10(@types/node@22.19.9)(typescript@5.9.3))(yaml@2.8.2))
@@ -72,8 +72,8 @@ importers:
         specifier: ^0.44.5
         version: 0.44.7(@cloudflare/workers-types@4.20260207.0)(kysely@0.28.11)
       hono:
-        specifier: ^4.7.11
-        version: 4.11.8
+        specifier: ^4.11.10
+        version: 4.12.0
       postal-mime:
         specifier: ^2.7.3
         version: 2.7.3
@@ -3517,8 +3517,8 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
-  hono@4.11.8:
-    resolution: {integrity: sha512-eVkB/CYCCei7K2WElZW9yYQFWssG0DhaDhVvr7wy5jJ22K+ck8fWW0EsLpB0sITUTvPnc97+rrbQqIr5iqiy9Q==}
+  hono@4.12.0:
+    resolution: {integrity: sha512-NekXntS5M94pUfiVZ8oXXK/kkri+5WpX2/Ik+LVsl+uvw+soj4roXIsPqO+XsWrAw20mOzaXOZf3Q7PfB9A/IA==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -6078,13 +6078,13 @@ snapshots:
 
   '@fontsource-variable/geist@5.2.8': {}
 
-  '@hono/node-server@1.19.9(hono@4.11.8)':
+  '@hono/node-server@1.19.9(hono@4.12.0)':
     dependencies:
-      hono: 4.11.8
+      hono: 4.12.0
 
-  '@hono/zod-validator@0.7.6(hono@4.11.8)(zod@4.3.6)':
+  '@hono/zod-validator@0.7.6(hono@4.12.0)(zod@4.3.6)':
     dependencies:
-      hono: 4.11.8
+      hono: 4.12.0
       zod: 4.3.6
 
   '@hugeicons/core-free-icons@3.1.1': {}
@@ -6325,7 +6325,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.26.0(zod@3.25.76)':
     dependencies:
-      '@hono/node-server': 1.19.9(hono@4.11.8)
+      '@hono/node-server': 1.19.9(hono@4.12.0)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -6335,7 +6335,7 @@ snapshots:
       eventsource-parser: 3.0.6
       express: 5.2.1
       express-rate-limit: 8.2.1(express@5.2.1)
-      hono: 4.11.8
+      hono: 4.12.0
       jose: 6.1.3
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -8433,7 +8433,7 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hono@4.11.8: {}
+  hono@4.12.0: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@2.0.1):
     dependencies:
