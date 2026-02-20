@@ -1,22 +1,16 @@
 import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  OrganizationInvitationsCard,
+  OrganizationMembersCard,
+  OrganizationProfileCard,
+} from "@/features/organization/components/organization-settings";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   useActiveOrganizationQuery,
@@ -32,6 +26,13 @@ import {
 const buildInvitationUrl = (invitationId: string) => {
   const base = window.location.origin;
   return `${base}/onboarding/organization?invitationId=${encodeURIComponent(invitationId)}`;
+};
+
+const toErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
 };
 
 export const OrganizationSettingsPage = () => {
@@ -75,8 +76,23 @@ export const OrganizationSettingsPage = () => {
     }
   }, [activeOrganization?.name]);
 
-  const handleError = (error: unknown) => {
-    setErrorMessage((error as Error).message);
+  const handleError = (error: unknown, fallback: string) => {
+    const message = toErrorMessage(error, fallback);
+    setErrorMessage(message);
+    toast.error(message);
+  };
+
+  const handleOrganizationNameChange = (value: string) => {
+    setOrganizationName(value);
+  };
+
+  const copyToClipboard = async (value: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(successMessage);
+    } catch {
+      toast.error("Could not copy to clipboard.");
+    }
   };
 
   const handleRenameOrganization = async (event: React.FormEvent) => {
@@ -85,9 +101,10 @@ export const OrganizationSettingsPage = () => {
     setErrorMessage(null);
 
     try {
-      await updateOrganizationMutation.mutateAsync(organizationName);
+      await updateOrganizationMutation.mutateAsync(organizationName.trim());
+      toast.success("Organization name updated.");
     } catch (error) {
-      handleError(error);
+      handleError(error, "Unable to update organization name");
     }
   };
 
@@ -99,7 +116,7 @@ export const OrganizationSettingsPage = () => {
 
     try {
       const invitation = await inviteMemberMutation.mutateAsync({
-        email: inviteEmail,
+        email: inviteEmail.trim(),
         role: inviteRole,
       });
       if (invitation?.id) {
@@ -107,8 +124,9 @@ export const OrganizationSettingsPage = () => {
       }
       setInviteEmail("");
       setInviteRole("member");
+      toast.success("Invitation sent.");
     } catch (error) {
-      handleError(error);
+      handleError(error, "Unable to invite member");
     }
   };
 
@@ -118,8 +136,9 @@ export const OrganizationSettingsPage = () => {
 
     try {
       await cancelInvitationMutation.mutateAsync(invitationId);
+      toast.success("Invitation canceled.");
     } catch (error) {
-      handleError(error);
+      handleError(error, "Unable to cancel invitation");
     }
   };
 
@@ -134,8 +153,13 @@ export const OrganizationSettingsPage = () => {
         memberId,
         role: role === "member" ? "admin" : "member",
       });
+      toast.success(
+        role === "member"
+          ? "Member promoted to admin."
+          : "Admin changed to member."
+      );
     } catch (error) {
-      handleError(error);
+      handleError(error, "Unable to update member role");
     }
   };
 
@@ -145,276 +169,105 @@ export const OrganizationSettingsPage = () => {
 
     try {
       await removeMemberMutation.mutateAsync(memberId);
+      toast.success("Member removed.");
     } catch (error) {
-      handleError(error);
+      handleError(error, "Unable to remove member");
     }
   };
 
-  const isLoading =
-    activeOrganizationQuery.isLoading ||
-    membersQuery.isLoading ||
-    (canManage && invitationsQuery.isLoading);
+  const isProfileLoading = activeOrganizationQuery.isLoading;
+  const isMembersLoading =
+    isProfileLoading || (Boolean(activeOrganization) && membersQuery.isLoading);
+  const isInvitationsLoading =
+    isProfileLoading ||
+    (Boolean(activeOrganization) && canManage && invitationsQuery.isLoading);
 
-  if (isLoading) {
+  if (!activeOrganization && !isProfileLoading) {
     return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Organization Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">Loading organization...</p>
-      </div>
+      <Card className="border-border/70 bg-card/60">
+        <CardHeader className="space-y-1 border-b border-border/70 pb-4">
+          <CardTitle>Organization Settings</CardTitle>
+          <CardDescription>No active organization found.</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
-  if (!activeOrganization) {
-    return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Organization Settings
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          No active organization found.
-        </p>
-      </div>
-    );
-  }
+  const organizationNameChanged =
+    activeOrganization != null &&
+    organizationName.trim() !== activeOrganization.name.trim();
+  const pendingInvitationsCount = invitations.filter(
+    invitation => invitation.status === "pending"
+  ).length;
+  const currentUserRole = currentMember?.role ?? "member";
 
   return (
-    <div className="space-y-6">
-      <Card className="border-border/70 bg-card/60">
-        <CardHeader>
-          <CardTitle className="text-lg">Organization Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Organization ID</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                readOnly
-                value={activeOrganization.id}
-                className="font-mono text-xs"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  void navigator.clipboard.writeText(activeOrganization.id)
-                }
-              >
-                Copy ID
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-6 [&_button]:cursor-pointer">
+      <OrganizationProfileCard
+        activeOrganization={activeOrganization ?? null}
+        isLoading={isProfileLoading}
+        canManage={canManage}
+        membersCount={members.length}
+        pendingInvitationsCount={pendingInvitationsCount}
+        currentUserRole={currentUserRole}
+        organizationName={organizationName}
+        organizationNameChanged={organizationNameChanged}
+        isRenamePending={updateOrganizationMutation.isPending}
+        onOrganizationNameChange={handleOrganizationNameChange}
+        onRenameOrganization={handleRenameOrganization}
+        onCopyOrganizationId={() =>
+          activeOrganization
+            ? void copyToClipboard(
+                activeOrganization.id,
+                "Organization ID copied."
+              )
+            : undefined
+        }
+      />
 
-          <form
-            className="flex flex-col gap-3 sm:flex-row"
-            onSubmit={handleRenameOrganization}
-          >
-            <Input
-              value={organizationName}
-              onChange={event => setOrganizationName(event.target.value)}
-              minLength={2}
-              disabled={!canManage}
-              required
-            />
-            <Button
-              disabled={!canManage || updateOrganizationMutation.isPending}
-              type="submit"
-            >
-              {updateOrganizationMutation.isPending ? "Saving..." : "Save name"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <OrganizationMembersCard
+        members={members}
+        isLoading={isMembersLoading}
+        currentUserId={user?.id}
+        canManage={canManage}
+        isUpdateRolePending={updateMemberRoleMutation.isPending}
+        isRemoveMemberPending={removeMemberMutation.isPending}
+        onToggleAdmin={(memberId, role) =>
+          void handleToggleAdmin(memberId, role)
+        }
+        onRemoveMember={memberId => void handleRemoveMember(memberId)}
+      />
 
-      <Card className="border-border/70 bg-card/60">
-        <CardHeader>
-          <CardTitle className="text-lg">Members</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map(member => {
-                const isCurrentUser = member.user.id === user?.id;
-                const isOwner = member.role === "owner";
-
-                return (
-                  <TableRow key={member.id}>
-                    <TableCell>{member.user.name}</TableCell>
-                    <TableCell>{member.user.email}</TableCell>
-                    <TableCell className="capitalize">{member.role}</TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      {canManage && !isOwner ? (
-                        <Button
-                          disabled={updateMemberRoleMutation.isPending}
-                          onClick={() =>
-                            void handleToggleAdmin(member.id, member.role)
-                          }
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          {member.role === "member"
-                            ? "Make admin"
-                            : "Make member"}
-                        </Button>
-                      ) : null}
-                      {canManage && !isCurrentUser ? (
-                        <Button
-                          disabled={removeMemberMutation.isPending}
-                          onClick={() => void handleRemoveMember(member.id)}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          Remove
-                        </Button>
-                      ) : null}
-                      {!canManage ? (
-                        <span className="text-xs text-muted-foreground">
-                          View only
-                        </span>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/70 bg-card/60">
-        <CardHeader>
-          <CardTitle className="text-lg">Invitations</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!canManage ? (
-            <p className="text-sm text-muted-foreground">
-              Only organization owners and admins can create and manage
-              invitations.
-            </p>
-          ) : (
-            <form
-              className="grid gap-3 sm:grid-cols-[1fr_auto_auto]"
-              onSubmit={handleInviteMember}
-            >
-              <Input
-                value={inviteEmail}
-                onChange={event => setInviteEmail(event.target.value)}
-                placeholder="new.member@company.com"
-                type="email"
-                required
-              />
-              <Select
-                value={inviteRole}
-                onValueChange={value => {
-                  if (value === "member" || value === "admin") {
-                    setInviteRole(value);
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9 w-full sm:w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="start">
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button disabled={inviteMemberMutation.isPending} type="submit">
-                {inviteMemberMutation.isPending ? "Inviting..." : "Invite"}
-              </Button>
-            </form>
-          )}
-
-          {canManage && createdInviteLink ? (
-            <div className="rounded-md border border-border/70 p-3">
-              <p className="text-xs text-muted-foreground">Share this link</p>
-              <p className="break-all font-mono text-xs">{createdInviteLink}</p>
-              <Button
-                className="mt-2"
-                onClick={() =>
-                  void navigator.clipboard.writeText(createdInviteLink)
-                }
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                Copy link
-              </Button>
-            </div>
-          ) : null}
-
-          {canManage && invitations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No pending invitations.
-            </p>
-          ) : null}
-
-          {canManage && invitations.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.map(invitation => (
-                  <TableRow key={invitation.id}>
-                    <TableCell>{invitation.email}</TableCell>
-                    <TableCell className="capitalize">
-                      {invitation.role}
-                    </TableCell>
-                    <TableCell className="capitalize">
-                      {invitation.status}
-                    </TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        onClick={() =>
-                          void navigator.clipboard.writeText(
-                            buildInvitationUrl(invitation.id)
-                          )
-                        }
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        Copy link
-                      </Button>
-                      {invitation.status === "pending" ? (
-                        <Button
-                          disabled={cancelInvitationMutation.isPending}
-                          onClick={() => void handleCancelInvite(invitation.id)}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          Cancel
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-        </CardContent>
-      </Card>
+      <OrganizationInvitationsCard
+        canManage={canManage}
+        isLoading={isInvitationsLoading}
+        pendingInvitationsCount={pendingInvitationsCount}
+        inviteEmail={inviteEmail}
+        inviteRole={inviteRole}
+        createdInviteLink={createdInviteLink}
+        invitations={invitations}
+        isInviteMemberPending={inviteMemberMutation.isPending}
+        isCancelInvitationPending={cancelInvitationMutation.isPending}
+        onInviteEmailChange={setInviteEmail}
+        onInviteRoleChange={setInviteRole}
+        onInviteMember={handleInviteMember}
+        onCopyCreatedInviteLink={() => {
+          if (!createdInviteLink) return;
+          void copyToClipboard(createdInviteLink, "Invitation link copied.");
+        }}
+        onCopyInvitationLink={invitationId =>
+          void copyToClipboard(
+            buildInvitationUrl(invitationId),
+            "Invitation link copied."
+          )
+        }
+        onCancelInvite={invitationId => void handleCancelInvite(invitationId)}
+      />
 
       {errorMessage ? (
-        <p className="text-sm text-destructive">{errorMessage}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {errorMessage}
+        </p>
       ) : null}
     </div>
   );

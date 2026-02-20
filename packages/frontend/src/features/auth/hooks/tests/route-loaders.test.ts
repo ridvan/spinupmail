@@ -96,4 +96,38 @@ describe("route loaders", () => {
       status: 302,
     });
   });
+
+  it("allows onboarding invitation links even when active organization exists", async () => {
+    mocks.getSession.mockResolvedValue({
+      error: null,
+      data: {
+        user: { id: "user-1" },
+        session: { activeOrganizationId: "org-1" },
+      },
+    });
+
+    await expect(
+      requireNoActiveOrganizationLoader(
+        loaderArgs(
+          "https://app/onboarding/organization?invitationId=inv-1&next=/settings"
+        )
+      )
+    ).resolves.toBeNull();
+  });
+
+  it("allows opening onboarding page without next when active organization exists", async () => {
+    mocks.getSession.mockResolvedValue({
+      error: null,
+      data: {
+        user: { id: "user-1" },
+        session: { activeOrganizationId: "org-1" },
+      },
+    });
+
+    await expect(
+      requireNoActiveOrganizationLoader(
+        loaderArgs("https://app/onboarding/organization")
+      )
+    ).resolves.toBeNull();
+  });
 });

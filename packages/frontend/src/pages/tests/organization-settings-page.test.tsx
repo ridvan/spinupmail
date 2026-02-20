@@ -180,7 +180,7 @@ describe("OrganizationSettingsPage", () => {
 
     renderPage();
 
-    expect(screen.getByText("Loading organization...")).toBeTruthy();
+    expect(screen.getByText("Loading organization settings")).toBeTruthy();
   });
 
   it("shows empty state when no active organization exists", () => {
@@ -241,7 +241,7 @@ describe("OrganizationSettingsPage", () => {
 
     renderPage();
 
-    expect(screen.getByText("View only")).toBeTruthy();
+    expect(screen.getAllByText("View only").length).toBeGreaterThan(0);
     expect(
       screen.getByText(
         "Only organization owners and admins can create and manage invitations."

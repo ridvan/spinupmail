@@ -207,6 +207,18 @@ describe("OrganizationOnboardingPage", () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof useOrganizationsQuery>);
+    mockedUseUserInvitationsQuery.mockReturnValue({
+      data: [
+        {
+          id: "inv-1",
+          organizationName: "Shared Org",
+          role: "member",
+          status: "pending",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useUserInvitationsQuery>);
     mockedUseAuth.mockReturnValue({
       activeOrganizationId: "org-1",
       refreshSession,
@@ -214,6 +226,7 @@ describe("OrganizationOnboardingPage", () => {
 
     renderPage(["/onboarding/organization"]);
     expect(screen.queryByText("Already have organizations?")).toBeNull();
+    expect(screen.getByText("Shared Org")).toBeTruthy();
   });
 
   it("surfaces mutation errors", async () => {

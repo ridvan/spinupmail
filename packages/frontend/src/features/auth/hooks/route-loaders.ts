@@ -85,14 +85,24 @@ export const requireActiveOrganizationLoader = async ({
 export const requireNoActiveOrganizationLoader = async ({
   request,
 }: LoaderFunctionArgs) => {
+  const url = new URL(request.url);
+  const invitationId = url.searchParams.get("invitationId");
+  if (invitationId) {
+    await getSessionOrRedirect(request);
+    return null;
+  }
+
   const session = await getSessionOrRedirect(request);
   if (!getActiveOrganizationId(session)) {
     if (!(await tryRestoreActiveOrganization(session.user.id))) return null;
   }
 
-  const url = new URL(request.url);
-  const next = safeNextPath(url.searchParams.get("next"));
-  throw redirect(next);
+  if (url.searchParams.has("next")) {
+    const next = safeNextPath(url.searchParams.get("next"));
+    throw redirect(next);
+  }
+
+  return null;
 };
 
 export const redirectIfAuthenticatedLoader = async ({

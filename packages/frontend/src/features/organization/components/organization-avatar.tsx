@@ -18,19 +18,18 @@ const SIZE_CLASS_MAP = {
 
 export const OrganizationAvatar = ({
   organizationId,
-  organizationName,
+  organizationName: _organizationName,
   size = "default",
   className,
 }: OrganizationAvatarProps) => {
   const { theme } = useTheme();
+  const prefersDark =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
   const resolvedTheme =
-    theme === "system"
-      ? window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
+    theme === "system" ? (prefersDark ? "dark" : "light") : theme;
   const colors = getAvatarColors(organizationId, resolvedTheme);
-  const name = organizationName?.trim() || organizationId;
 
   return (
     <div
@@ -43,7 +42,7 @@ export const OrganizationAvatar = ({
     >
       <BoringAvatar
         size="100%"
-        name={`${organizationId}:${name}`}
+        name={organizationId}
         variant="bauhaus"
         colors={colors}
         className="block! size-full!"
