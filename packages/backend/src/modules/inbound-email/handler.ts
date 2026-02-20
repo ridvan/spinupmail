@@ -167,10 +167,15 @@ export const handleIncomingEmail = async (
 
         await deleteEmailsForAddress(db, addressRow.id);
         await resetAddressEmailCount(db, addressRow.id);
-        // Claim the post-cleanup slot directly to avoid rejecting this email
-        // when concurrent requests race after cleanup.
-        await incrementAddressEmailCount(db, addressRow.id);
-        inboxSlotReserved = true;
+        // Re-acquire using the same atomic reservation check after cleanup.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          inboxSlotReserved = await reserveInboxSlot({
+            db,
+            addressId: addressRow.id,
+            maxReceivedEmailCount,
+          });
+          if (inboxSlotReserved) break;
+        }
       }
     }
 
