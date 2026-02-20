@@ -91,6 +91,7 @@ Edit `packages/backend/wrangler.toml` with:
   - `[vars].EMAIL_BODY_MAX_BYTES`
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
+  - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
   - `[vars].RESEND_FROM_EMAIL` (e.g. `Spinupmail <verify@your-domain.com>`)
   - `[vars].EMAIL_STORE_HEADERS_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_DB`
@@ -204,6 +205,7 @@ In `packages/backend/wrangler.toml`:
 ```
 [vars]
 EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
+MAX_ADDRESSES_PER_ORGANIZATION = "100"
 ```
 
 `EMAIL_DOMAIN` is still supported as a fallback, but `EMAIL_DOMAINS` is the

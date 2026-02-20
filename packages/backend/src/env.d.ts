@@ -4,6 +4,7 @@ declare global {
     EMAIL_STORE_HEADERS_IN_DB?: string;
     EMAIL_STORE_RAW_IN_DB?: string;
     EMAIL_STORE_RAW_IN_R2?: string;
+    MAX_ADDRESSES_PER_ORGANIZATION?: string;
   }
 }
 

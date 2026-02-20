@@ -2,6 +2,7 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ type AddressListProps = {
 };
 
 const PAGE_SIZE = 10;
+const ADDRESS_LIMIT_FALLBACK = 100;
 const ALLOWED_SENDER_VISIBLE_COUNT = 2;
 const LOADING_SKELETON_ROW_COUNT = 3;
 const allowedSenderBadgeClass =
@@ -164,6 +166,11 @@ const formatDate = (
     options,
     fallback: "Never",
   });
+};
+
+const toErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 };
 
 const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
@@ -397,15 +404,24 @@ export const AddressList = ({ domains }: AddressListProps) => {
   const handleConfirmDelete = async () => {
     if (!pendingDeleteAddress) return;
 
+    const deleteAddressToast = toast.promise(
+      deleteMutation.mutateAsync(pendingDeleteAddress.id),
+      {
+        loading: "Deleting address...",
+        success: "Address deleted.",
+        error: error => toErrorMessage(error, "Unable to delete address"),
+      }
+    );
+
     try {
-      await deleteMutation.mutateAsync(pendingDeleteAddress.id);
+      await deleteAddressToast.unwrap();
       if (editingAddress?.id === pendingDeleteAddress.id) {
         setIsEditSheetOpen(false);
         setEditingAddress(null);
       }
       setPendingDeleteAddress(null);
     } catch {
-      // Error shown from mutation state.
+      // Error is already shown in toast.
     }
   };
 
@@ -427,7 +443,10 @@ export const AddressList = ({ domains }: AddressListProps) => {
   const isTableLoading = addressesQuery.isLoading;
   const currentPage = addressesQuery.data?.page ?? page;
   const totalItems = addressesQuery.data?.totalItems ?? 0;
+  const addressLimit =
+    addressesQuery.data?.addressLimit ?? ADDRESS_LIMIT_FALLBACK;
   const totalPages = addressesQuery.data?.totalPages ?? 1;
+  const isTotalLoading = !addressesQuery.data && addressesQuery.isLoading;
   const showEmptyState = !isTableLoading && addresses.length === 0;
   const nowDayKey = React.useMemo(
     () => getDayKey(new Date(), effectiveTimeZone),
@@ -436,8 +455,18 @@ export const AddressList = ({ domains }: AddressListProps) => {
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader>
+      <CardHeader className="flex flex-col gap-2 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-lg">Addresses</CardTitle>
+        <div className="flex items-center gap-2 self-start text-sm text-muted-foreground sm:self-auto">
+          <span>Total</span>
+          {isTotalLoading ? (
+            <Skeleton className="h-5 w-14 rounded-md" />
+          ) : (
+            <Badge variant="secondary" className="font-mono text-xs">
+              {totalItems}/{addressLimit}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {showEmptyState ? (
@@ -617,11 +646,6 @@ export const AddressList = ({ domains }: AddressListProps) => {
         {addressesQuery.error ? (
           <p className="text-sm text-destructive">
             {addressesQuery.error.message}
-          </p>
-        ) : null}
-        {deleteMutation.error ? (
-          <p className="text-sm text-destructive">
-            {deleteMutation.error.message}
           </p>
         ) : null}
       </CardContent>

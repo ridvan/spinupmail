@@ -1,6 +1,8 @@
 export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
+const MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT = 100;
+
 export const getAllowedOrigins = (env: CloudflareBindings) => {
   const configured = env.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
@@ -20,6 +22,18 @@ export const getAllowedDomains = (env: CloudflareBindings) => {
   const fallback = fallbackDomain ? [fallbackDomain] : [];
   const combined = [...rawList, ...fallback];
   return Array.from(new Set(combined));
+};
+
+export const getMaxAddressesPerOrganization = (env: CloudflareBindings) => {
+  const rawLimit = env.MAX_ADDRESSES_PER_ORGANIZATION?.trim();
+  if (!rawLimit) return MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT;
+
+  const parsed = Number(rawLimit);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT;
+  }
+
+  return parsed;
 };
 
 export const parsePositiveNumber = (value: string | null | undefined) => {

@@ -35,6 +35,7 @@ name = "EMAIL"
 [vars]
 EMAIL_DOMAIN = "example.com"
 EMAIL_DOMAINS = "example.com,example-test.com"
+MAX_ADDRESSES_PER_ORGANIZATION = "100"
 RESEND_FROM_EMAIL = "Spinupmail <verify@example.com>"
 # Configure secrets via `wrangler secret put`:
 # BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY

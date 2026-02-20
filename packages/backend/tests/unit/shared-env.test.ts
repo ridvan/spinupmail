@@ -1,5 +1,6 @@
 import {
   getAllowedDomains,
+  getMaxAddressesPerOrganization,
   normalizeDomain,
   parseBooleanEnv,
   parsePositiveNumber,
@@ -28,6 +29,30 @@ describe("shared env helpers", () => {
     expect(parsePositiveNumber("0")).toBeUndefined();
     expect(parsePositiveNumber("-1")).toBeUndefined();
     expect(parsePositiveNumber("nope")).toBeUndefined();
+  });
+
+  it("parses max addresses per organization and falls back to default", () => {
+    expect(
+      getMaxAddressesPerOrganization({
+        MAX_ADDRESSES_PER_ORGANIZATION: "250",
+      } as CloudflareBindings)
+    ).toBe(250);
+    expect(
+      getMaxAddressesPerOrganization({
+        MAX_ADDRESSES_PER_ORGANIZATION: "1.5",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxAddressesPerOrganization({
+        MAX_ADDRESSES_PER_ORGANIZATION: "0",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxAddressesPerOrganization({
+        MAX_ADDRESSES_PER_ORGANIZATION: "invalid",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(getMaxAddressesPerOrganization({} as CloudflareBindings)).toBe(100);
   });
 
   it("parses boolean-like env values with fallback", () => {

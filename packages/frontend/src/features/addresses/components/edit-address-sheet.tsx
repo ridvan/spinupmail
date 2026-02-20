@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -149,16 +150,29 @@ export const EditAddressSheet = ({
     onSubmit: async ({ value }) => {
       if (!address) return;
 
-      await updateMutation.mutateAsync({
-        addressId: address.id,
-        payload: {
-          localPart: value.localPart.trim(),
-          domain: value.domain.trim(),
-          tag: value.tag.trim() || null,
-          ttlMinutes: value.ttlMinutes ?? null,
-          allowedFromDomains: uniqueDomains(value.allowedFromDomains),
-        },
-      });
+      const updateAddressToast = toast.promise(
+        updateMutation.mutateAsync({
+          addressId: address.id,
+          payload: {
+            localPart: value.localPart.trim(),
+            domain: value.domain.trim(),
+            tag: value.tag.trim() || null,
+            ttlMinutes: value.ttlMinutes ?? null,
+            allowedFromDomains: uniqueDomains(value.allowedFromDomains),
+          },
+        }),
+        {
+          loading: "Saving address changes...",
+          success: "Address updated.",
+          error: error =>
+            error instanceof Error ? error.message : "Unable to update address",
+        }
+      );
+      try {
+        await updateAddressToast.unwrap();
+      } catch {
+        return;
+      }
 
       onOpenChange(false);
     },
@@ -380,12 +394,6 @@ export const EditAddressSheet = ({
               }}
             />
           </FieldGroup>
-
-          {updateMutation.error ? (
-            <p className="text-sm text-destructive">
-              {updateMutation.error.message}
-            </p>
-          ) : null}
 
           <SheetFooter className="p-0">
             <Button

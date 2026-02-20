@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { Link } from "react-router";
 import { useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -128,16 +129,28 @@ export const CreateAddressForm = ({
     onSubmit: async ({ value }) => {
       const selectedDomain = value.domain?.trim() || domains[0] || undefined;
       const allowedFromDomains = uniqueDomains(value.allowedFromDomains);
-
-      await createMutation.mutateAsync({
-        localPart: value.localPart.trim(),
-        ttlMinutes: value.ttlMinutes,
-        domain: selectedDomain,
-        tag: value.tag.trim() || undefined,
-        allowedFromDomains:
-          allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
-        acceptedRiskNotice: value.acceptedRiskNotice,
-      });
+      const createAddressToast = toast.promise(
+        createMutation.mutateAsync({
+          localPart: value.localPart.trim(),
+          ttlMinutes: value.ttlMinutes,
+          domain: selectedDomain,
+          tag: value.tag.trim() || undefined,
+          allowedFromDomains:
+            allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
+          acceptedRiskNotice: value.acceptedRiskNotice,
+        }),
+        {
+          loading: "Creating address...",
+          success: "Address created.",
+          error: error =>
+            error instanceof Error ? error.message : "Unable to create address",
+        }
+      );
+      try {
+        await createAddressToast.unwrap();
+      } catch {
+        return;
+      }
 
       form.reset({
         ...form.state.values,
@@ -151,7 +164,7 @@ export const CreateAddressForm = ({
 
   return (
     <Card className="border-border/70 bg-card/60">
-      <CardHeader>
+      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <CardTitle className="text-lg">Create Address</CardTitle>
         <p className="text-sm text-muted-foreground">
           Enter the address prefix, choose TTL and domain, and optionally limit
@@ -383,12 +396,6 @@ export const CreateAddressForm = ({
               <div aria-hidden className="hidden md:block" />
             </div>
           </FieldGroup>
-
-          {createMutation.error ? (
-            <p className="text-sm text-destructive">
-              {createMutation.error.message}
-            </p>
-          ) : null}
 
           <form.Field
             name="acceptedRiskNotice"

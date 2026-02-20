@@ -102,6 +102,7 @@ export type EmailAddressListResponse = {
   page: number;
   pageSize: number;
   totalItems: number;
+  addressLimit: number;
   totalPages: number;
   sortBy: EmailAddressSortBy;
   sortDirection: SortDirection;
