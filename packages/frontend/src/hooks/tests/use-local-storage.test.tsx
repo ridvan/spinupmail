@@ -53,6 +53,18 @@ describe("useLocalStorage", () => {
     expect(result.current[0]).toBe(3);
   });
 
+  it("applies multiple synchronous functional updates sequentially", () => {
+    const { result } = renderHook(() => useLocalStorage<number>("count", 0));
+
+    act(() => {
+      result.current[1](prev => prev + 1);
+      result.current[1](prev => prev + 1);
+    });
+
+    expect(window.localStorage.getItem("count")).toBe("2");
+    expect(result.current[0]).toBe(2);
+  });
+
   it("re-reads data when the key changes", () => {
     window.localStorage.setItem("key-a", JSON.stringify("value-a"));
     window.localStorage.setItem("key-b", JSON.stringify("value-b"));
