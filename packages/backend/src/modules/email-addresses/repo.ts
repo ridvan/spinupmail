@@ -147,15 +147,43 @@ export const insertAddress = (
     tag?: string;
     meta?: string;
     expiresAt?: Date;
-  }
+  },
+  maxAddressesPerOrganization: number
 ) =>
   db
-    .insert(emailAddresses)
-    .values({
-      ...values,
-      autoCreated: false,
-    })
-    .run();
+    .run(
+      sql`
+      insert into email_addresses (
+        id,
+        organization_id,
+        user_id,
+        address,
+        local_part,
+        domain,
+        tag,
+        meta,
+        expires_at,
+        auto_created
+      )
+      select
+        ${values.id},
+        ${values.organizationId},
+        ${values.userId},
+        ${values.address},
+        ${values.localPart},
+        ${values.domain},
+        ${values.tag ?? null},
+        ${values.meta ?? null},
+        ${values.expiresAt ? values.expiresAt.getTime() : null},
+        ${0}
+      where (
+        select count(*)
+        from email_addresses
+        where organization_id = ${values.organizationId}
+      ) < ${maxAddressesPerOrganization}
+    `
+    )
+    .then(result => result.meta.changes > 0);
 
 export const updateAddressByIdAndOrganization = ({
   db,

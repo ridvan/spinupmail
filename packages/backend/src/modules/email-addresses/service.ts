@@ -363,31 +363,32 @@ export const createEmailAddress = async ({
 
   const db = getDb(env);
   const addressLimit = getMaxAddressesPerOrganization(env);
-  const countRow = await countAddressesByOrganization(db, organizationId);
-  const currentAddressCount = Number(countRow?.count ?? 0);
-  if (currentAddressCount >= addressLimit) {
-    return {
-      status: 409 as const,
-      body: {
-        error: `Address limit reached. Each organization can create up to ${addressLimit} addresses.`,
-      },
-    };
-  }
-
   const id = crypto.randomUUID();
 
   try {
-    await insertAddress(db, {
-      id,
-      organizationId,
-      userId: session.user.id,
-      address,
-      localPart,
-      domain,
-      tag: typeof body.tag === "string" ? body.tag : undefined,
-      meta: meta ?? undefined,
-      expiresAt,
-    });
+    const inserted = await insertAddress(
+      db,
+      {
+        id,
+        organizationId,
+        userId: session.user.id,
+        address,
+        localPart,
+        domain,
+        tag: typeof body.tag === "string" ? body.tag : undefined,
+        meta: meta ?? undefined,
+        expiresAt,
+      },
+      addressLimit
+    );
+    if (!inserted) {
+      return {
+        status: 409 as const,
+        body: {
+          error: `Address limit reached. Each organization can create up to ${addressLimit} addresses.`,
+        },
+      };
+    }
   } catch (error) {
     if (!isAddressConflictError(error)) throw error;
 
