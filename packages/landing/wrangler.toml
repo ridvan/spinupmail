@@ -1,0 +1,8 @@
+"$schema" = "node_modules/wrangler/config-schema.json"
+name = "spinupmail-landing"
+compatibility_date = "2026-02-22"
+compatibility_flags = [ "nodejs_compat" ]
+main = "@tanstack/react-start/server-entry"
+
+[observability]
+enabled = true
