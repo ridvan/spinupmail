@@ -130,6 +130,7 @@ export function Hero() {
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button
               size="lg"
+              nativeButton={false}
               render={
                 <a href={landingLinks.app} target="_blank" rel="noreferrer" />
               }
@@ -141,6 +142,7 @@ export function Hero() {
             <Button
               variant="outline"
               size="lg"
+              nativeButton={false}
               render={
                 <a
                   href={landingLinks.github}

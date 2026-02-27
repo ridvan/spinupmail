@@ -85,12 +85,9 @@ export function HowItWorks() {
             <Button
               variant="outline"
               size="sm"
+              nativeButton={false}
               render={
-                <a
-                  href={landingLinks.quickstart}
-                  target="_blank"
-                  rel="noreferrer"
-                />
+                <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
               }
             >
               Open Full Deployment Guide

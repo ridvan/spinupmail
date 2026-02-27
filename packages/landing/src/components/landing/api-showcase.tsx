@@ -92,6 +92,7 @@ export function ApiShowcase() {
               <Button
                 variant="outline"
                 size="sm"
+                nativeButton={false}
                 render={
                   <a
                     href={landingLinks.apiDocs}

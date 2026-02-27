@@ -16,7 +16,7 @@ export function CtaSection() {
     <section className="border-t border-border/60 py-20 md:py-24">
       <div className="mx-auto max-w-6xl px-6">
         <motion.div
-          className="relative overflow-hidden border border-border/70 bg-linear-to-br from-white/[0.04] via-transparent to-black/10 p-px"
+          className="relative overflow-hidden border border-border/70 bg-linear-to-br from-white/4 via-transparent to-black/10 p-px"
           {...(reduceMotion
             ? {}
             : {
@@ -31,8 +31,8 @@ export function CtaSection() {
               className="pointer-events-none absolute inset-0"
               aria-hidden="true"
             >
-              <div className="absolute left-1/4 top-0 h-44 w-64 bg-white/[0.06] blur-[70px]" />
-              <div className="absolute bottom-0 right-1/4 h-44 w-64 bg-white/[0.04] blur-[70px]" />
+              <div className="absolute left-1/4 top-0 h-44 w-64 bg-white/6 blur-[70px]" />
+              <div className="absolute bottom-0 right-1/4 h-44 w-64 bg-white/4 blur-[70px]" />
             </div>
 
             <div className="relative z-10">
@@ -57,9 +57,10 @@ export function CtaSection() {
               >
                 <Button
                   size="lg"
+                  nativeButton={false}
                   render={
                     <a
-                      href={landingLinks.quickstart}
+                      href={landingLinks.docs}
                       target="_blank"
                       rel="noreferrer"
                     />
@@ -74,6 +75,7 @@ export function CtaSection() {
                 <Button
                   variant="outline"
                   size="lg"
+                  nativeButton={false}
                   render={
                     <a
                       href={landingLinks.github}

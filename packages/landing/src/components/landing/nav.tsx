@@ -106,6 +106,7 @@ export function Nav() {
               <Button
                 variant="outline"
                 size="sm"
+                nativeButton={false}
                 className="rounded-xl px-3 max-lg:hidden"
                 render={
                   <a
@@ -120,6 +121,7 @@ export function Nav() {
 
               <Button
                 size="sm"
+                nativeButton={false}
                 className="rounded-xl px-3.5"
                 render={
                   <a href={landingLinks.app} target="_blank" rel="noreferrer" />
@@ -133,6 +135,7 @@ export function Nav() {
             <div className="flex items-center gap-1.5 sm:hidden">
               <Button
                 size="sm"
+                nativeButton={false}
                 className="rounded-xl px-2.5"
                 render={
                   <a href={landingLinks.app} target="_blank" rel="noreferrer" />
