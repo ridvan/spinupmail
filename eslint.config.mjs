@@ -19,6 +19,7 @@ export default [
   {
     ignores: [
       "**/dist/**",
+      "**/.output/**",
       "**/node_modules/**",
       "**/coverage/**",
       "packages/backend/.wrangler/**",

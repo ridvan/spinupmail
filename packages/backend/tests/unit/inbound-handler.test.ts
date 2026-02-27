@@ -86,6 +86,7 @@ const buildCtx = () => ({
 
 describe("inbound email handler", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
     mocks.updateAddressLastReceivedAt.mockResolvedValue(undefined);
     mocks.readRawWithLimit.mockResolvedValue({

@@ -42,11 +42,13 @@ describe("createResendVerificationEmailSender", () => {
     sendEmailMock.mockReset();
     sendEmailMock.mockResolvedValue({ id: "mail_123" });
     resendConstructorMock.mockReset();
-    resendConstructorMock.mockImplementation(() => ({
-      emails: {
-        send: sendEmailMock,
-      },
-    }));
+    resendConstructorMock.mockImplementation(function mockResendConstructor() {
+      return {
+        emails: {
+          send: sendEmailMock,
+        },
+      };
+    });
   });
 
   it("limits signup verification emails to 2 per hour and skips overflow", async () => {
