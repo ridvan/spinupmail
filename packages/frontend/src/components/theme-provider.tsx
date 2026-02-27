@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+} from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -19,6 +25,27 @@ const initialState: ThemeProviderState = {
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+const THEME_MEDIA_QUERY = "(prefers-color-scheme: dark)";
+const THEME_CHANGE_EVENT = "theme-change";
+
+const isTheme = (value: string | null): value is Theme =>
+  value === "dark" || value === "light" || value === "system";
+
+const getStoredTheme = (storageKey: string, defaultTheme: Theme): Theme => {
+  const storedTheme = localStorage.getItem(storageKey);
+  return isTheme(storedTheme) ? storedTheme : defaultTheme;
+};
+
+const resolveTheme = (theme: Theme) => {
+  if (theme !== "system") return theme;
+  return window.matchMedia(THEME_MEDIA_QUERY).matches ? "dark" : "light";
+};
+
+const applyTheme = (theme: Theme) => {
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  root.classList.add(resolveTheme(theme));
+};
 
 export function ThemeProvider({
   children,
@@ -26,35 +53,74 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+  const getSnapshot = useCallback(
+    () => getStoredTheme(storageKey, defaultTheme),
+    [storageKey, defaultTheme]
   );
 
-  useEffect(() => {
-    const root = window.document.documentElement;
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const mediaQuery = window.matchMedia(THEME_MEDIA_QUERY);
 
-    root.classList.remove("light", "dark");
+      const handleThemeStoreChange = () => {
+        applyTheme(getSnapshot());
+        onStoreChange();
+      };
 
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
+      const handleStorageChange = (event: StorageEvent) => {
+        if (event.key && event.key !== storageKey) return;
+        handleThemeStoreChange();
+      };
 
-      root.classList.add(systemTheme);
-      return;
-    }
+      const handleThemeChangeEvent = (event: Event) => {
+        const customEvent = event as CustomEvent<{ storageKey?: string }>;
+        if (customEvent.detail?.storageKey !== storageKey) return;
+        handleThemeStoreChange();
+      };
 
-    root.classList.add(theme);
-  }, [theme]);
+      const handleSystemThemeChange = () => {
+        if (getSnapshot() !== "system") return;
+        applyTheme("system");
+      };
 
-  const value = {
-    theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+      window.addEventListener("storage", handleStorageChange);
+      window.addEventListener(THEME_CHANGE_EVENT, handleThemeChangeEvent);
+      mediaQuery.addEventListener("change", handleSystemThemeChange);
+
+      handleThemeStoreChange();
+
+      return () => {
+        window.removeEventListener("storage", handleStorageChange);
+        window.removeEventListener(THEME_CHANGE_EVENT, handleThemeChangeEvent);
+        mediaQuery.removeEventListener("change", handleSystemThemeChange);
+      };
     },
-  };
+    [getSnapshot, storageKey]
+  );
+
+  const theme = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    () => defaultTheme
+  );
+
+  const setTheme = useCallback(
+    (nextTheme: Theme) => {
+      localStorage.setItem(storageKey, nextTheme);
+      window.dispatchEvent(
+        new CustomEvent(THEME_CHANGE_EVENT, { detail: { storageKey } })
+      );
+    },
+    [storageKey]
+  );
+
+  const value = useMemo(
+    () => ({
+      theme,
+      setTheme,
+    }),
+    [theme, setTheme]
+  );
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

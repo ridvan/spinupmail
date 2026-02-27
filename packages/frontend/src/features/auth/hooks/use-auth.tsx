@@ -49,12 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLastActiveOrganizationId(sessionUserId, sessionActiveOrganizationId);
   }, [sessionActiveOrganizationId, sessionUserId]);
 
-  React.useEffect(() => {
-    if (!pendingOrganizationId) return;
-    if (sessionActiveOrganizationId !== pendingOrganizationId) return;
-    setPendingOrganizationId(null);
-  }, [pendingOrganizationId, sessionActiveOrganizationId]);
-
   const refreshSession = React.useCallback(async () => {
     await refetch({
       query: {
@@ -101,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const completeOrganizationSwitch = React.useCallback(() => {
+    setPendingOrganizationId(null);
     setIsOrganizationSwitching(false);
   }, []);
 
