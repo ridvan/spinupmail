@@ -20,8 +20,11 @@ export function DocsHeader({
   return (
     <header className="docs-header fixed inset-x-0 top-0 z-50 border-b border-border/70 bg-background">
       <div className="flex h-14 w-full items-stretch">
-        <div className="hidden w-[22vw] min-w-[17.5rem] items-center border-r border-border/70 px-4 lg:flex">
-          <Link to="/" className="group inline-flex items-center gap-2 py-1.5">
+        <div className="hidden w-72 items-center border-r border-border/70 px-4 lg:flex">
+          <Link
+            to="/"
+            className="group inline-flex items-center gap-1 px-1 py-1.5"
+          >
             <img
               src="/logo-transparent.png"
               alt="Spinupmail"
@@ -30,7 +33,7 @@ export function DocsHeader({
             <span className="text-sm font-semibold tracking-tight">
               Spinupmail
             </span>
-            <span className="ml-1 border border-border/70 bg-card/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="ml-1.5 border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
               Docs
             </span>
           </Link>

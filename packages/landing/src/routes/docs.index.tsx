@@ -13,7 +13,7 @@ export function DocsIndexPage() {
         <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
           Overview
         </p>
-        <h1 className="mt-3 text-balance text-4xl font-bold tracking-tight sm:text-[2.75rem]">
+        <h1 className="mt-3 text-balance text-3xl font-bold tracking-tight">
           Spinupmail Documentation
         </h1>
         <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">

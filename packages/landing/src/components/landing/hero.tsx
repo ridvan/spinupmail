@@ -8,6 +8,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CloudflareCloudIcon } from "@/components/icons/cloudflare-cloud-icon";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
@@ -114,7 +115,10 @@ export function Hero() {
                   className="inline-flex shrink-0 text-foreground/65 dark:text-white/80"
                   {...cloudMotion}
                 >
-                  <CloudflareCloud className="h-[0.82em] w-auto" />
+                  <CloudflareCloudIcon
+                    label="Cloudflare"
+                    className="h-[0.82em] w-auto"
+                  />
                 </motion.span>
                 <span>Cloudflare</span>
               </span>
@@ -202,28 +206,6 @@ export function Hero() {
         </motion.div>
       </div>
     </section>
-  );
-}
-
-function CloudflareCloud({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="44 88 422 254"
-      role="img"
-      aria-label="Cloudflare"
-      className={cn("h-4 w-auto", className)}
-    >
-      <path
-        fill="currentColor"
-        d="M331 326c11-26-4-38-19-38l-148-2c-4 0-4-6 1-7l150-2c17-1 37-15 43-33 0 0 10-21 9-24a97 97 0 0 0-187-11c-38-25-78 9-69 46-48 3-65 46-60 72 0 1 1 2 3 2h274c1 0 3-1 3-3z"
-        opacity="0.92"
-      />
-      <path
-        fill="currentColor"
-        d="M381 224c-4 0-6-1-7 1l-5 21c-5 16 3 30 20 31l32 2c4 0 4 6-1 7l-33 1c-36 4-46 39-46 39 0 2 0 3 2 3h113l3-2a81 81 0 0 0-78-103"
-        opacity="0.74"
-      />
-    </svg>
   );
 }
 

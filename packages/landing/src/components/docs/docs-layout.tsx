@@ -77,7 +77,7 @@ export function DocsLayout({
 
       {mobileSidebarOpen ? (
         <div
-          className="fixed inset-0 z-[70] bg-black/55 backdrop-blur-[2px] lg:hidden"
+          className="fixed inset-0 z-70 bg-black/55 backdrop-blur-[2px] lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         >
           <div
@@ -96,9 +96,9 @@ export function DocsLayout({
         </div>
       ) : null}
 
-      <div className="docs-layout-grid pt-14 lg:grid lg:grid-cols-[minmax(17.5rem,22vw)_minmax(0,1fr)_19.5rem]">
+      <div className="docs-layout-grid pt-14 lg:grid lg:grid-cols-[minmax(17.5rem,22vw)_minmax(0,1fr)] 2xl:grid-cols-[minmax(17.5rem,22vw)_minmax(0,1fr)_19.5rem]">
         <div className="hidden lg:block">
-          <div className="docs-left-pane sticky top-14 h-[calc(100vh-56px)] border-r border-border/60 bg-background">
+          <div className="docs-left-pane sticky top-14 w-72 h-[calc(100vh-56px)] border-r border-border/60 bg-background">
             <DocsSidebar
               currentSlug={currentSlug}
               onOpenSearch={() => setSearchOpen(true)}
@@ -108,7 +108,7 @@ export function DocsLayout({
 
         <main className="docs-main-pane min-w-0 bg-background">{children}</main>
 
-        <div className="hidden xl:block">
+        <div className="hidden 2xl:block">
           <div className="docs-right-pane sticky top-14 h-[calc(100vh-56px)] overflow-y-auto bg-background">
             <DocsToc headings={headings} />
           </div>

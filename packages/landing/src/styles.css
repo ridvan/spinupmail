@@ -123,6 +123,7 @@
 
   html {
     @apply font-sans scroll-smooth;
+    scrollbar-gutter: stable both-edges;
   }
 
   body {

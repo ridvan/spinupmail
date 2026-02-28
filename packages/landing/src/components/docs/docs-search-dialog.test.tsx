@@ -5,6 +5,15 @@ import { DocsSearchDialog } from "./docs-search-dialog";
 
 const navigateMock = vi.fn();
 
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateMock,
 }));
@@ -15,7 +24,9 @@ describe("DocsSearchDialog", () => {
 
     render(<DocsSearchDialog open onClose={onClose} />);
 
-    const input = screen.getByLabelText("Search documentation");
+    const input = screen.getByPlaceholderText(
+      "Search docs, endpoints, env vars..."
+    );
     fireEvent.change(input, { target: { value: "emails" } });
 
     fireEvent.keyDown(input, { key: "ArrowDown" });
