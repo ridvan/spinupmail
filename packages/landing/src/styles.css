@@ -150,31 +150,8 @@
 
 @layer components {
   .docs-shell {
-    background-image:
-      linear-gradient(
-        to bottom,
-        color-mix(in oklab, var(--color-background) 82%, black 18%) 0%,
-        var(--color-background) 55%
-      ),
-      radial-gradient(
-        circle at 10% 0%,
-        color-mix(in oklab, white 4%, transparent) 0,
-        transparent 28%
-      ),
-      radial-gradient(
-        circle at 92% 0%,
-        color-mix(in oklab, white 3%, transparent) 0,
-        transparent 26%
-      ),
-      linear-gradient(
-        90deg,
-        transparent 0,
-        color-mix(in oklab, white 1.8%, transparent) 12%,
-        transparent 36%,
-        transparent 64%,
-        color-mix(in oklab, white 1.8%, transparent) 88%,
-        transparent 100%
-      );
+    --docs-surface: var(--color-background);
+    background: var(--color-background);
   }
 
   .docs-shell a:focus-visible,
@@ -186,7 +163,21 @@
   }
 
   .docs-header {
-    box-shadow: 0 10px 32px -30px rgba(0, 0, 0, 0.9);
+    box-shadow: none;
+    background: var(--docs-surface);
+  }
+
+  .docs-layout-grid {
+    max-width: 100%;
+  }
+
+  .docs-left-pane,
+  .docs-right-pane {
+    background: var(--color-background);
+  }
+
+  .docs-main-pane {
+    background: var(--color-background);
   }
 
   .docs-shell h1,
@@ -200,10 +191,38 @@
     scrollbar-color: color-mix(in oklab, white 20%, transparent) transparent;
   }
 
+  .docs-sidebar a,
+  .docs-sidebar button,
+  .docs-header a,
+  .docs-header button {
+    border-radius: 0;
+  }
+
+  .docs-article {
+    max-width: 70rem;
+  }
+
+  .docs-article > header {
+    border-bottom-color: color-mix(in oklab, white 8%, transparent);
+  }
+
+  .docs-article > header h1 {
+    font-size: clamp(2.15rem, 4vw, 3.15rem);
+    letter-spacing: -0.03em;
+  }
+
+  .docs-article > header p {
+    max-width: 58rem;
+  }
+
+  .docs-article footer a {
+    border-radius: 0;
+  }
+
   .docs-code-shell {
     overflow: hidden;
     border: 1px solid color-mix(in oklab, white 13%, transparent);
-    border-radius: 0.95rem;
+    border-radius: 0;
     background: #050505;
     box-shadow: 0 22px 56px -44px rgba(0, 0, 0, 0.92);
   }
@@ -278,7 +297,7 @@
     min-height: 2.8rem;
     border: 1px solid color-mix(in oklab, white 13%, transparent);
     border-bottom: 0;
-    border-radius: 0.95rem 0.95rem 0 0;
+    border-radius: 0;
     background: #040404;
     padding: 0.65rem 0.9rem;
     font-size: 12.5px;
@@ -293,6 +312,16 @@
 
   .docs-toc {
     font-size: 14px;
+    --docs-toc-rail: color-mix(in oklab, white 11%, transparent);
+    --docs-toc-active: color-mix(in oklab, white 78%, transparent);
+  }
+
+  .docs-toc nav [mask-image] > div {
+    background: var(--docs-toc-active) !important;
+  }
+
+  .docs-toc nav a {
+    border-radius: 0;
   }
 
   .docs-callout {

@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  ComputerIcon,
+  DatabaseIcon,
+  LayoutIcon,
+  Search01Icon,
+  ShieldIcon,
+} from "@hugeicons/core-free-icons";
 import { docsNavGroups } from "./content/docs-nav";
 import { getDocPageBySlug } from "./content/docs-content";
 import { cn } from "@/lib/utils";
@@ -8,7 +19,15 @@ type DocsSidebarProps = {
   currentSlug?: string;
   className?: string;
   onNavigate?: () => void;
+  onOpenSearch?: () => void;
 };
+
+const groupIconById = {
+  "get-started": ArrowRight01Icon,
+  configuration: ShieldIcon,
+  "api-data": DatabaseIcon,
+  operations: ComputerIcon,
+} as const;
 
 function initialOpenState(currentSlug?: string): Record<string, boolean> {
   return Object.fromEntries(
@@ -25,6 +44,7 @@ export function DocsSidebar({
   currentSlug,
   className,
   onNavigate,
+  onOpenSearch,
 }: DocsSidebarProps) {
   const defaultOpen = useMemo(
     () => initialOpenState(currentSlug),
@@ -39,52 +59,63 @@ export function DocsSidebar({
 
   return (
     <aside className={cn("docs-sidebar flex h-full flex-col", className)}>
-      <div className="border-b border-border/60 bg-linear-to-b from-card/65 to-card/35 px-4 py-5">
-        <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground/70">
-          Documentation
-        </p>
-        <h2 className="mt-2 text-base font-semibold tracking-tight text-foreground">
-          Spinupmail Docs
+      <div className="border-b border-border/60 px-4 py-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+          <HugeiconsIcon
+            icon={LayoutIcon}
+            className="size-4 text-foreground/80"
+            strokeWidth={1.8}
+          />
+          Docs
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Setup, API references, and production operations.
-        </p>
-        <Link
-          to="/docs/$slug"
-          params={{ slug: "quickstart" }}
-          onClick={onNavigate}
-          className="mt-3 inline-flex border border-border/70 bg-background/70 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-card"
+        <button
+          type="button"
+          onClick={onOpenSearch}
+          className="mt-3 inline-flex w-full items-center gap-2 border border-border/70 bg-card/35 px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:border-border/90 hover:text-foreground"
         >
-          Start with Quickstart
-        </Link>
+          <HugeiconsIcon
+            icon={Search01Icon}
+            className="size-3.5 text-muted-foreground"
+            strokeWidth={1.8}
+          />
+          <span className="flex-1">Search documentation...</span>
+          <kbd className="border border-border/70 bg-background px-1 font-mono text-[10px] text-muted-foreground">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       <nav
         aria-label="Documentation navigation"
-        className="flex-1 overflow-y-auto px-2 py-4"
+        className="flex-1 overflow-y-auto px-0 py-3"
       >
         <Link
           to="/docs"
           onClick={onNavigate}
           className={cn(
-            "block border px-3 py-2.5 text-[14px] font-medium tracking-tight transition-colors",
+            "mx-2 flex items-center gap-2 border px-3 py-2 text-[14px] font-medium tracking-tight transition-colors",
             !currentSlug
-              ? "border-border/80 bg-card text-foreground shadow-[inset_3px_0_0_0_rgba(255,255,255,0.5)]"
-              : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-card/50 hover:text-foreground"
+              ? "border-border/80 bg-card/60 text-foreground"
+              : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-card/30 hover:text-foreground"
           )}
         >
+          <HugeiconsIcon
+            icon={LayoutIcon}
+            className="size-4 text-foreground/70"
+            strokeWidth={1.8}
+          />
           Overview
         </Link>
 
-        <div className="mt-4 space-y-2.5">
+        <div className="mt-3 border-y border-border/60">
           {docsNavGroups.map(group => (
             <section
               key={group.id}
-              className="border border-border/55 bg-card/30"
+              className="border-b border-border/50 last:border-b-0"
             >
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-card/25"
                 onClick={() => {
                   setOpenGroups(prev => ({
                     ...prev,
@@ -93,21 +124,30 @@ export function DocsSidebar({
                 }}
                 aria-expanded={Boolean(openGroups[group.id])}
               >
-                <span>
-                  <span className="block text-[13px] font-semibold text-foreground/95">
-                    {group.title}
-                  </span>
-                  <span className="block pt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                    {group.description}
+                <span className="flex items-start gap-2.5">
+                  <HugeiconsIcon
+                    icon={groupIconById[group.id]}
+                    className="mt-0.5 size-4 text-foreground/65"
+                    strokeWidth={1.8}
+                  />
+                  <span>
+                    <span className="block text-[15px] font-medium text-foreground/95">
+                      {group.title}
+                    </span>
+                    <span className="block pt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                      {group.description}
+                    </span>
                   </span>
                 </span>
-                <span className="text-xs font-medium text-muted-foreground/80">
-                  {openGroups[group.id] ? "−" : "+"}
-                </span>
+                <HugeiconsIcon
+                  icon={openGroups[group.id] ? ArrowUp01Icon : ArrowDown01Icon}
+                  className="size-4 text-muted-foreground/80"
+                  strokeWidth={1.8}
+                />
               </button>
 
               {openGroups[group.id] ? (
-                <ul className="border-t border-border/50 px-1.5 py-2">
+                <ul className="border-t border-border/50 px-1.5 py-2.5">
                   {group.slugs.map(slug => {
                     const page = getDocPageBySlug(slug);
                     if (!page) return null;
@@ -125,7 +165,7 @@ export function DocsSidebar({
                             "block border-l-2 px-2.5 py-1.5 text-[13px] leading-relaxed transition-colors",
                             isActive
                               ? "border-foreground bg-foreground/[0.08] text-foreground"
-                              : "border-transparent text-muted-foreground hover:border-border/80 hover:bg-foreground/[0.04] hover:text-foreground"
+                              : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-foreground/[0.04] hover:text-foreground"
                           )}
                         >
                           {page.title}

@@ -19,6 +19,18 @@ export function DocsLayout({
 }: DocsLayoutProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  const toggleTheme = () => {
+    if (typeof document === "undefined") return;
+
+    setIsDark(current => {
+      const next = !current;
+      document.documentElement.classList.toggle("dark", next);
+      window.localStorage.setItem("spinupmail-theme", next ? "dark" : "light");
+      return next;
+    });
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -36,11 +48,25 @@ export function DocsLayout({
     setMobileSidebarOpen(false);
   }, [currentSlug]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const savedTheme = window.localStorage.getItem("spinupmail-theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+    const shouldUseDark = savedTheme ? savedTheme === "dark" : prefersDark;
+
+    document.documentElement.classList.toggle("dark", shouldUseDark);
+    setIsDark(shouldUseDark);
+  }, []);
+
   return (
     <div className="docs-shell min-h-screen bg-background text-foreground">
       <DocsHeader
         currentSlug={currentSlug}
-        onOpenSearch={() => setSearchOpen(true)}
+        isDark={isDark}
+        onToggleTheme={toggleTheme}
         onToggleMobileSidebar={() => setMobileSidebarOpen(state => !state)}
       />
 
@@ -60,35 +86,30 @@ export function DocsLayout({
           >
             <DocsSidebar
               currentSlug={currentSlug}
+              onOpenSearch={() => {
+                setMobileSidebarOpen(false);
+                setSearchOpen(true);
+              }}
               onNavigate={() => setMobileSidebarOpen(false)}
             />
           </div>
         </div>
       ) : null}
 
-      <div className="mx-auto max-w-[1720px] pt-14 lg:grid lg:grid-cols-[20rem_minmax(0,1fr)_18rem]">
+      <div className="docs-layout-grid pt-14 lg:grid lg:grid-cols-[minmax(17.5rem,22vw)_minmax(0,1fr)_19.5rem]">
         <div className="hidden lg:block">
-          <div className="sticky top-14 h-[calc(100vh-56px)] border-r border-border/60 bg-background/35 backdrop-blur-sm">
-            <DocsSidebar currentSlug={currentSlug} />
+          <div className="docs-left-pane sticky top-14 h-[calc(100vh-56px)] border-r border-border/60 bg-background">
+            <DocsSidebar
+              currentSlug={currentSlug}
+              onOpenSearch={() => setSearchOpen(true)}
+            />
           </div>
         </div>
 
-        <main className="min-w-0 border-x border-border/60 bg-background/20">
-          {headings.length ? (
-            <details className="mx-4 mt-4 border border-border/70 bg-card/55 px-3 py-2 text-sm lg:hidden">
-              <summary className="cursor-pointer text-sm font-medium tracking-tight">
-                On this page
-              </summary>
-              <div className="mt-2">
-                <DocsToc headings={headings} />
-              </div>
-            </details>
-          ) : null}
-          {children}
-        </main>
+        <main className="docs-main-pane min-w-0 bg-background">{children}</main>
 
         <div className="hidden xl:block">
-          <div className="sticky top-14 h-[calc(100vh-56px)] overflow-y-auto border-l border-border/60 bg-background/35 backdrop-blur-sm">
+          <div className="docs-right-pane sticky top-14 h-[calc(100vh-56px)] overflow-y-auto bg-background">
             <DocsToc headings={headings} />
           </div>
         </div>
