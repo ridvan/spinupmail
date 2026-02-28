@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUpRight01Icon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { getAdjacentDocPages } from "./content/docs-content";
 import { docsMdxComponents } from "./docs-mdx-components";
+import type { ComponentType } from "react";
 import type { DocPage } from "./content/docs-content";
 import { landingLinks } from "@/lib/links";
 
@@ -11,6 +12,10 @@ export function DocsContentRenderer({ page }: { page: DocPage }) {
   const adjacent = getAdjacentDocPages(page.slug);
   const Content = page.Content;
   const [copied, setCopied] = useState(false);
+  const mdxComponents = docsMdxComponents as unknown as Record<
+    string,
+    ComponentType<Record<string, unknown>>
+  >;
 
   const onCopyLink = async () => {
     if (typeof window === "undefined") return;
@@ -65,7 +70,7 @@ export function DocsContentRenderer({ page }: { page: DocPage }) {
       </header>
 
       <div className="docs-mdx mt-10 space-y-6">
-        <Content components={docsMdxComponents} />
+        <Content components={mdxComponents} />
       </div>
 
       <footer className="mt-14 grid gap-3 border-t border-border/60 pt-6 sm:grid-cols-2">

@@ -77,7 +77,7 @@ export function DocsToc({ headings }: { headings: Array<DocHeading> }) {
         document.documentElement.scrollHeight - 8;
 
       if (isNearBottom) {
-        nextActiveId = headingElements.at(-1)?.id;
+        nextActiveId = headingElements[headingElements.length - 1].id;
       } else {
         for (const element of headingElements) {
           const offsetTop =

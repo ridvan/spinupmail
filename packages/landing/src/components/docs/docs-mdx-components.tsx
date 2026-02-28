@@ -1,13 +1,13 @@
 import { isValidElement, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { DocsCallout } from "./docs-callout";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type EndpointProps = {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
-  children?: unknown;
+  children?: ReactNode;
 };
 
 const endpointTone: Record<EndpointProps["method"], string> = {
@@ -157,7 +157,7 @@ function DocsInlineCode({
 
   return (
     <code
-      className="rounded-md border border-white/14 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[13px] text-foreground"
+      className="rounded-md border border-white/14 bg-white/6 px-1.5 py-0.5 font-mono text-[13px] text-foreground"
       {...props}
     >
       {children}
@@ -170,7 +170,7 @@ function DocsLink({
   children,
 }: {
   href?: string;
-  children?: unknown;
+  children?: ReactNode;
 }) {
   if (href.startsWith("/docs")) {
     const slug = href.replace("/docs/", "");
@@ -235,35 +235,37 @@ function DocsLink({
 }
 
 export const docsMdxComponents = {
-  h2: props => (
+  h2: (props: ComponentProps<"h2">) => (
     <h2
       className="scroll-mt-28 text-[1.85rem] font-semibold tracking-tight"
       {...props}
     />
   ),
-  h3: props => (
+  h3: (props: ComponentProps<"h3">) => (
     <h3
       className="scroll-mt-28 text-2xl font-semibold tracking-tight"
       {...props}
     />
   ),
-  p: props => (
+  p: (props: ComponentProps<"p">) => (
     <p className="text-[16px] leading-8 text-foreground/92" {...props} />
   ),
-  ul: props => (
+  ul: (props: ComponentProps<"ul">) => (
     <ul
       className="space-y-2.5 pl-6 text-[16px] leading-8 marker:text-foreground/60"
       {...props}
     />
   ),
-  ol: props => (
+  ol: (props: ComponentProps<"ol">) => (
     <ol
       className="space-y-2.5 pl-6 text-[16px] leading-8 marker:text-foreground/60"
       {...props}
     />
   ),
-  li: props => <li {...props} />,
-  figure: props => <figure className="my-6" {...props} />,
+  li: (props: ComponentProps<"li">) => <li {...props} />,
+  figure: (props: ComponentProps<"figure">) => (
+    <figure className="my-6" {...props} />
+  ),
   a: DocsLink,
   pre: DocsMdxPre,
   code: DocsInlineCode,
