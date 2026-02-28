@@ -93,7 +93,7 @@ export function DocsSidebar({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="inline-flex h-full w-full items-center gap-2 px-4 py-4 text-left text-[12px] text-muted-foreground transition-colors hover:bg-card/55 hover:text-foreground"
+          className="inline-flex h-full w-full items-center gap-2 px-4 py-4 text-left text-[12px] text-muted-foreground transition-colors hover:bg-card/55 hover:text-foreground focus-visible:outline-0"
         >
           <HugeiconsIcon
             icon={Search01Icon}
