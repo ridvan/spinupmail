@@ -1,5 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
@@ -38,6 +39,11 @@ curl -L "/api/emails/mail_123/attachments/att_987" \\
 
 export function ApiShowcase() {
   const reduceMotion = useReducedMotion();
+  const apiDocsRender = landingLinks.apiDocs.startsWith("http") ? (
+    <a href={landingLinks.apiDocs} target="_blank" rel="noreferrer" />
+  ) : (
+    <Link to="/docs/$slug" params={{ slug: "email-addresses" }} />
+  );
 
   return (
     <section id="api" className="border-t border-border/60 py-20 md:py-24">
@@ -93,13 +99,7 @@ export function ApiShowcase() {
                 variant="outline"
                 size="sm"
                 nativeButton={false}
-                render={
-                  <a
-                    href={landingLinks.apiDocs}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
-                }
+                render={apiDocsRender}
               >
                 Read API Usage Docs
                 <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />

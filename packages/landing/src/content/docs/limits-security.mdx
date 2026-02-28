@@ -1,0 +1,31 @@
+export const meta = {
+  title: "Limits and Security",
+  description: "Operational limits, storage flags, and access protections.",
+  summary: "Tune storage behavior and size limits while preserving org-safe access boundaries.",
+  groupId: "operations",
+  keywords: ["limits", "security", "attachments", "raw", "headers"]
+};
+
+## Size limits
+
+- `EMAIL_MAX_BYTES`: max raw email bytes parsed by worker
+- `EMAIL_BODY_MAX_BYTES`: max body bytes persisted in D1
+- `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2
+
+## Storage toggles
+
+- `EMAIL_STORE_HEADERS_IN_DB`
+- `EMAIL_STORE_RAW_IN_DB`
+- `EMAIL_STORE_RAW_IN_R2`
+
+<Callout tone="warning" title="Default-safe mode">
+Raw MIME storage is disabled by default to reduce risk and storage overhead.
+</Callout>
+
+## Access boundaries
+
+Attachment and raw downloads require org membership via session auth or API key + `X-Org-Id`.
+
+<Callout tone="success" title="Defense in depth">
+Both inbound policy checks and org-scoped retrieval are required for production-safe operation.
+</Callout>

@@ -1,0 +1,39 @@
+export const meta = {
+  title: "Cloudflare Resources",
+  description: "Create D1, KV, and R2 resources and wire backend bindings.",
+  summary: "Provision Cloudflare dependencies for Spinupmail backend and attachment storage.",
+  groupId: "configuration",
+  keywords: ["cloudflare", "d1", "kv", "r2", "wrangler"]
+};
+
+## Create D1, KV, and R2
+
+```bash
+pnpm exec wrangler d1 create SUM_DB
+pnpm exec wrangler kv namespace create SUM_KV
+pnpm exec wrangler r2 bucket create spinupmail-attachments
+pnpm exec wrangler r2 bucket create spinupmail-attachments-preview
+```
+
+## Configure Worker bindings
+
+Copy and edit the backend wrangler config.
+
+```bash
+cp packages/backend/wrangler.toml.example packages/backend/wrangler.toml
+```
+
+```toml
+[vars]
+EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
+MAX_ADDRESSES_PER_ORGANIZATION = "100"
+EMAIL_ATTACHMENT_MAX_BYTES = "10485760"
+```
+
+<Callout tone="warning" title="Routing rules are per-domain">
+If you use multiple inbound domains, configure Email Routing rules for each domain.
+</Callout>
+
+## Domain configuration strategy
+
+Use `EMAIL_DOMAINS` as the primary source of truth. Keep `EMAIL_DOMAIN` only as a legacy fallback.

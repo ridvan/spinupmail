@@ -1,5 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
@@ -60,6 +61,11 @@ const terminalLines = [
 
 export function HowItWorks() {
   const reduceMotion = useReducedMotion();
+  const docsRender = landingLinks.docs.startsWith("http") ? (
+    <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
+  ) : (
+    <Link to="/docs/$slug" params={{ slug: "deploy-routing" }} />
+  );
 
   const sectionMotion = reduceMotion
     ? {}
@@ -86,9 +92,7 @@ export function HowItWorks() {
               variant="outline"
               size="sm"
               nativeButton={false}
-              render={
-                <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
-              }
+              render={docsRender}
             >
               Open Full Deployment Guide
               <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />

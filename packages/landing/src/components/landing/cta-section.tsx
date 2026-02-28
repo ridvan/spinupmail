@@ -3,6 +3,7 @@ import {
   ArrowRight01Icon,
   ArrowUpRight01Icon,
 } from "@hugeicons/core-free-icons";
+import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
@@ -11,6 +12,11 @@ const ease = [0.16, 1, 0.3, 1] as const;
 
 export function CtaSection() {
   const reduceMotion = useReducedMotion();
+  const docsRender = landingLinks.docs.startsWith("http") ? (
+    <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
+  ) : (
+    <Link to="/docs/$slug" params={{ slug: "quickstart" }} />
+  );
 
   return (
     <section className="border-t border-border/60 py-20 md:py-24">
@@ -55,17 +61,7 @@ export function CtaSection() {
                       transition: { duration: 0.45, ease, delay: 0.12 },
                     })}
               >
-                <Button
-                  size="lg"
-                  nativeButton={false}
-                  render={
-                    <a
-                      href={landingLinks.docs}
-                      target="_blank"
-                      rel="noreferrer"
-                    />
-                  }
-                >
+                <Button size="lg" nativeButton={false} render={docsRender}>
                   Start Quickstart
                   <HugeiconsIcon
                     icon={ArrowRight01Icon}

@@ -1,0 +1,31 @@
+export const meta = {
+  title: "Deploy and Routing",
+  description: "Deploy backend and frontend, then route API traffic to Worker.",
+  summary: "Run backend Worker and frontend Pages as separate deploy units, then route `/api/*`.",
+  groupId: "configuration",
+  keywords: ["deploy", "workers", "pages", "routing", "api"]
+};
+
+## Deploy backend Worker
+
+```bash
+pnpm -C packages/backend deploy
+```
+
+## Deploy frontend Pages
+
+Set Pages root directory to `packages/frontend` and output directory to `dist`.
+
+```env
+VITE_AUTH_BASE_URL=/api/auth
+VITE_API_BASE_URL=/api
+VITE_TURNSTILE_SITE_KEY=<site-key>
+```
+
+## Route API paths to Worker
+
+Configure route mapping such as `your-domain.com/api/*` -> `spinupmail` Worker.
+
+<Callout tone="success" title="Recommended topology">
+Keep frontend and API on the same host with path-based routing for simpler auth and CORS.
+</Callout>

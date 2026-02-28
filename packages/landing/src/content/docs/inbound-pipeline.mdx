@@ -1,0 +1,27 @@
+export const meta = {
+  title: "Inbound Pipeline",
+  description: "How inbound mail is validated, parsed, sanitized, and persisted.",
+  summary: "Follow the full path from Email Routing intake to D1/R2 persistence.",
+  groupId: "operations",
+  keywords: ["inbound", "pipeline", "mime", "sanitization", "r2", "d1"]
+};
+
+## Processing flow
+
+1. Cloudflare Email Routing forwards inbound mail to the worker email handler.
+2. Address existence and sender-domain policy checks run first.
+3. MIME is parsed and HTML/text are sanitized.
+4. Metadata is persisted in D1; files are persisted in R2.
+5. Retrieval is guarded by organization scope.
+
+## Storage paths
+
+Attachments are stored under:
+
+```text
+email-attachments/<organizationId>/<addressId>/<emailId>/<attachmentId>-<filename>
+```
+
+<Callout tone="info" title="Raw MIME is optional">
+Raw MIME storage is disabled by default and should only be enabled for debugging workflows.
+</Callout>

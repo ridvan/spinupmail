@@ -1,5 +1,5 @@
 const FALLBACK_GITHUB_URL = "https://github.com/ridvan/spinupmail";
-const FALLBACK_DOCS_URL = `${FALLBACK_GITHUB_URL}#readme`;
+const FALLBACK_DOCS_URL = "/docs";
 const FALLBACK_APP_URL = "https://app.spinupmail.com";
 
 const normalizeUrl = (value: string | undefined) => {
@@ -17,7 +17,7 @@ export const landingLinks = {
   github,
   docs,
   app,
-  apiDocs: `${docs}#api-usage-automation`,
-  deployBackend: `${docs}#5-deploy-the-backend-worker`,
-  deployFrontend: `${docs}#7-deploy-the-frontend-cloudflare-pages`,
+  apiDocs: `${docs.replace(/\/$/, "")}/email-addresses`,
+  deployBackend: `${docs.replace(/\/$/, "")}/deploy-routing`,
+  deployFrontend: `${docs.replace(/\/$/, "")}/deploy-routing`,
 } as const;

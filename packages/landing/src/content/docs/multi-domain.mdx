@@ -1,0 +1,24 @@
+export const meta = {
+  title: "Multi-domain Setup",
+  description: "Configure Spinupmail for multiple inbound domains.",
+  summary: "Scale to multiple domains with EMAIL_DOMAINS and per-domain routing rules.",
+  groupId: "operations",
+  keywords: ["multi-domain", "email routing", "email_domains"]
+};
+
+## Worker config
+
+```toml
+[vars]
+EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
+```
+
+## Routing rule checklist
+
+1. Enable Email Routing for each domain.
+2. Add destination address for each domain.
+3. Create `*@domain` -> Worker routing rule for each domain.
+
+## UI behavior
+
+When multiple domains are configured, address creation displays a domain selector. With a single domain, it is preselected automatically.

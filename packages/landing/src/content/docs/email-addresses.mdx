@@ -1,0 +1,46 @@
+export const meta = {
+  title: "Email Addresses API",
+  description: "Create, list, update, and delete temporary email addresses.",
+  summary: "Address lifecycle endpoints with TTL, sender policy, and max-email controls.",
+  groupId: "api-data",
+  keywords: ["email addresses", "ttl", "allowlist", "policy"]
+};
+
+## List and create
+
+<Endpoint method="GET" path="/api/email-addresses">
+List addresses for the current organization scope.
+</Endpoint>
+
+<Endpoint method="POST" path="/api/email-addresses">
+Create disposable addresses with policy settings.
+</Endpoint>
+
+```bash
+curl -X POST /api/email-addresses \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: spin_..." \
+  -H "X-Org-Id: org_abc123" \
+  -d '{
+    "localPart": "signup-test",
+    "domain": "spinupmail.dev",
+    "ttlMinutes": 120,
+    "maxEmails": 25,
+    "allowedSenderDomains": ["gmail.com", "example.com"],
+    "acceptedRiskNotice": true
+  }'
+```
+
+## Update and delete
+
+<Endpoint method="PATCH" path="/api/email-addresses/:id">
+Update address policy, TTL, and max-email behavior.
+</Endpoint>
+
+<Endpoint method="DELETE" path="/api/email-addresses/:id">
+Delete an address from the organization workspace.
+</Endpoint>
+
+<Endpoint method="GET" path="/api/email-addresses/recent-activity">
+Fetch recent address activity for dashboard widgets.
+</Endpoint>

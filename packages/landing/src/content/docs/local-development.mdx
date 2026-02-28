@@ -1,0 +1,42 @@
+export const meta = {
+  title: "Local Development",
+  description: "Run Spinupmail locally and simulate inbound email deliveries.",
+  summary: "Use wrangler dev, `.dev.vars`, and local email handler simulation for deterministic testing.",
+  groupId: "operations",
+  keywords: ["local development", "wrangler dev", "simulation"]
+};
+
+## Run locally
+
+```bash
+pnpm -C packages/backend dev
+pnpm -C packages/frontend dev
+```
+
+```env
+VITE_AUTH_BASE_URL=http://localhost:8787/api/auth
+VITE_API_BASE_URL=http://localhost:8787
+VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+```
+
+```env
+# packages/backend/.dev.vars
+BETTER_AUTH_SECRET=dev-secret
+BETTER_AUTH_BASE_URL=http://localhost:8787/api/auth
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+```
+
+## Simulate inbound delivery
+
+Use Wrangler local email endpoint for realistic inbound pipeline testing.
+
+```bash
+curl --location 'http://localhost:8787/cdn-cgi/handler/email?from=sender%40example.com&to=test-82bdbbd2%40spinupmail.com' \
+  --header 'Content-Type: application/json' \
+  --data-raw 'From: "John" <sender@example.com>
+To: recipient@example.com
+Subject: Testing Email Workers Local Dev
+Content-Type: text/plain; charset="utf-8"
+
+Hi there'
+```
