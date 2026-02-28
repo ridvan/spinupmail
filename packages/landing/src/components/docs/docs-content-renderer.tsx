@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUpRight01Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { getAdjacentDocPages } from "./content/docs-content";
 import { docsMdxComponents } from "./docs-mdx-components";
 import type { ComponentType } from "react";
 import type { DocPage } from "./content/docs-content";
-import { landingLinks } from "@/lib/links";
+import { Button } from "@/components/ui/button";
 
 export function DocsContentRenderer({ page }: { page: DocPage }) {
   const adjacent = getAdjacentDocPages(page.slug);
@@ -17,10 +17,10 @@ export function DocsContentRenderer({ page }: { page: DocPage }) {
     ComponentType<Record<string, unknown>>
   >;
 
-  const onCopyLink = async () => {
-    if (typeof window === "undefined") return;
+  const onCopyMarkdown = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      const md = page.markdown;
+      await navigator.clipboard.writeText(md);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
     } catch {
@@ -41,31 +41,18 @@ export function DocsContentRenderer({ page }: { page: DocPage }) {
           {page.description}
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void onCopyLink()}
-            className="inline-flex items-center gap-2 border border-border/70 bg-card/35 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-card/55"
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => void onCopyMarkdown()}
           >
             <HugeiconsIcon
               icon={Copy01Icon}
               className="size-3.5 text-foreground/85"
               strokeWidth={1.8}
             />
-            {copied ? "Copied link" : "Copy link"}
-          </button>
-          <a
-            href={landingLinks.github}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 border border-border/70 bg-card/35 px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-card/55"
-          >
-            <HugeiconsIcon
-              icon={ArrowUpRight01Icon}
-              className="size-3.5 text-foreground/85"
-              strokeWidth={1.8}
-            />
-            Open GitHub
-          </a>
+            {copied ? "Copied!" : "Copy Markdown"}
+          </Button>
         </div>
       </header>
 

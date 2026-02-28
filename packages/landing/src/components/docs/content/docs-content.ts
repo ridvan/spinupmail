@@ -1,3 +1,4 @@
+import docsMarkdown from "virtual:docs-markdown";
 import { docsOrderedSlugs } from "./docs-nav";
 import type { ComponentType } from "react";
 
@@ -27,6 +28,7 @@ export type DocPage = DocMeta & {
   headings: Array<DocHeading>;
   searchText: string;
   codeText: string;
+  markdown: string;
   Content: ComponentType<{
     components?: Record<string, ComponentType<Record<string, unknown>>>;
   }>;
@@ -234,13 +236,13 @@ const pagesBySlug = new Map<string, DocPage>();
 for (const [path, mdxModule] of Object.entries(mdxModules)) {
   const slug = pathToSlug(path);
   const indexEntry = DOC_INDEX[slug];
-
   pagesBySlug.set(slug, {
     slug,
     ...mdxModule.meta,
     headings: (indexEntry?.headings ?? []).map(toHeading),
     searchText: indexEntry?.searchText ?? "",
     codeText: indexEntry?.codeText ?? "",
+    markdown: (docsMarkdown as Record<string, string>)[slug] ?? "",
     Content: mdxModule.default,
   });
 }
