@@ -33,8 +33,10 @@ function docsMarkdownPlugin() {
       for (const file of files) {
         if (!file.endsWith(".mdx")) continue;
         const slug = file.replace(".mdx", "");
-        const raw = await readFile(join(DOCS_DIR, file), "utf-8");
-        entries[slug] = raw.replace(/^---[\s\S]*?---\s*/m, "").trim();
+        const filePath = join(DOCS_DIR, file);
+        this.addWatchFile(filePath);
+        const raw = await readFile(filePath, "utf-8");
+        entries[slug] = raw.replace(/^---[\s\S]*?---\s*/, "").trim();
       }
       return `export default ${JSON.stringify(entries)}`;
     },
