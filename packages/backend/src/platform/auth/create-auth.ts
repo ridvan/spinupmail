@@ -13,7 +13,7 @@ import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
-import { schema } from "@/db";
+import { schema } from "../../db";
 import {
   APP_NAME,
   createResendResetPasswordEmailSender,

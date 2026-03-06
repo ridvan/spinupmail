@@ -15,7 +15,6 @@ export const users = sqliteTable("users", {
     .default(false)
     .notNull(),
   image: text("image"),
-  timezone: text("timezone"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
     .notNull(),
@@ -26,6 +25,7 @@ export const users = sqliteTable("users", {
   twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(
     false
   ),
+  timezone: text("timezone"),
 });
 
 export const sessions = sqliteTable(
@@ -169,9 +169,9 @@ export const apikeys = sqliteTable(
     configId: text("config_id").default("default").notNull(),
     name: text("name"),
     start: text("start"),
+    referenceId: text("reference_id").notNull(),
     prefix: text("prefix"),
     key: text("key").notNull(),
-    referenceId: text("reference_id").notNull(),
     refillInterval: integer("refill_interval"),
     refillAmount: integer("refill_amount"),
     lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
@@ -191,9 +191,9 @@ export const apikeys = sqliteTable(
     metadata: text("metadata"),
   },
   table => [
-    index("apikeys_key_idx").on(table.key),
     index("apikeys_configId_idx").on(table.configId),
     index("apikeys_referenceId_idx").on(table.referenceId),
+    index("apikeys_key_idx").on(table.key),
   ]
 );
 

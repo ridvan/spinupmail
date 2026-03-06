@@ -24,7 +24,7 @@ CREATE TABLE `__new_apikeys` (
 	`metadata` text
 );
 --> statement-breakpoint
-INSERT INTO `__new_apikeys`("id", "config_id", "name", "start", "prefix", "key", "reference_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata") SELECT "id", "config_id", "name", "start", "prefix", "key", "reference_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata" FROM `apikeys`;--> statement-breakpoint
+INSERT INTO `__new_apikeys`("id", "config_id", "name", "start", "prefix", "key", "reference_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata") SELECT "id", 'default', "name", "start", "prefix", "key", "user_id", "refill_interval", "refill_amount", "last_refill_at", "enabled", "rate_limit_enabled", "rate_limit_time_window", "rate_limit_max", "request_count", "remaining", "last_request", "expires_at", "created_at", "updated_at", "permissions", "metadata" FROM `apikeys`;--> statement-breakpoint
 DROP TABLE `apikeys`;--> statement-breakpoint
 ALTER TABLE `__new_apikeys` RENAME TO `apikeys`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
