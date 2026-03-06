@@ -2,6 +2,8 @@ import { createApp } from "@/index";
 
 type SessionShape = {
   session?: {
+    id: string;
+    userId?: string;
     activeOrganizationId?: string | null;
   };
   user?: {
@@ -16,6 +18,7 @@ const createAuthFactory = (options: {
 }) => {
   const organization =
     "organization" in options ? options.organization : { id: "org-1" };
+
   return () => {
     return {
       api: {
@@ -57,7 +60,11 @@ describe("app auth middleware integration", () => {
     const app = createApp({
       createAuthFactory: createAuthFactory({
         session: {
-          session: { activeOrganizationId: "org-1" },
+          session: {
+            id: "session-1",
+            userId: "user-1",
+            activeOrganizationId: "org-1",
+          },
           user: { id: "user-1", emailVerified: false },
         },
       }),
@@ -80,7 +87,11 @@ describe("app auth middleware integration", () => {
     const app = createApp({
       createAuthFactory: createAuthFactory({
         session: {
-          session: { activeOrganizationId: "org-1" },
+          session: {
+            id: "session-1",
+            userId: "user-1",
+            activeOrganizationId: "org-1",
+          },
           user: { id: "user-1", emailVerified: true },
         },
       }),
@@ -107,7 +118,11 @@ describe("app auth middleware integration", () => {
     const app = createApp({
       createAuthFactory: createAuthFactory({
         session: {
-          session: { activeOrganizationId: "org-1" },
+          session: {
+            id: "session-1",
+            userId: "user-1",
+            activeOrganizationId: "org-1",
+          },
           user: { id: "user-1", emailVerified: true },
         },
         organization: null,

@@ -30,6 +30,7 @@ import {
   useCreateApiKeyMutation,
   useDeleteApiKeyMutation,
 } from "@/features/settings/hooks/use-api-keys";
+import type { ApiKeyRow } from "@/features/settings/types/api-key.types";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
@@ -240,7 +241,7 @@ export const ApiKeysPanel = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {apiKeysQuery.data?.map(item => (
+                {apiKeysQuery.data?.map((item: ApiKeyRow) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.name || "Untitled"}</TableCell>
                     <TableCell className="font-mono text-xs">

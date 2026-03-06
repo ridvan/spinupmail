@@ -3,6 +3,12 @@ import type { ApiKeyRow } from "@/features/settings/types/api-key.types";
 import { authClient } from "@/lib/auth";
 import { queryKeys } from "@/lib/query-keys";
 
+type ApiKeyListResponse = NonNullable<
+  Awaited<ReturnType<typeof authClient.apiKey.list>>["data"]
+>;
+
+type ApiKeyListItem = ApiKeyListResponse["apiKeys"][number];
+
 const normalizeApiKeyRow = (row: {
   id: string;
   name?: string | null;
@@ -39,10 +45,12 @@ export const useApiKeysQuery = () => {
         throw new Error(result.error.message || "Unable to load API keys");
       }
 
-      return (result.data ?? [])
-        .map(item => normalizeApiKeyRow(item))
+      const rows = result.data?.apiKeys ?? [];
+
+      return rows
+        .map((item: ApiKeyListItem) => normalizeApiKeyRow(item))
         .sort(
-          (a, b) =>
+          (a: ApiKeyRow, b: ApiKeyRow) =>
             getCreatedAtTimestamp(b.createdAt) -
             getCreatedAtTimestamp(a.createdAt)
         );

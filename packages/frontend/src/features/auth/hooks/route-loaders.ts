@@ -5,6 +5,10 @@ import {
 } from "@/features/organization/utils/active-organization-storage";
 import { authClient } from "@/lib/auth";
 
+type OrganizationListItem = NonNullable<
+  Awaited<ReturnType<typeof authClient.organization.list>>["data"]
+>[number];
+
 const safeNextPath = (value: string | null) => {
   if (!value) return "/";
   if (!value.startsWith("/")) return "/";
@@ -45,7 +49,9 @@ const tryRestoreActiveOrganization = async (userId: string) => {
   const lastActiveOrganizationId = getLastActiveOrganizationId(userId);
   const fallbackOrganizationId =
     (lastActiveOrganizationId &&
-    orgList.some(org => org.id === lastActiveOrganizationId)
+    orgList.some(
+      (org: OrganizationListItem) => org.id === lastActiveOrganizationId
+    )
       ? lastActiveOrganizationId
       : null) ?? orgList[0]?.id;
 

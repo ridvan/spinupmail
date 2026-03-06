@@ -13,6 +13,7 @@
     "test:component": "pnpm exec vitest run --config vitest.component.config.ts"
   },
   "dependencies": {
+    "@better-auth/api-key": "1.5.4",
     "@base-ui/react": "^1.2.0",
     "@fontsource-variable/geist": "^5.2.8",
     "@hugeicons/core-free-icons": "^3.3.0",
@@ -21,7 +22,7 @@
     "@tanstack/react-form": "^1.28.3",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-table": "^8.21.3",
-    "better-auth": "^1.4.19",
+    "better-auth": "1.5.4",
     "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
