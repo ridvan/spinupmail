@@ -48,8 +48,9 @@ export function Features() {
             <span className="text-foreground/80">in real team workflows</span>
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Spinupmail combines mailbox controls, organization isolation, and
-            automation APIs for QA, growth, and engineering workflows.
+            Spinupmail gives teams controlled inboxes, isolated workspaces, and
+            automation-ready APIs for testing, verification, and internal
+            operations.
           </p>
         </motion.div>
 
@@ -137,7 +138,7 @@ function AddressControlsCard() {
       <CardHeader
         icon={MailIcon}
         title="Address controls"
-        description="Create temporary addresses with TTL, sender-domain allowlists, optional tags, and configurable inbox max-count behavior."
+        description="Create addresses with TTL, domain allowlists, and configurable inbox cleanup behavior."
       />
       <div className="mt-auto border-t border-border/60 bg-muted/20 px-6 py-4">
         <div className="space-y-2.5 font-mono text-xs">
@@ -169,28 +170,29 @@ function AddressControlsCard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-muted-foreground/60">
-              Action
-            </span>
-            <div className="flex-1 border border-border/70 bg-background px-2.5 py-1.5 text-foreground">
-              cleanAll on limit
+          <div className="flex gap-3">
+            <div className="flex flex-1 items-center gap-3">
+              <span className="w-16 shrink-0 text-muted-foreground/60">
+                Action
+              </span>
+              <div className="flex-1 border border-border/70 bg-background px-2.5 py-1.5 text-foreground">
+                cleanAll on limit
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-muted-foreground/60">
-              Allow
-            </span>
-            <div className="flex flex-1 flex-wrap gap-1.5">
-              {["gmail.com", "example.com", "outlook.com"].map(domain => (
-                <span
-                  key={domain}
-                  className="border border-border/70 bg-background px-2 py-0.5"
-                >
-                  {domain}
-                </span>
-              ))}
+            <div className="flex flex-1 items-center gap-3">
+              <span className="w-16 shrink-0 text-muted-foreground/60">
+                Allow
+              </span>
+              <div className="flex flex-1 flex-wrap gap-1.5">
+                {["gmail.com", "example.com"].map(domain => (
+                  <span
+                    key={domain}
+                    className="border border-border/70 bg-background px-2 py-0.5"
+                  >
+                    {domain}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -202,12 +204,12 @@ function AddressControlsCard() {
 function TeamsCard() {
   const orgs = [
     {
-      name: "Engineering",
+      name: "Operations",
       members: 6,
       colors: ["#D4D4D8", "#A1A1AA", "#71717A", "#52525B", "#3F3F46"],
     },
     { name: "QA", members: 4, colors: ["#D4D4D8", "#A1A1AA", "#71717A"] },
-    { name: "Growth", members: 3, colors: ["#D4D4D8", "#A1A1AA", "#71717A"] },
+    { name: "Support", members: 3, colors: ["#D4D4D8", "#A1A1AA", "#71717A"] },
   ];
 
   return (
@@ -215,7 +217,7 @@ function TeamsCard() {
       <CardHeader
         icon={UserMultipleIcon}
         title="Team workspaces"
-        description="Role-based organizations, invitation links, and shared inbox visibility keep projects isolated by default."
+        description="Role-based organizations, and shared inbox visibility keep projects isolated by default."
       />
       <div className="mt-auto border-t border-border/60 bg-muted/20 px-6 py-4">
         <div className="space-y-3">

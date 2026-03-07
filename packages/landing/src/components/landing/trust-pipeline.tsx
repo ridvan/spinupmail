@@ -21,7 +21,7 @@ const steps = [
   {
     icon: ShieldIcon,
     title: "Address + sender policy check",
-    copy: "Unknown, expired, or disallowed sender-domain traffic is rejected before storage.",
+    copy: "Disallowed or expired sender-domain traffic is rejected before storage.",
   },
   {
     icon: CodeIcon,
@@ -97,7 +97,7 @@ export function TrustPipeline() {
           {steps.map((step, index) => (
             <motion.article
               key={step.title}
-              className="group border border-border/70 bg-card p-4"
+              className="group border border-border/70 bg-card p-4 pb-2"
               {...itemMotion(index * 0.05)}
               whileHover={reduceMotion ? undefined : { y: -3 }}
             >
@@ -105,10 +105,10 @@ export function TrustPipeline() {
                 <div className="flex items-center gap-2.5">
                   <HugeiconsIcon
                     icon={step.icon}
-                    className="size-4 text-muted-foreground/70"
+                    className="size-3 text-muted-foreground/70"
                     aria-hidden="true"
                   />
-                  <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground/75">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/75">
                     Step {String(index + 1).padStart(2, "0")}
                   </p>
                 </div>

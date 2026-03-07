@@ -2,7 +2,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
+import { startTransition, useState } from "react";
+import {
+  AnimatedTerminalCode,
+  type AnimatedTerminalLine,
+} from "@/components/landing/animated-terminal-code";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -184,6 +188,7 @@ export function HowItWorks() {
   const [activeTerminalStepId, setActiveTerminalStepId] = useState(
     terminalSteps[0].id
   );
+  const [terminalReplayKey, setTerminalReplayKey] = useState(0);
   const docsRender = landingLinks.docs.startsWith("http") ? (
     <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
   ) : (
@@ -201,6 +206,13 @@ export function HowItWorks() {
         viewport: { once: true, margin: "-80px" },
         transition: { duration: 0.65, ease },
       };
+
+  const activateTerminalStep = (stepId: string) => {
+    startTransition(() => {
+      setActiveTerminalStepId(stepId);
+      setTerminalReplayKey(current => current + 1);
+    });
+  };
 
   return (
     <section id="setup" className="border-t border-border/60 py-20 md:py-24">
@@ -238,28 +250,37 @@ export function HowItWorks() {
                     };
 
                 return (
-                  <motion.div
-                    key={step.number}
-                    className="flex gap-5"
-                    {...itemMotion}
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 text-3xl font-bold transition-colors",
-                        activeTerminalStepId === step.number
-                          ? "text-muted-foreground/55"
-                          : "text-muted-foreground/20"
-                      )}
-                    >
-                      {step.number}
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-semibold">{step.title}</h3>
-                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                        {step.description}
-                      </p>
-                    </div>
-                  </motion.div>
+                  <div key={step.number} className="relative">
+                    {!reduceMotion ? (
+                      <motion.div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0"
+                        onViewportEnter={() =>
+                          activateTerminalStep(step.number)
+                        }
+                        viewport={{ once: false, margin: "0px 0px -70% 0px" }}
+                      />
+                    ) : null}
+
+                    <motion.div className="flex gap-5" {...itemMotion}>
+                      <span
+                        className={cn(
+                          "mt-0.5 text-3xl font-bold transition-colors",
+                          activeTerminalStepId === step.number
+                            ? "text-muted-foreground/55"
+                            : "text-muted-foreground/20"
+                        )}
+                      >
+                        {step.number}
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-semibold">{step.title}</h3>
+                        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                          {step.description}
+                        </p>
+                      </div>
+                    </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -299,7 +320,7 @@ export function HowItWorks() {
                       aria-selected={isActive}
                       aria-controls={`setup-terminal-panel-${step.id}`}
                       id={`setup-terminal-tab-${step.id}`}
-                      onClick={() => setActiveTerminalStepId(step.id)}
+                      onClick={() => activateTerminalStep(step.id)}
                       className={cn(
                         "border px-2.5 py-1 text-[11px] transition-colors",
                         isActive
@@ -324,49 +345,21 @@ export function HowItWorks() {
                 {activeTerminalStep.detail}
               </p>
 
-              <div className="overflow-x-auto rounded-sm border border-border/60 bg-background/55 px-3 py-3 font-mono text-[13px] leading-relaxed">
-                {activeTerminalStep.lines.map((line, index) => {
-                  if (line.kind === "blank") {
-                    return (
-                      <div key={`${activeTerminalStep.id}-blank-${index}`}>
-                        &nbsp;
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={`${activeTerminalStep.id}-${index}`}>
-                      {line.prompt ? (
-                        <span className="select-none text-muted-foreground/45">
-                          ${" "}
-                        </span>
-                      ) : null}
-
-                      {line.tokens.map((token, tokenIndex) => (
-                        <span
-                          key={`${activeTerminalStep.id}-${index}-${tokenIndex}`}
-                          className={cn(toneClassName[token.tone ?? "base"])}
-                        >
-                          {token.text}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {activeTerminalStep.output?.length ? (
-                <div className="mt-3 rounded-sm border border-border/60 bg-muted/15 px-3 py-2.5">
-                  <div className="space-y-1 text-[12px] text-muted-foreground/80">
-                    {activeTerminalStep.output.map(item => (
-                      <div key={item} className="flex items-center gap-2">
-                        <span className="text-muted-foreground/50">+</span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <AnimatedTerminalCode
+                sequenceKey={`${activeTerminalStep.id}-${terminalReplayKey}`}
+                lines={
+                  activeTerminalStep.lines as ReadonlyArray<AnimatedTerminalLine>
+                }
+                output={activeTerminalStep.output}
+                reduceMotion={!!reduceMotion}
+                getToneClassName={tone =>
+                  cn(
+                    toneClassName[
+                      (tone as TerminalTokenTone | undefined) ?? "base"
+                    ]
+                  )
+                }
+              />
             </div>
           </motion.div>
         </div>

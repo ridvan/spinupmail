@@ -3,6 +3,10 @@ import { ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
+import {
+  AnimatedTerminalCode,
+  type AnimatedTerminalLine,
+} from "@/components/landing/animated-terminal-code";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -420,40 +424,17 @@ export function ApiShowcase() {
                 {activeExample.note}
               </p>
 
-              <div className="overflow-x-auto rounded-sm border border-border/60 bg-background/60 px-4 py-3">
-                <pre className="font-mono text-[13px] leading-relaxed whitespace-pre">
-                  <code>
-                    {activeExample.lines.map((line, index) => {
-                      if (line.kind === "blank") {
-                        return (
-                          <div key={`blank-${activeExample.id}-${index}`}>
-                            &nbsp;
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={`${activeExample.id}-${index}`}>
-                          {line.prompt ? (
-                            <span className="select-none text-muted-foreground/45">
-                              ${" "}
-                            </span>
-                          ) : null}
-
-                          {line.tokens.map((token, tokenIndex) => (
-                            <span
-                              key={`${activeExample.id}-${index}-${tokenIndex}`}
-                              className={toneClassName[token.tone ?? "base"]}
-                            >
-                              {token.text}
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </code>
-                </pre>
-              </div>
+              <AnimatedTerminalCode
+                sequenceKey={activeExample.id}
+                lines={
+                  activeExample.lines as ReadonlyArray<AnimatedTerminalLine>
+                }
+                reduceMotion={!!reduceMotion}
+                getToneClassName={tone =>
+                  toneClassName[(tone as TokenTone | undefined) ?? "base"]
+                }
+                codeClassName="bg-background/60 px-4 whitespace-pre"
+              />
             </div>
           </motion.div>
         </div>
