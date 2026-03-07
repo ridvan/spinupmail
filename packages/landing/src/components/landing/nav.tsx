@@ -1,7 +1,9 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowRight01Icon, BookOpen01Icon } from "@hugeicons/core-free-icons";
-import { useEffect, useState } from "react";
+import { BookOpen01Icon } from "@hugeicons/core-free-icons";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import type { ChevronRightIconHandle } from "@/components/ui/chevron-right";
+import { ChevronRightIcon } from "@/components/ui/chevron-right";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
 
@@ -13,8 +15,22 @@ const sections = [
   { href: "#api", label: "API" },
 ] as const;
 
+const startArrowAnimation = (arrowRef: {
+  current: ChevronRightIconHandle | null;
+}) => {
+  arrowRef.current?.startAnimation();
+};
+
+const stopArrowAnimation = (arrowRef: {
+  current: ChevronRightIconHandle | null;
+}) => {
+  arrowRef.current?.stopAnimation();
+};
+
 export function Nav() {
   const [activeSection, setActiveSection] = useState<string>(sections[0].href);
+  const desktopAppArrowRef = useRef<ChevronRightIconHandle>(null);
+  const mobileAppArrowRef = useRef<ChevronRightIconHandle>(null);
 
   useEffect(() => {
     const ids = sections.map(section => section.href.slice(1));
@@ -65,20 +81,20 @@ export function Nav() {
   }, []);
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-3 z-50">
-      <div className="mx-auto max-w-6xl px-6">
+    <header className="pointer-events-none fixed inset-x-0 top-2 z-50 sm:top-3">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="pointer-events-auto overflow-hidden rounded-none border border-border/70 bg-background/60 shadow-[0_10px_40px_-28px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-4">
+          <div className="flex h-12 items-center justify-between gap-2 px-2.5 sm:h-14 sm:gap-3 sm:px-4">
             <a
               href="/"
-              className="group inline-flex items-center gap-1 px-1 py-1.5"
+              className="group inline-flex min-w-0 items-center gap-1.5 px-1 py-1"
             >
               <img
                 src="/logo-transparent.png"
                 alt="Spinupmail logo"
-                className="size-7 object-contain"
+                className="size-6 object-contain sm:size-7"
               />
-              <span className="text-sm font-semibold tracking-tight">
+              <span className="truncate text-[13px] font-semibold tracking-tight sm:text-sm">
                 Spinupmail
               </span>
             </a>
@@ -108,7 +124,7 @@ export function Nav() {
                 variant="outline"
                 size="sm"
                 nativeButton={false}
-                className="rounded-xl px-3 max-lg:hidden"
+                className="px-3 max-lg:hidden"
                 render={<Link to="/docs" />}
               >
                 <HugeiconsIcon
@@ -122,32 +138,60 @@ export function Nav() {
               <Button
                 size="sm"
                 nativeButton={false}
-                className="rounded-xl px-3.5"
+                className="px-3.5"
+                onMouseEnter={() => startArrowAnimation(desktopAppArrowRef)}
+                onMouseLeave={() => stopArrowAnimation(desktopAppArrowRef)}
+                onFocus={() => startArrowAnimation(desktopAppArrowRef)}
+                onBlur={() => stopArrowAnimation(desktopAppArrowRef)}
                 render={
                   <a href={landingLinks.app} target="_blank" rel="noreferrer" />
                 }
               >
-                Dashboard
-                <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />
+                Open App
+                <ChevronRightIcon
+                  ref={desktopAppArrowRef}
+                  size={14}
+                  data-icon="inline-end"
+                  aria-hidden="true"
+                />
               </Button>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:hidden">
+            <div className="flex items-center gap-1 sm:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                className="h-8 rounded-full px-2.5 text-[12px]"
+                render={<Link to="/docs" />}
+              >
+                Docs
+              </Button>
+
               <Button
                 size="sm"
                 nativeButton={false}
-                className="rounded-xl px-2.5"
+                className="h-8 rounded-full px-3 text-[12px]"
+                onMouseEnter={() => startArrowAnimation(mobileAppArrowRef)}
+                onMouseLeave={() => stopArrowAnimation(mobileAppArrowRef)}
+                onFocus={() => startArrowAnimation(mobileAppArrowRef)}
+                onBlur={() => stopArrowAnimation(mobileAppArrowRef)}
                 render={
                   <a href={landingLinks.app} target="_blank" rel="noreferrer" />
                 }
               >
-                Setup
-                <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />
+                App
+                <ChevronRightIcon
+                  ref={mobileAppArrowRef}
+                  size={14}
+                  data-icon="inline-end"
+                  aria-hidden="true"
+                />
               </Button>
             </div>
           </div>
 
-          <div className="border-t border-border/60 px-3 py-2 lg:hidden">
+          <div className="border-t border-border/60 px-2 py-1.5 lg:hidden">
             <nav className="flex flex-wrap items-center justify-center gap-1">
               {sections.map(section => (
                 <a
@@ -159,8 +203,8 @@ export function Nav() {
                   }
                   className={
                     activeSection === section.href
-                      ? "snap-start shrink-0 rounded-lg border border-border/90 bg-card/75 px-2.5 py-1 text-[11px] text-foreground/95 transition-colors"
-                      : "snap-start shrink-0 rounded-lg border border-border/70 bg-card/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      ? "shrink-0 rounded-full border border-border/90 bg-card/75 px-2.5 py-1 text-[10px] font-medium text-foreground/95 transition-colors"
+                      : "shrink-0 rounded-full border border-border/70 bg-card/60 px-2.5 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
                   }
                 >
                   {section.label}

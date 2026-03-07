@@ -2,8 +2,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
+import { cn } from "@/lib/utils";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -28,44 +30,168 @@ const steps = [
   },
 ] as const;
 
-const terminalLines = [
+type TerminalTokenTone = "base" | "muted" | "comment" | "flag" | "value";
+
+type TerminalToken = {
+  text: string;
+  tone?: TerminalTokenTone;
+};
+
+type TerminalLine =
+  | {
+      kind: "code";
+      prompt?: boolean;
+      tokens: ReadonlyArray<TerminalToken>;
+    }
+  | {
+      kind: "blank";
+    };
+
+type TerminalStep = {
+  id: string;
+  label: string;
+  detail: string;
+  lines: ReadonlyArray<TerminalLine>;
+  output?: ReadonlyArray<string>;
+};
+
+const toneClassName: Record<TerminalTokenTone, string> = {
+  base: "text-foreground/88",
+  muted: "text-muted-foreground/72",
+  comment: "text-muted-foreground/42",
+  flag: "text-muted-foreground/62",
+  value: "text-foreground/78",
+};
+
+const terminalSteps: ReadonlyArray<TerminalStep> = [
   {
-    text: "git clone https://github.com/spinupmail/spinupmail",
-    type: "cmd" as const,
+    id: "01",
+    label: "Bootstrap",
+    detail: "Clone the repo and install workspace dependencies.",
+    lines: [
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "git", tone: "base" },
+          { text: " clone ", tone: "muted" },
+          {
+            text: "https://github.com/ridvan/spinupmail",
+            tone: "value",
+          },
+        ],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "cd", tone: "base" },
+          { text: " spinupmail ", tone: "value" },
+          { text: "&&", tone: "muted" },
+          { text: " pnpm", tone: "base" },
+          { text: " install", tone: "value" },
+        ],
+      },
+    ],
   },
-  { text: "cd spinupmail && pnpm install", type: "cmd" as const },
-  { text: "", type: "blank" as const },
-  { text: "# Provision Cloudflare resources", type: "comment" as const },
-  { text: "pnpm exec wrangler d1 create SUM_DB", type: "cmd" as const },
   {
-    text: "pnpm exec wrangler kv namespace create SUM_KV",
-    type: "cmd" as const,
+    id: "02",
+    label: "Provision",
+    detail: "Create Cloudflare primitives and copy the backend config.",
+    lines: [
+      {
+        kind: "code",
+        tokens: [{ text: "# Provision Cloudflare resources", tone: "comment" }],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "pnpm", tone: "base" },
+          { text: " exec wrangler d1 create ", tone: "muted" },
+          { text: "SUM_DB", tone: "value" },
+        ],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "pnpm", tone: "base" },
+          { text: " exec wrangler kv namespace create ", tone: "muted" },
+          { text: "SUM_KV", tone: "value" },
+        ],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "pnpm", tone: "base" },
+          { text: " exec wrangler r2 bucket create ", tone: "muted" },
+          { text: "spinupmail-attachments", tone: "value" },
+        ],
+      },
+      { kind: "blank" },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "cp", tone: "base" },
+          {
+            text: " packages/backend/wrangler.toml.example",
+            tone: "value",
+          },
+          { text: " packages/backend/wrangler.toml", tone: "value" },
+        ],
+      },
+    ],
   },
   {
-    text: "pnpm exec wrangler r2 bucket create spinupmail-attachments",
-    type: "cmd" as const,
+    id: "03",
+    label: "Deploy",
+    detail: "Ship the backend and frontend, then confirm routing.",
+    lines: [
+      {
+        kind: "code",
+        tokens: [{ text: "# Deploy services", tone: "comment" }],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "pnpm", tone: "base" },
+          { text: " deploy:backend", tone: "value" },
+        ],
+      },
+      {
+        kind: "code",
+        prompt: true,
+        tokens: [
+          { text: "pnpm", tone: "base" },
+          { text: " deploy:frontend", tone: "value" },
+        ],
+      },
+    ],
+    output: [
+      "Worker deployed",
+      "Pages deployed",
+      "Route /api/* points to Worker",
+    ],
   },
-  {
-    text: "cp packages/backend/wrangler.toml.example packages/backend/wrangler.toml",
-    type: "cmd" as const,
-  },
-  { text: "", type: "blank" as const },
-  { text: "# Deploy services", type: "comment" as const },
-  { text: "pnpm deploy:backend", type: "cmd" as const },
-  { text: "pnpm deploy:frontend", type: "cmd" as const },
-  { text: "", type: "blank" as const },
-  { text: "✓ Worker deployed", type: "success" as const },
-  { text: "✓ Pages deployed", type: "success" as const },
-  { text: "✓ Route /api/* points to Worker", type: "success" as const },
 ] as const;
 
 export function HowItWorks() {
   const reduceMotion = useReducedMotion();
+  const [activeTerminalStepId, setActiveTerminalStepId] = useState(
+    terminalSteps[0].id
+  );
   const docsRender = landingLinks.docs.startsWith("http") ? (
     <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
   ) : (
     <Link to="/docs/$slug" params={{ slug: "deploy-routing" }} />
   );
+  const activeTerminalStep =
+    terminalSteps.find(step => step.id === activeTerminalStepId) ??
+    terminalSteps[0];
 
   const sectionMotion = reduceMotion
     ? {}
@@ -79,58 +205,65 @@ export function HowItWorks() {
   return (
     <section id="setup" className="border-t border-border/60 py-20 md:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <motion.div {...sectionMotion}>
-          <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-            Self-host setup in three steps
-          </h2>
-          <p className="mt-3 max-w-2xl text-muted-foreground">
-            The deployment flow is explicit: provision Cloudflare resources,
-            configure bindings, deploy Worker + Pages, then route API traffic.
-          </p>
-          <div className="mt-5">
-            <Button
-              variant="outline"
-              size="sm"
-              nativeButton={false}
-              render={docsRender}
-            >
-              Open Full Deployment Guide
-              <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />
-            </Button>
-          </div>
-        </motion.div>
+        <div className="grid items-start gap-10 md:grid-cols-2 md:gap-14">
+          <motion.div {...sectionMotion}>
+            <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
+              Self-host setup in three steps
+            </h2>
+            <p className="mt-3 max-w-2xl text-muted-foreground">
+              The deployment flow is explicit: provision Cloudflare resources,
+              configure bindings, deploy Worker + Pages, then route API traffic.
+            </p>
+            <div className="mt-5">
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={docsRender}
+              >
+                Open Full Deployment Guide
+                <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />
+              </Button>
+            </div>
 
-        <div className="mt-12 grid items-start gap-12 lg:grid-cols-2 lg:gap-14">
-          <div className="space-y-8">
-            {steps.map((step, index) => {
-              const itemMotion = reduceMotion
-                ? {}
-                : {
-                    initial: { opacity: 0, y: 18 },
-                    whileInView: { opacity: 1, y: 0 },
-                    viewport: { once: true, margin: "-40px" },
-                    transition: { duration: 0.5, ease, delay: index * 0.08 },
-                  };
+            <div className="mt-12 space-y-8">
+              {steps.map((step, index) => {
+                const itemMotion = reduceMotion
+                  ? {}
+                  : {
+                      initial: { opacity: 0, y: 18 },
+                      whileInView: { opacity: 1, y: 0 },
+                      viewport: { once: true, margin: "-40px" },
+                      transition: { duration: 0.5, ease, delay: index * 0.08 },
+                    };
 
-              return (
-                <motion.div
-                  key={step.number}
-                  className="flex gap-5"
-                  {...itemMotion}
-                >
-                  <span className="mt-0.5 text-3xl font-bold text-muted-foreground/20">
-                    {step.number}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold">{step.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+                return (
+                  <motion.div
+                    key={step.number}
+                    className="flex gap-5"
+                    {...itemMotion}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 text-3xl font-bold transition-colors",
+                        activeTerminalStepId === step.number
+                          ? "text-muted-foreground/55"
+                          : "text-muted-foreground/20"
+                      )}
+                    >
+                      {step.number}
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold">{step.title}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                        {step.description}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
 
           <motion.div
             className="overflow-hidden border border-border/70 bg-card"
@@ -143,40 +276,97 @@ export function HowItWorks() {
                   transition: { duration: 0.65, ease, delay: 0.12 },
                 })}
           >
-            <div className="flex items-center gap-2 border-b border-border/70 px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-2.5">
               <div className="size-2.5 rounded-full bg-muted-foreground/20" />
               <div className="size-2.5 rounded-full bg-muted-foreground/20" />
               <div className="size-2.5 rounded-full bg-muted-foreground/20" />
               <span className="ml-2 text-xs text-muted-foreground">
                 terminal
               </span>
+              <div
+                role="tablist"
+                aria-label="Setup steps"
+                className="ml-auto flex flex-wrap items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start"
+              >
+                {terminalSteps.map(step => {
+                  const isActive = step.id === activeTerminalStep.id;
+
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-controls={`setup-terminal-panel-${step.id}`}
+                      id={`setup-terminal-tab-${step.id}`}
+                      onClick={() => setActiveTerminalStepId(step.id)}
+                      className={cn(
+                        "border px-2.5 py-1 text-[11px] transition-colors",
+                        isActive
+                          ? "border-border/90 bg-background text-foreground"
+                          : "border-border/60 bg-transparent text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {step.id} {step.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="p-4 font-mono text-[13px] leading-relaxed">
-              {terminalLines.map((line, index) => (
-                <div key={`${line.text}-${index}`}>
-                  {line.type === "cmd" ? (
-                    <span>
-                      <span className="text-muted-foreground/55 select-none">
-                        ${" "}
-                      </span>
-                      <span className="text-foreground/85">{line.text}</span>
-                    </span>
-                  ) : null}
+            <div
+              role="tabpanel"
+              id={`setup-terminal-panel-${activeTerminalStep.id}`}
+              aria-labelledby={`setup-terminal-tab-${activeTerminalStep.id}`}
+              className="bg-linear-to-b from-muted/10 via-transparent to-transparent p-4"
+            >
+              <p className="mb-3 text-[11px] text-muted-foreground/60">
+                {activeTerminalStep.detail}
+              </p>
 
-                  {line.type === "comment" ? (
-                    <span className="text-muted-foreground/45">
-                      {line.text}
-                    </span>
-                  ) : null}
+              <div className="overflow-x-auto rounded-sm border border-border/60 bg-background/55 px-3 py-3 font-mono text-[13px] leading-relaxed">
+                {activeTerminalStep.lines.map((line, index) => {
+                  if (line.kind === "blank") {
+                    return (
+                      <div key={`${activeTerminalStep.id}-blank-${index}`}>
+                        &nbsp;
+                      </div>
+                    );
+                  }
 
-                  {line.type === "success" ? (
-                    <span className="text-muted-foreground">{line.text}</span>
-                  ) : null}
+                  return (
+                    <div key={`${activeTerminalStep.id}-${index}`}>
+                      {line.prompt ? (
+                        <span className="select-none text-muted-foreground/45">
+                          ${" "}
+                        </span>
+                      ) : null}
 
-                  {line.type === "blank" ? <br /> : null}
+                      {line.tokens.map((token, tokenIndex) => (
+                        <span
+                          key={`${activeTerminalStep.id}-${index}-${tokenIndex}`}
+                          className={cn(toneClassName[token.tone ?? "base"])}
+                        >
+                          {token.text}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {activeTerminalStep.output?.length ? (
+                <div className="mt-3 rounded-sm border border-border/60 bg-muted/15 px-3 py-2.5">
+                  <div className="space-y-1 text-[12px] text-muted-foreground/80">
+                    {activeTerminalStep.output.map(item => (
+                      <div key={item} className="flex items-center gap-2">
+                        <span className="text-muted-foreground/50">+</span>
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              ) : null}
             </div>
           </motion.div>
         </div>

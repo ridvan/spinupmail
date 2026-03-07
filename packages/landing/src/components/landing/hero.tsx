@@ -1,13 +1,17 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  ArrowRight01Icon,
-  ArrowUpRight01Icon,
   CheckmarkCircle02Icon,
+  GithubIcon,
   MailIcon,
 } from "@hugeicons/core-free-icons";
 import { motion, useReducedMotion } from "motion/react";
+import { useRef } from "react";
+import type { ArrowUpRightIconHandle } from "@/components/ui/arrow-up-right";
+import type { ChevronRightIconHandle } from "@/components/ui/chevron-right";
 import { Badge } from "@/components/ui/badge";
+import { ArrowUpRightIcon } from "@/components/ui/arrow-up-right";
 import { Button } from "@/components/ui/button";
+import { ChevronRightIcon } from "@/components/ui/chevron-right";
 import { CloudflareCloudIcon } from "@/components/icons/cloudflare-cloud-icon";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -19,6 +23,23 @@ const inboxRows = [
   { from: "github.com", subject: "Pipeline Alert", time: "9m" },
   { from: "example.com", subject: "SMTP Service Testing", time: "21m" },
 ] as const;
+
+type AnimatedArrowHandle = {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+};
+
+const startArrowAnimation = (arrowRef: {
+  current: AnimatedArrowHandle | null;
+}) => {
+  arrowRef.current?.startAnimation();
+};
+
+const stopArrowAnimation = (arrowRef: {
+  current: AnimatedArrowHandle | null;
+}) => {
+  arrowRef.current?.stopAnimation();
+};
 
 const techStack = [
   {
@@ -42,10 +63,17 @@ const techStack = [
     logoClassName:
       "h-4 w-auto saturate-0 brightness-[2.2] contrast-75 opacity-90",
   },
+  {
+    name: "TanStack Start",
+    logo: "/logos/tanstack.svg",
+    logoClassName: "h-4 w-auto",
+  },
 ] as const;
 
 export function Hero() {
   const reduceMotion = useReducedMotion();
+  const getStartedArrowRef = useRef<ChevronRightIconHandle>(null);
+  const githubArrowRef = useRef<ArrowUpRightIconHandle>(null);
 
   const topMotion = reduceMotion
     ? {}
@@ -134,19 +162,33 @@ export function Hero() {
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button
               size="lg"
+              className="px-5"
               nativeButton={false}
+              onMouseEnter={() => startArrowAnimation(getStartedArrowRef)}
+              onMouseLeave={() => stopArrowAnimation(getStartedArrowRef)}
+              onFocus={() => startArrowAnimation(getStartedArrowRef)}
+              onBlur={() => stopArrowAnimation(getStartedArrowRef)}
               render={
                 <a href={landingLinks.app} target="_blank" rel="noreferrer" />
               }
             >
-              Try it now
-              <HugeiconsIcon icon={ArrowRight01Icon} data-icon="inline-end" />
+              Get Started
+              <ChevronRightIcon
+                ref={getStartedArrowRef}
+                size={16}
+                data-icon="inline-end"
+                aria-hidden="true"
+              />
             </Button>
 
             <Button
               variant="outline"
               size="lg"
               nativeButton={false}
+              onMouseEnter={() => startArrowAnimation(githubArrowRef)}
+              onMouseLeave={() => stopArrowAnimation(githubArrowRef)}
+              onFocus={() => startArrowAnimation(githubArrowRef)}
+              onBlur={() => stopArrowAnimation(githubArrowRef)}
               render={
                 <a
                   href={landingLinks.github}
@@ -155,8 +197,18 @@ export function Hero() {
                 />
               }
             >
+              <HugeiconsIcon
+                icon={GithubIcon}
+                className="size-4 text-muted-foreground/75"
+                aria-hidden="true"
+              />
               View on GitHub
-              <HugeiconsIcon icon={ArrowUpRight01Icon} data-icon="inline-end" />
+              <ArrowUpRightIcon
+                ref={githubArrowRef}
+                size={16}
+                data-icon="inline-end"
+                aria-hidden="true"
+              />
             </Button>
           </div>
         </motion.div>
@@ -192,7 +244,7 @@ export function Hero() {
             ))}
           </div>
 
-          <p className="mt-3 text-center font-mono text-[11px] text-muted-foreground/70">
+          <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground/70">
             scaffolded with{" "}
             <a
               href="https://github.com/zpg6/better-auth-cloudflare"

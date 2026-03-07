@@ -1,14 +1,15 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   CodeIcon,
-  ComputerIcon,
   LayoutIcon,
   MailIcon,
   ShieldIcon,
   UserMultipleIcon,
 } from "@hugeicons/core-free-icons";
 import { motion, useReducedMotion } from "motion/react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { CloudflareCloudIcon } from "@/components/icons/cloudflare-cloud-icon";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -102,17 +103,27 @@ export function Features() {
 
 function CardHeader({
   icon,
+  iconNode,
   title,
   description,
 }: {
-  icon: Parameters<typeof HugeiconsIcon>[0]["icon"];
+  icon?: Parameters<typeof HugeiconsIcon>[0]["icon"];
+  iconNode?: ReactNode;
   title: string;
   description: string;
 }) {
   return (
     <div className="p-6 pb-4">
-      <HugeiconsIcon icon={icon} className="size-5 text-muted-foreground" />
-      <h3 className="mt-3 text-sm font-semibold">{title}</h3>
+      <div className="flex items-center gap-2.5">
+        {iconNode ??
+          (icon ? (
+            <HugeiconsIcon
+              icon={icon}
+              className="size-4 text-muted-foreground"
+            />
+          ) : null)}
+        <h3 className="text-base font-semibold">{title}</h3>
+      </div>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
@@ -135,7 +146,7 @@ function AddressControlsCard() {
               Address
             </span>
             <div className="flex-1 border border-border/70 bg-background px-2.5 py-1.5 text-foreground">
-              signup-run@spinupmail.dev
+              test-signup-flow@spinupmail.dev
             </div>
           </div>
 
@@ -295,7 +306,7 @@ function AnalyticsCard() {
         description="Track org-level email volume, inbox growth, and recent address activity from the dashboard."
       />
       <div className="mt-auto border-t border-border/60 bg-muted/20 px-6 py-4">
-        <div className="flex h-16 items-end gap-[3px]">
+        <div className="flex h-16 items-end gap-0.75">
           {bars.map((height, index) => (
             <div
               key={`bar-${index}`}
@@ -325,7 +336,14 @@ function CloudflareCard() {
   return (
     <>
       <CardHeader
-        icon={ComputerIcon}
+        iconNode={
+          <span className="inline-flex h-4 w-6 shrink-0 items-center justify-center text-muted-foreground">
+            <CloudflareCloudIcon
+              className="h-4 w-auto -mt-0.5"
+              aria-hidden="true"
+            />
+          </span>
+        }
         title="Cloudflare-native architecture"
         description="Run API, intake, storage, and frontend on Cloudflare services."
       />
