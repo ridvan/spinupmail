@@ -148,8 +148,11 @@ export function AnimatedTerminalCode({
             transition={{ duration: reduceMotion ? 0 : 0.2, ease, delay: 0.08 }}
           >
             <div className="space-y-1 text-[12px] text-muted-foreground/80">
-              {output.map(item => (
-                <div key={item} className="flex items-center gap-2">
+              {output.map((item, index) => (
+                <div
+                  key={`${sequenceKey}-${index}`}
+                  className="flex items-center gap-2"
+                >
                   <span className="text-muted-foreground/50">+</span>
                   <span>{item}</span>
                 </div>

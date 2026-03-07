@@ -353,11 +353,9 @@ export function HowItWorks() {
                 output={activeTerminalStep.output}
                 reduceMotion={!!reduceMotion}
                 getToneClassName={tone =>
-                  cn(
-                    toneClassName[
-                      (tone as TerminalTokenTone | undefined) ?? "base"
-                    ]
-                  )
+                  toneClassName[
+                    (tone as TerminalTokenTone | undefined) ?? "base"
+                  ]
                 }
               />
             </div>
