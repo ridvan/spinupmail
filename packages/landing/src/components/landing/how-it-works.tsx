@@ -3,10 +3,8 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { startTransition, useState } from "react";
-import {
-  AnimatedTerminalCode,
-  type AnimatedTerminalLine,
-} from "@/components/landing/animated-terminal-code";
+import type { AnimatedTerminalLine } from "@/components/landing/animated-terminal-code";
+import { AnimatedTerminalCode } from "@/components/landing/animated-terminal-code";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";

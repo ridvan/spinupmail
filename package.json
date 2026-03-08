@@ -26,8 +26,10 @@
     "dev:landing": "pnpm -C packages/landing dev",
     "build:landing": "pnpm -C packages/landing build",
     "deploy:landing": "pnpm -C packages/landing deploy",
-    "lint": "eslint .",
+    "lint": "pnpm run lint:root && pnpm run lint:landing",
     "lint:backend": "eslint packages/backend",
+    "lint:landing": "pnpm -C packages/landing exec eslint .",
+    "lint:root": "eslint packages/backend packages/frontend eslint.config.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -48,8 +50,14 @@
     "vitest": "^3.2.4"
   },
   "lint-staged": {
-    "**/*.{js,mjs,cjs,ts,tsx}": [
-      "pnpm exec eslint --quiet --fix"
+    "packages/{backend,frontend}/**/*.{js,mjs,cjs,ts,tsx}": [
+      "pnpm exec eslint --quiet --fix --no-warn-ignored"
+    ],
+    "eslint.config.mjs": [
+      "pnpm exec eslint --quiet --fix --no-warn-ignored"
+    ],
+    "packages/landing/**/*.{js,mjs,cjs,ts,tsx}": [
+      "pnpm -C packages/landing exec eslint --fix --no-warn-ignored"
     ],
     "**/*.{js,mjs,cjs,ts,tsx,jsx,json,css,md,html}": [
       "prettier --write --ignore-unknown"

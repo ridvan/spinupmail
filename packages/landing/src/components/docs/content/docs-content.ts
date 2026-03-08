@@ -242,7 +242,7 @@ for (const [path, mdxModule] of Object.entries(mdxModules)) {
     headings: (indexEntry?.headings ?? []).map(toHeading),
     searchText: indexEntry?.searchText ?? "",
     codeText: indexEntry?.codeText ?? "",
-    markdown: (docsMarkdown as Record<string, string>)[slug] ?? "",
+    markdown: docsMarkdown[slug] ?? "",
     Content: mdxModule.default,
   });
 }
