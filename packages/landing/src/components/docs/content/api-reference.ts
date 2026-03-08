@@ -440,9 +440,11 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/organizations/stats/email-activity?days=7&timezone=Europe%2FIstanbul" \\
+    exampleRequest: `curl --get "https://your-domain.com/api/organizations/stats/email-activity" \\
   -H "X-API-Key: spin_..." \\
-  -H "X-Org-Id: org_abc123"`,
+  -H "X-Org-Id: org_abc123" \\
+  --data-urlencode "days=7" \\
+  --data-urlencode "timezone=Europe/Istanbul"`,
     exampleResponse: `{
   "timezone": "Europe/Istanbul",
   "daily": [
@@ -687,9 +689,13 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/email-addresses?page=1&pageSize=20&sortBy=createdAt&sortDirection=desc" \\
+    exampleRequest: `curl --get "https://your-domain.com/api/email-addresses" \\
   -H "X-API-Key: spin_..." \\
-  -H "X-Org-Id: org_abc123"`,
+  -H "X-Org-Id: org_abc123" \\
+  --data-urlencode "page=1" \\
+  --data-urlencode "pageSize=20" \\
+  --data-urlencode "sortBy=createdAt" \\
+  --data-urlencode "sortDirection=desc"`,
     exampleResponse: `{
   "items": [
     {
@@ -795,9 +801,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/email-addresses/recent-activity?limit=10" \\
+    exampleRequest: `curl --get "https://your-domain.com/api/email-addresses/recent-activity" \\
   -H "X-API-Key: spin_..." \\
-  -H "X-Org-Id: org_abc123"`,
+  -H "X-Org-Id: org_abc123" \\
+  --data-urlencode "limit=10"`,
     exampleResponse: `{
   "items": [
     {
@@ -1317,9 +1324,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The supplied address or addressId does not exist in the current organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/emails?addressId=addr_123&limit=20&order=desc" \\
+    exampleRequest: `curl --get "https://your-domain.com/api/emails" \\
   -H "X-API-Key: spin_..." \\
-  -H "X-Org-Id: org_abc123"`,
+  -H "X-Org-Id: org_abc123" \\
+  --data-urlencode "addressId=addr_123" \\
+  --data-urlencode "limit=20" \\
+  --data-urlencode "order=desc"`,
     exampleResponse: `{
   "address": "signup-test@spinupmail.dev",
   "addressId": "addr_123",
@@ -1471,9 +1481,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The requested email does not exist in the current organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/emails/mail_123?raw=1" \\
+    exampleRequest: `curl --get "https://your-domain.com/api/emails/mail_123" \\
   -H "X-API-Key: spin_..." \\
-  -H "X-Org-Id: org_abc123"`,
+  -H "X-Org-Id: org_abc123" \\
+  --data-urlencode "raw=1"`,
     exampleResponse: `{
   "id": "mail_123",
   "addressId": "addr_123",

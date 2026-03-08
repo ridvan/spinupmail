@@ -43,6 +43,9 @@ jobs:
       - name: Unit tests
         run: pnpm run test:unit
 
+      - name: Landing tests
+        run: pnpm run test:landing
+
       - name: Backend integration tests
         run: pnpm run test:integration
 

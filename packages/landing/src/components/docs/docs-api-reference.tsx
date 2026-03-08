@@ -1,5 +1,6 @@
-import { useState } from "react";
+import {  startTransition, useEffect, useState } from "react";
 import { getApiEndpointSpecById } from "./content/api-reference";
+import type {ReactNode} from "react";
 import type {
   ApiEndpointSpec,
   ApiErrorSpec,
@@ -47,6 +48,23 @@ function ApiMethodBadge({ method }: { method: ApiEndpointSpec["method"] }) {
   );
 }
 
+function ApiTableShell({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="docs-reference-table-wrap">
+      <div className="docs-reference-table-header">
+        <span>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ApiFieldTable({
   caption,
   fields,
@@ -59,9 +77,9 @@ function ApiFieldTable({
   if (fields.length === 0) return null;
 
   return (
-    <div className="docs-reference-table-wrap">
+    <ApiTableShell title={caption}>
       <table className="docs-reference-table">
-        <caption>{caption}</caption>
+        <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
             <th scope="col">Field</th>
@@ -101,15 +119,15 @@ function ApiFieldTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </ApiTableShell>
   );
 }
 
 function ApiHeaderTable({ spec }: { spec: ApiEndpointSpec }) {
   return (
-    <div className="docs-reference-table-wrap">
+    <ApiTableShell title="Request headers">
       <table className="docs-reference-table">
-        <caption>Request headers</caption>
+        <caption className="sr-only">Request headers</caption>
         <thead>
           <tr>
             <th scope="col">Header</th>
@@ -135,15 +153,15 @@ function ApiHeaderTable({ spec }: { spec: ApiEndpointSpec }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ApiTableShell>
   );
 }
 
 function ApiErrorTable({ errors }: { errors: Array<ApiErrorSpec> }) {
   return (
-    <div className="docs-reference-table-wrap">
+    <ApiTableShell title="Common error responses">
       <table className="docs-reference-table">
-        <caption>Common error responses</caption>
+        <caption className="sr-only">Common error responses</caption>
         <thead>
           <tr>
             <th scope="col">Status</th>
@@ -165,7 +183,7 @@ function ApiErrorTable({ errors }: { errors: Array<ApiErrorSpec> }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ApiTableShell>
   );
 }
 
@@ -179,6 +197,41 @@ function ApiCodePanel({
   title: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let cancelled = false;
+
+    const highlightCode = async () => {
+      try {
+        const { codeToHtml } = await import("shiki");
+        const html = await codeToHtml(code, {
+          lang: normalizeCodeLanguage(language),
+          theme: "github-dark-default",
+        });
+
+        if (cancelled) return;
+
+        startTransition(() => {
+          setHighlightedCode(html);
+        });
+      } catch {
+        if (cancelled) return;
+
+        startTransition(() => {
+          setHighlightedCode(null);
+        });
+      }
+    };
+
+    void highlightCode();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, language]);
 
   const onCopy = async () => {
     if (typeof window === "undefined") return;
@@ -219,11 +272,32 @@ function ApiCodePanel({
         </button>
       </div>
 
-      <pre className="docs-code-pre">
-        <code className="docs-code-plain">{code}</code>
-      </pre>
+      {highlightedCode ? (
+        <div
+          className="docs-code-pre docs-code-rendered"
+          dangerouslySetInnerHTML={{ __html: highlightedCode }}
+        />
+      ) : (
+        <pre className="docs-code-pre">
+          <code className="docs-code-plain">{code}</code>
+        </pre>
+      )}
     </div>
   );
+}
+
+function normalizeCodeLanguage(language: string) {
+  const normalizedLanguage = language.toLowerCase();
+
+  switch (normalizedLanguage) {
+    case "shell":
+    case "sh":
+      return "bash";
+    case "plaintext":
+      return "text";
+    default:
+      return normalizedLanguage;
+  }
 }
 
 export function ApiEndpointReference({ specId }: { specId: string }) {
@@ -243,9 +317,11 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
         className="docs-api-summary-card"
         aria-label={`${spec.method} ${spec.path}`}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <ApiMethodBadge method={spec.method} />
-          <code className="text-[15px] text-foreground">{spec.path}</code>
+        <div className="docs-api-summary-header">
+          <div className="flex flex-wrap items-center gap-2">
+            <ApiMethodBadge method={spec.method} />
+            <code className="text-[15px] text-foreground">{spec.path}</code>
+          </div>
         </div>
 
         <p className="mt-3 text-[15px] leading-7 text-foreground/88">
@@ -253,14 +329,16 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
         </p>
 
         <dl className="docs-api-summary-grid">
-          <div>
+          <div className="docs-api-summary-item">
             <dt>Auth</dt>
             <dd>{spec.auth.summary}</dd>
           </div>
-          <div>
+          <div className="docs-api-summary-item docs-api-summary-item-success">
             <dt>Success</dt>
             <dd>
-              <code>{spec.successStatus}</code>
+              <span className="docs-api-status-badge">
+                <code>{spec.successStatus}</code>
+              </span>
             </dd>
           </div>
         </dl>
@@ -276,20 +354,17 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
 
       <div className="space-y-8">
         <section>
-          <h3>Headers</h3>
           <ApiHeaderTable spec={spec} />
         </section>
 
         {spec.pathParams?.length ? (
           <section>
-            <h3>Path parameters</h3>
             <ApiFieldTable caption="Path parameters" fields={spec.pathParams} />
           </section>
         ) : null}
 
         {spec.queryParams?.length ? (
           <section>
-            <h3>Query parameters</h3>
             <ApiFieldTable
               caption="Query parameters"
               fields={spec.queryParams}
@@ -299,25 +374,19 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
 
         {spec.bodyFields?.length ? (
           <section>
-            <h3>Request body</h3>
-            <ApiFieldTable
-              caption="Request body fields"
-              fields={spec.bodyFields}
-            />
+            <ApiFieldTable caption="Request body" fields={spec.bodyFields} />
           </section>
         ) : null}
 
         <section>
-          <h3>Success response</h3>
           <ApiFieldTable
-            caption="Successful response fields"
+            caption="Success response"
             fields={spec.responseFields}
             showRequirement={false}
           />
         </section>
 
         <section>
-          <h3>Common errors</h3>
           <ApiErrorTable errors={spec.errors} />
         </section>
 
