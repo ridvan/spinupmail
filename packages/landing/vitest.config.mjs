@@ -56,8 +56,8 @@ const mdxPlugin = mdx({
           inline: "text",
         },
         theme: {
-          dark: "one-dark-pro",
-          light: "github-light",
+          dark: "tokyo-night",
+          light: "github-light-default",
         },
         tokensMap: {
           env: "dotenv",
