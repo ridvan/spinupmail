@@ -58,7 +58,7 @@ function ApiTableShell({
   return (
     <div className="docs-reference-table-wrap">
       <div className="docs-reference-table-header">
-        <span>{title}</span>
+        <h3>{title}</h3>
       </div>
       {children}
     </div>
