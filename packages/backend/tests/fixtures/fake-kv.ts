@@ -30,4 +30,8 @@ export class FakeKvNamespace {
 
     this.store.set(key, { value, expiresAtMs });
   }
+
+  async delete(key: string): Promise<void> {
+    this.store.delete(key);
+  }
 }
