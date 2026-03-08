@@ -24,7 +24,7 @@ const overviewDocument: SearchDocument = {
   slug: "overview",
   href: "/docs",
   title: "Spinupmail Documentation",
-  body: "Get started with setup, configuration, API usage, operations, and security guidance for Spinupmail.",
+  body: "Get started with setup, API reference, configuration, operations, and security guidance for Spinupmail.",
   code: "",
   keywords: ["docs", "overview", "spinupmail", "setup"],
 };

@@ -30,8 +30,30 @@ describe("docs routes", () => {
   });
 
   it("renders /docs/:slug pages", () => {
-    render(<DocsSlugPageContent slug="quickstart" />);
-    expect(screen.getByRole("heading", { name: "Quickstart" })).toBeTruthy();
+    render(<DocsSlugPageContent slug="api-overview" />);
+    expect(screen.getByRole("heading", { name: "API Overview" })).toBeTruthy();
+  });
+
+  it("renders the API reference content users need", () => {
+    render(<DocsSlugPageContent slug="api-email-addresses" />);
+
+    expect(screen.getAllByText("allowedFromDomains").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("maxReceivedEmailCount").length).toBeGreaterThan(
+      0
+    );
+    expect(
+      screen.getAllByText("maxReceivedEmailAction").length
+    ).toBeGreaterThan(0);
+
+    render(<DocsSlugPageContent slug="api-organizations" />);
+    expect(
+      screen.getAllByText("x-org-id header is required for api key usage")
+        .length
+    ).toBeGreaterThan(0);
+
+    render(<DocsSlugPageContent slug="api-emails" />);
+    expect(screen.getByText("address or addressId is required")).toBeTruthy();
+    expect(screen.getByText("raw source not available")).toBeTruthy();
   });
 
   it("renders not found content for unknown slugs", () => {

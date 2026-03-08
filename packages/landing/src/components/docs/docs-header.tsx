@@ -76,10 +76,10 @@ export function DocsHeader({
               </Link>
               <Link
                 to="/docs/$slug"
-                params={{ slug: "email-addresses" }}
+                params={{ slug: "api-overview" }}
                 className={cn(
                   "flex h-14 items-center border-r border-border/60 px-5 text-[12px] transition-colors",
-                  currentSlug === "email-addresses" || currentSlug === "emails"
+                  currentSlug?.startsWith("api-")
                     ? "bg-card/40 text-foreground"
                     : "text-muted-foreground hover:bg-card/25 hover:text-foreground"
                 )}

@@ -96,7 +96,7 @@ export function DocsLayout({
         </div>
       ) : null}
 
-      <div className="docs-layout-grid pt-14 lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] 2xl:grid-cols-[18rem_minmax(0,1fr)_19.5rem]">
+      <div className="docs-layout-grid pt-14 lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_15rem] 2xl:grid-cols-[18rem_minmax(0,1fr)_19.5rem]">
         <div className="hidden lg:block">
           <div className="docs-left-pane sticky top-14 h-[calc(100vh-56px)] border-r border-border/60 bg-background">
             <DocsSidebar
@@ -108,7 +108,7 @@ export function DocsLayout({
 
         <main className="docs-main-pane min-w-0 bg-background">{children}</main>
 
-        <div className="hidden 2xl:block">
+        <div className="hidden xl:block">
           <div className="docs-right-pane sticky top-14 h-[calc(100vh-56px)] overflow-y-auto bg-background">
             <DocsToc headings={headings} />
           </div>

@@ -56,7 +56,7 @@ export function Footer() {
           {isInternalApiDocs ? (
             <Link
               to="/docs/$slug"
-              params={{ slug: "email-addresses" }}
+              params={{ slug: "api-overview" }}
               className="text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               API Usage

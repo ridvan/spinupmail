@@ -7,10 +7,10 @@ describe("docs-search-index", () => {
     const docs = buildSearchDocuments(docPages);
 
     const hasPageDoc = docs.some(
-      document => document.id === "quickstart::page"
+      document => document.id === "api-overview::page"
     );
     const hasSectionDoc = docs.some(
-      document => document.id === "emails::downloads"
+      document => document.id === "api-emails::download-attachment"
     );
 
     expect(hasPageDoc).toBe(true);
@@ -18,16 +18,18 @@ describe("docs-search-index", () => {
   });
 
   it("ranks title matches above body-only matches", () => {
-    const results = searchDocs("quickstart");
+    const results = searchDocs("api overview");
 
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0]?.document.title).toBe("Quickstart");
+    expect(results[0]?.document.title).toBe("API Overview");
   });
 
   it("searches code snippets and env vars", () => {
-    const results = searchDocs("BETTER_AUTH_BASE_URL");
+    const results = searchDocs("allowedFromDomains");
     expect(
-      results.some(result => result.document.href.includes("auth-secrets"))
+      results.some(result =>
+        result.document.href.includes("api-email-addresses")
+      )
     ).toBe(true);
   });
 });

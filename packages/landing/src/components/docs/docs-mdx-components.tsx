@@ -1,6 +1,7 @@
 import { isValidElement, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { DocsCallout } from "./docs-callout";
+import { ApiEndpointReference } from "./docs-api-reference";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -263,6 +264,16 @@ export const docsMdxComponents = {
     />
   ),
   li: (props: ComponentProps<"li">) => <li {...props} />,
+  table: (props: ComponentProps<"table">) => (
+    <div className="docs-reference-table-wrap">
+      <table className="docs-reference-table" {...props} />
+    </div>
+  ),
+  thead: (props: ComponentProps<"thead">) => <thead {...props} />,
+  tbody: (props: ComponentProps<"tbody">) => <tbody {...props} />,
+  tr: (props: ComponentProps<"tr">) => <tr {...props} />,
+  th: (props: ComponentProps<"th">) => <th {...props} />,
+  td: (props: ComponentProps<"td">) => <td {...props} />,
   figure: (props: ComponentProps<"figure">) => (
     <figure className="my-6" {...props} />
   ),
@@ -271,4 +282,5 @@ export const docsMdxComponents = {
   code: DocsInlineCode,
   Callout: DocsCallout,
   Endpoint: DocsEndpoint,
+  ApiEndpointReference,
 };

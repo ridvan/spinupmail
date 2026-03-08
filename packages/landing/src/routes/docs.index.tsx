@@ -17,8 +17,9 @@ export function DocsIndexPage() {
           Spinupmail Documentation
         </h1>
         <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
-          Deployment, API, and operations guidance for running disposable email
-          workflows on Cloudflare with organization-safe access controls.
+          API reference, deployment guidance, and operational details for
+          running disposable email workflows on Cloudflare with
+          organization-safe access controls.
         </p>
       </header>
 

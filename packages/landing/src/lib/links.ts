@@ -17,7 +17,7 @@ export const landingLinks = {
   github,
   docs,
   app,
-  apiDocs: `${docs.replace(/\/$/, "")}/email-addresses`,
+  apiDocs: `${docs.replace(/\/$/, "")}/api-overview`,
   deployBackend: `${docs.replace(/\/$/, "")}/deploy-routing`,
   deployFrontend: `${docs.replace(/\/$/, "")}/deploy-routing`,
 } as const;

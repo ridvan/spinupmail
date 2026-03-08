@@ -8,16 +8,22 @@ export const docsNavGroups: Array<DocNavGroup> = [
     slugs: ["quickstart"],
   },
   {
+    id: "api-reference",
+    title: "API Reference",
+    description: "Authentication model and exhaustive endpoint contracts.",
+    slugs: [
+      "api-overview",
+      "api-domains",
+      "api-organizations",
+      "api-email-addresses",
+      "api-emails",
+    ],
+  },
+  {
     id: "configuration",
     title: "Configuration",
     description: "Cloudflare, auth, and deploy setup.",
     slugs: ["cloudflare-resources", "auth-secrets", "deploy-routing"],
-  },
-  {
-    id: "api-data",
-    title: "API and Data",
-    description: "Core API usage and org scoping.",
-    slugs: ["organizations-scope", "email-addresses", "emails"],
   },
   {
     id: "operations",

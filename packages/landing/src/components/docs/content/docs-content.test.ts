@@ -5,12 +5,14 @@ describe("docs-content", () => {
   it("contains all required documentation slugs", () => {
     const requiredSlugs = [
       "quickstart",
+      "api-overview",
+      "api-domains",
+      "api-organizations",
+      "api-email-addresses",
+      "api-emails",
       "cloudflare-resources",
       "auth-secrets",
       "deploy-routing",
-      "organizations-scope",
-      "email-addresses",
-      "emails",
       "inbound-pipeline",
       "multi-domain",
       "local-development",
@@ -29,18 +31,16 @@ describe("docs-content", () => {
   });
 
   it("builds TOC headings from section and subsection metadata", () => {
-    const page = getDocPageBySlug("quickstart");
+    const page = getDocPageBySlug("api-email-addresses");
     expect(page).toBeDefined();
 
     const toc = buildDocToc(page!);
 
     expect(toc.length).toBeGreaterThan(0);
     expect(
-      toc.some(heading => heading.level === 2 && heading.id === "prerequisites")
-    ).toBe(true);
-    expect(
       toc.some(
-        heading => heading.level === 3 && heading.id === "first-api-check"
+        heading =>
+          heading.level === 2 && heading.id === "create-an-email-address"
       )
     ).toBe(true);
   });

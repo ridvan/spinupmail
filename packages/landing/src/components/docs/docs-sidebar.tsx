@@ -7,6 +7,7 @@ import {
   ArrowDown01Icon,
   ArrowUp01Icon,
   ArrowUpRight01Icon,
+  BookOpen01Icon,
   ComputerIcon,
   DatabaseIcon,
   LayoutIcon,
@@ -31,18 +32,20 @@ type DocsSidebarProps = {
 
 const groupIconById = {
   "get-started": Rocket01Icon,
+  "api-reference": DatabaseIcon,
   configuration: ShieldIcon,
-  "api-data": DatabaseIcon,
   operations: Mail01Icon,
 } as const;
 
 const pageIconBySlug = {
   quickstart: Rocket01Icon,
+  "api-overview": BookOpen01Icon,
+  "api-domains": DatabaseIcon,
+  "api-organizations": UserMultiple02Icon,
+  "api-email-addresses": AddressBookIcon,
+  "api-emails": Mailbox01Icon,
   "auth-secrets": ShieldIcon,
   "deploy-routing": ArrowUpRight01Icon,
-  "organizations-scope": UserMultiple02Icon,
-  "email-addresses": AddressBookIcon,
-  emails: Mailbox01Icon,
   "inbound-pipeline": Mail01Icon,
   "multi-domain": LayoutIcon,
   "local-development": ComputerIcon,

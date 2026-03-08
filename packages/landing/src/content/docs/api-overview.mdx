@@ -1,0 +1,74 @@
+---
+title: API Overview
+description: Authentication, org scope, base URL conventions, and health checks for the Spinupmail product API.
+summary: Start here before using the endpoint reference pages.
+groupId: api-reference
+keywords:
+  - api overview
+  - x-org-id
+  - api key
+  - session cookie
+  - health
+---
+
+Spinupmail exposes a product API under `/api/*` for domain discovery, organization metrics, inbox lifecycle operations, and message retrieval. This reference documents that integration-facing surface only. Generic Better Auth routes under `/api/auth/*` are intentionally not expanded here.
+
+## Base URL and authentication
+
+Use your deployed Worker route as the API base URL, for example `https://your-domain.com/api`.
+
+Product endpoints accept either of these auth modes:
+
+- A Better Auth session cookie for browser-based requests
+- An API key sent in `X-API-Key` for automation and test tooling
+
+<Callout tone="info" title="Email verification still matters">
+  Protected product endpoints reject authenticated users whose email is not
+  verified.
+</Callout>
+
+## Organization scope rules
+
+Mailbox and inbox-management endpoints are organization-scoped.
+
+- Session-cookie requests can use the active organization stored on the session
+- Session-cookie requests can also pass `X-Org-Id` explicitly to target another organization the user belongs to
+- API key requests must pass `X-Org-Id` on org-scoped endpoints
+
+When that header is missing for an API key request, the API returns the exact error string `x-org-id header is required for api key usage`.
+
+## Response and error conventions
+
+- JSON endpoints return regular JSON bodies and use explicit `error` strings for failure cases
+- Download endpoints such as raw MIME and attachments stream file content instead of JSON on success
+- Validation and scope failures return concrete messages; do not assume all `4xx` responses share the same shape or wording
+- Use the endpoint pages for field-by-field request and response details, including limits and enum values
+
+Key reference pages:
+
+- [Configured domains](/docs/api-domains)
+- [Organization stats](/docs/api-organizations)
+- [Email addresses](/docs/api-email-addresses)
+- [Emails](/docs/api-emails)
+
+## Health check
+
+Use `GET /health` for a lightweight deployment health probe.
+
+<Endpoint method="GET" path="/health">
+  Returns an operational status payload with a current timestamp. This route is
+  useful for uptime checks and deployment verification, not mailbox workflows.
+</Endpoint>
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-08T09:12:30.000Z"
+}
+```
+
+## Auth endpoints outside this reference
+
+Spinupmail uses Better Auth for sign-in, sign-up, sessions, password reset, Google OAuth, API keys, organizations, and two-factor flows.
+
+This docs section does **not** try to enumerate the generated `/api/auth/*` surface. The only API documented here is the product API that external users and automation scripts call directly after authentication is already in place.

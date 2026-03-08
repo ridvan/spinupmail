@@ -271,6 +271,11 @@
     padding: 0;
   }
 
+  .docs-code-shell > .docs-code-pre code.docs-code-plain {
+    padding: 1rem;
+    white-space: pre;
+  }
+
   .docs-code-shell > .docs-code-pre code [data-line] {
     display: block;
     padding-inline: 1rem;
@@ -327,6 +332,110 @@
 
   .docs-callout {
     box-shadow: inset 0 0 0 1px color-mix(in oklab, white 8%, transparent);
+  }
+
+  .docs-reference-table-wrap {
+    overflow-x: auto;
+    border: 1px solid color-mix(in oklab, white 12%, transparent);
+    background: color-mix(in oklab, var(--color-card) 82%, transparent);
+  }
+
+  .docs-reference-table {
+    width: 100%;
+    min-width: 42rem;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .docs-reference-table caption {
+    padding: 0.9rem 1rem 0;
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, white 55%, transparent);
+  }
+
+  .docs-reference-table th,
+  .docs-reference-table td {
+    border-top: 1px solid color-mix(in oklab, white 10%, transparent);
+    padding: 0.85rem 1rem;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  .docs-reference-table thead th {
+    background: color-mix(in oklab, white 4%, transparent);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, white 74%, transparent);
+  }
+
+  .docs-reference-table tbody th {
+    min-width: 11rem;
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  .docs-reference-table td p {
+    margin: 0;
+  }
+
+  .docs-reference-table td p + p {
+    margin-top: 0.5rem;
+  }
+
+  .docs-api-section {
+    margin-top: 1rem;
+  }
+
+  .docs-api-summary-card {
+    border: 1px solid color-mix(in oklab, white 12%, transparent);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, white 4%, transparent),
+        transparent 100%
+      ),
+      color-mix(in oklab, var(--color-card) 78%, transparent);
+    padding: 1rem;
+  }
+
+  .docs-api-summary-grid {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .docs-api-summary-grid dt {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, white 55%, transparent);
+  }
+
+  .docs-api-summary-grid dd {
+    margin-top: 0.35rem;
+    color: color-mix(in oklab, white 88%, transparent);
+  }
+
+  .docs-api-note-list {
+    margin-top: 1rem;
+    padding-left: 1.15rem;
+    font-size: 14px;
+    line-height: 1.75;
+    color: color-mix(in oklab, white 78%, transparent);
+  }
+
+  .docs-api-note-list li + li {
+    margin-top: 0.35rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .docs-api-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

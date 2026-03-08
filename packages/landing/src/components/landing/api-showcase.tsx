@@ -290,7 +290,7 @@ export function ApiShowcase() {
   const apiDocsRender = landingLinks.apiDocs.startsWith("http") ? (
     <a href={landingLinks.apiDocs} target="_blank" rel="noreferrer" />
   ) : (
-    <Link to="/docs/$slug" params={{ slug: "email-addresses" }} />
+    <Link to="/docs/$slug" params={{ slug: "api-overview" }} />
   );
 
   const activeExample =
