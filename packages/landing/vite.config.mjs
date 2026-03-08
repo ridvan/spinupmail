@@ -14,6 +14,7 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import rehypeSlug from "rehype-slug";
 import tailwindcss from "@tailwindcss/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { getDocsHighlighter } from "./shiki-docs.mjs";
 
 const DOCS_DIR = join(fileURLToPath(import.meta.url), "../src/content/docs");
 
@@ -56,12 +57,21 @@ const mdxPlugin = mdx({
       {
         keepBackground: false,
         defaultLang: {
-          block: "txt",
-          inline: "txt",
+          block: "text",
+          inline: "text",
         },
         theme: {
-          dark: "one-dark-pro",
-          light: "github-light",
+          dark: "tokyo-night",
+          light: "github-light-default",
+        },
+        tokensMap: {
+          env: "dotenv",
+          sh: "bash",
+          shell: "bash",
+        },
+        getHighlighter: () => getDocsHighlighter(),
+        filterMetaString(str) {
+          return str;
         },
         onVisitLine(/** @type {{ children: Array<unknown> }} */ node) {
           if (node.children.length === 0) {

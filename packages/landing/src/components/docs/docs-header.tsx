@@ -33,7 +33,7 @@ export function DocsHeader({
               className="hidden size-7 object-contain dark:block"
             />
             <span className="text-sm font-semibold">SpinupMail</span>
-            <span className="ml-1.5 border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="px-1.5 mt-px text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
               Docs
             </span>
           </Link>

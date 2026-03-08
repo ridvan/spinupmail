@@ -285,7 +285,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The Worker has no EMAIL_DOMAIN or EMAIL_DOMAINS value configured.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/domains" \\
+    exampleRequest: `curl "https://api.spinupmail.com/api/domains" \\
   -H "X-API-Key: spin_..."`,
     exampleResponse: `{
   "items": ["spinupmail.dev", "qa.spinupmail.dev"],
@@ -343,7 +343,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated user has not verified their email address.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/organizations/stats" \\
+    exampleRequest: `curl "https://api.spinupmail.com/api/organizations/stats" \\
   -H "X-API-Key: spin_..."`,
     exampleResponse: `{
   "items": [
@@ -440,7 +440,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl --get "https://your-domain.com/api/organizations/stats/email-activity" \\
+    exampleRequest: `curl --get "https://api.spinupmail.com/api/organizations/stats/email-activity" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --data-urlencode "days=7" \\
@@ -559,7 +559,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl "https://your-domain.com/api/organizations/stats/email-summary" \\
+    exampleRequest: `curl "https://api.spinupmail.com/api/organizations/stats/email-summary" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123"`,
     exampleResponse: `{
@@ -689,7 +689,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl --get "https://your-domain.com/api/email-addresses" \\
+    exampleRequest: `curl --get "https://api.spinupmail.com/api/email-addresses" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --data-urlencode "page=1" \\
@@ -801,7 +801,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The authenticated principal does not belong to the requested organization.",
       },
     ],
-    exampleRequest: `curl --get "https://your-domain.com/api/email-addresses/recent-activity" \\
+    exampleRequest: `curl --get "https://api.spinupmail.com/api/email-addresses/recent-activity" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --data-urlencode "limit=10"`,
@@ -976,7 +976,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The organization has reached MAX_ADDRESSES_PER_ORGANIZATION.",
       },
     ],
-    exampleRequest: `curl -X POST "https://your-domain.com/api/email-addresses" \\
+    exampleRequest: `curl -X POST "https://api.spinupmail.com/api/email-addresses" \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
@@ -1142,7 +1142,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The requested rename would collide with another existing address.",
       },
     ],
-    exampleRequest: `curl -X PATCH "https://your-domain.com/api/email-addresses/addr_123" \\
+    exampleRequest: `curl -X PATCH "https://api.spinupmail.com/api/email-addresses/addr_123" \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
@@ -1223,7 +1223,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The database record exists but R2 cleanup fails before deletion completes.",
       },
     ],
-    exampleRequest: `curl -X DELETE "https://your-domain.com/api/email-addresses/addr_123" \\
+    exampleRequest: `curl -X DELETE "https://api.spinupmail.com/api/email-addresses/addr_123" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123"`,
     exampleResponse: `{
@@ -1324,7 +1324,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The supplied address or addressId does not exist in the current organization.",
       },
     ],
-    exampleRequest: `curl --get "https://your-domain.com/api/emails" \\
+    exampleRequest: `curl --get "https://api.spinupmail.com/api/emails" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --data-urlencode "addressId=addr_123" \\
@@ -1481,7 +1481,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The requested email does not exist in the current organization.",
       },
     ],
-    exampleRequest: `curl --get "https://your-domain.com/api/emails/mail_123" \\
+    exampleRequest: `curl --get "https://api.spinupmail.com/api/emails/mail_123" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --data-urlencode "raw=1"`,
@@ -1569,7 +1569,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The email exists but no raw MIME source is available from D1 or R2.",
       },
     ],
-    exampleRequest: `curl -L "https://your-domain.com/api/emails/mail_123/raw" \\
+    exampleRequest: `curl -L "https://api.spinupmail.com/api/emails/mail_123/raw" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --output mail_123.eml`,
@@ -1643,7 +1643,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "Attachment metadata exists but the R2 object cannot be found.",
       },
     ],
-    exampleRequest: `curl -L "https://your-domain.com/api/emails/mail_123/attachments/att_987" \\
+    exampleRequest: `curl -L "https://api.spinupmail.com/api/emails/mail_123/attachments/att_987" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123" \\
   --output receipt.pdf`,
@@ -1692,7 +1692,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "The email exists but R2 cleanup fails before deletion completes.",
       },
     ],
-    exampleRequest: `curl -X DELETE "https://your-domain.com/api/emails/mail_123" \\
+    exampleRequest: `curl -X DELETE "https://api.spinupmail.com/api/emails/mail_123" \\
   -H "X-API-Key: spin_..." \\
   -H "X-Org-Id: org_abc123"`,
     exampleResponse: `{

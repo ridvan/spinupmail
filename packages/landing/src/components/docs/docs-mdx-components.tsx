@@ -2,6 +2,7 @@ import { isValidElement, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { DocsCallout } from "./docs-callout";
 import { ApiEndpointReference } from "./docs-api-reference";
+import { formatCodeLanguageLabel, inferMdxCodeTitle } from "./docs-code-meta";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ function DocsEndpoint({ method, path, children }: EndpointProps) {
         >
           {method}
         </span>
-        <code className="text-[15px] text-foreground">{path}</code>
+        <code className="font-mono text-[15px] text-foreground">{path}</code>
       </div>
       {children ? (
         <div className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
@@ -62,31 +63,13 @@ function flattenNodeText(node: unknown): string {
   return "";
 }
 
-function inferSnippetTitle(language: string): string {
-  const extensionByLanguage: Record<string, string> = {
-    ts: "ts",
-    tsx: "tsx",
-    js: "js",
-    jsx: "jsx",
-    json: "json",
-    bash: "sh",
-    shell: "sh",
-    sh: "sh",
-    yaml: "yml",
-    yml: "yml",
-    toml: "toml",
-  };
-
-  const extension = extensionByLanguage[language] ?? language;
-  return `snippet.${extension}`;
-}
-
 function DocsMdxPre({ className, children, ...props }: ComponentProps<"pre">) {
   const [copied, setCopied] = useState(false);
   const attrs = props as Record<string, unknown>;
   const language = String(attrs["data-language"] ?? "text");
-  const snippetTitle = inferSnippetTitle(language);
   const rawCode = flattenNodeText(children).replace(/\n$/, "");
+  const snippetTitle = inferMdxCodeTitle(language, rawCode);
+  const languageLabel = formatCodeLanguageLabel(language);
 
   const handleCopy = async () => {
     if (typeof window === "undefined" || !rawCode) {
@@ -106,9 +89,7 @@ function DocsMdxPre({ className, children, ...props }: ComponentProps<"pre">) {
     <div className="docs-code-shell">
       <div className="docs-code-toolbar">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="docs-code-language-badge">
-            {language.slice(0, 2)}
-          </span>
+          <span className="docs-code-language-badge">{languageLabel}</span>
           <span className="docs-code-title">{snippetTitle}</span>
         </div>
 

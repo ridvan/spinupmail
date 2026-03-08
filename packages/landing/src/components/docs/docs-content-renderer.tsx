@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Copy01Icon } from "@hugeicons/core-free-icons";
 import { getAdjacentDocPages } from "./content/docs-content";
+import { expandApiEndpointReferencesInMarkdown } from "./content/api-reference-markdown";
 import { docsMdxComponents } from "./docs-mdx-components";
 import type { ComponentType } from "react";
 import type { DocPage } from "./content/docs-content";
@@ -19,7 +20,12 @@ export function DocsContentRenderer({ page }: { page: DocPage }) {
 
   const onCopyMarkdown = async () => {
     try {
-      const md = page.markdown;
+      const body = expandApiEndpointReferencesInMarkdown(page.markdown).trim();
+      const md = [
+        `# SpinupMail Docs: ${page.title}`,
+        page.description,
+        body,
+      ].join("\n\n");
       await navigator.clipboard.writeText(md);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);

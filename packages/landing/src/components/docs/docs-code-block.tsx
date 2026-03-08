@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCodeLanguageLabel } from "./docs-code-meta";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,8 @@ export function DocsCodeBlock({
   renderedCode?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
+  const languageLabel = formatCodeLanguageLabel(code.language);
+  const title = code.title || `${languageLabel} example`;
 
   const handleCopy = async () => {
     try {
@@ -37,10 +40,8 @@ export function DocsCodeBlock({
     <figure className="docs-code-block docs-code-shell relative overflow-hidden rounded-2xl">
       <figcaption className="docs-code-toolbar">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="docs-code-language-badge">
-            {code.language.slice(0, 2)}
-          </span>
-          <span className="docs-code-title">{code.title}</span>
+          <span className="docs-code-language-badge">{languageLabel}</span>
+          <span className="docs-code-title">{title}</span>
         </div>
 
         <button
@@ -50,7 +51,7 @@ export function DocsCodeBlock({
             copied && "docs-code-copy-button-copied"
           )}
           onClick={handleCopy}
-          aria-label={`Copy ${code.title} snippet`}
+          aria-label={`Copy ${title} snippet`}
         >
           {copied ? "Copied" : "Copy"}
         </button>

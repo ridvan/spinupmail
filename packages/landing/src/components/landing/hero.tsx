@@ -134,7 +134,7 @@ export function Hero() {
   return (
     <section
       id="overview"
-      className="relative overflow-hidden border-b border-border/60 pb-18 pt-32 md:pb-24 lg:pt-24"
+      className="relative overflow-hidden border-b border-border/60 pb-18 pt-20 sm:pt-24 md:pb-24 lg:pt-24"
     >
       <div
         className="pointer-events-none absolute inset-0"

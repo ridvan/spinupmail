@@ -52,7 +52,7 @@ export function ThemeSelector({
               chromeless
                 ? "border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent dark:hover:bg-transparent"
                 : mobile
-                  ? "size-8 rounded-full p-0"
+                  ? "size-8 p-0"
                   : "aspect-square px-0"
             )}
             aria-label="Theme options"

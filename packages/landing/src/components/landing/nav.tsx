@@ -1,11 +1,17 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { BookOpen01Icon } from "@hugeicons/core-free-icons";
+import { BookOpen01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ChevronRightIconHandle } from "@/components/ui/chevron-right";
 import { ChevronRightIcon } from "@/components/ui/chevron-right";
 import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { landingLinks } from "@/lib/links";
 
 const sections = [
@@ -27,6 +33,50 @@ const stopArrowAnimation = (arrowRef: {
 }) => {
   arrowRef.current?.stopAnimation();
 };
+
+function MobileSectionMenu({
+  activeSection,
+  onSelect,
+  mobile = false,
+}: {
+  activeSection: string;
+  onSelect: (sectionHref: string) => void;
+  mobile?: boolean;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className={mobile ? "size-8 p-0" : "aspect-square px-0"}
+            aria-label="Open section menu"
+          />
+        }
+      >
+        <HugeiconsIcon icon={Menu01Icon} className="size-4" strokeWidth={1.8} />
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-36 min-w-36">
+        {sections.map(section => (
+          <DropdownMenuItem
+            key={`section-menu-${section.href}`}
+            render={<a href={section.href} />}
+            onClick={() => onSelect(section.href)}
+            className={
+              activeSection === section.href
+                ? "font-semibold text-foreground"
+                : "text-muted-foreground"
+            }
+          >
+            {section.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Nav() {
   const [activeSection, setActiveSection] = useState<string>(sections[0].href);
@@ -88,7 +138,7 @@ export function Nav() {
           <div className="flex h-12 items-center justify-between gap-2 px-2.5 sm:h-14 sm:gap-3 sm:px-4">
             <a
               href="/"
-              className="group inline-flex min-w-0 items-center gap-1.5 px-1 py-1"
+              className="group inline-flex min-w-0 items-center gap-1 px-1 py-1"
             >
               <img
                 src="/logo-black.png"
@@ -100,10 +150,12 @@ export function Nav() {
                 alt="Spinupmail logo"
                 className="hidden size-6 object-contain dark:block sm:size-7"
               />
-              <span className="truncate text-sm font-semibold">SpinupMail</span>
+              <span className="landing-logo-wordmark truncate text-sm font-semibold">
+                SpinupMail
+              </span>
             </a>
 
-            <nav className="hidden items-center gap-1 lg:flex">
+            <nav className="hidden items-center gap-1 min-[900px]:flex">
               {sections.map(section => (
                 <a
                   key={section.href}
@@ -114,8 +166,8 @@ export function Nav() {
                   }
                   className={
                     activeSection === section.href
-                      ? "rounded-lg px-3 py-1.5 text-[13px] text-foreground/95 transition-colors"
-                      : "rounded-lg px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+                      ? "px-3 py-1.5 text-[13px] text-foreground/95 transition-colors"
+                      : "px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
                   }
                 >
                   {section.label}
@@ -124,13 +176,20 @@ export function Nav() {
             </nav>
 
             <div className="hidden items-center gap-1.5 sm:flex">
+              <div className="min-[900px]:hidden">
+                <MobileSectionMenu
+                  activeSection={activeSection}
+                  onSelect={setActiveSection}
+                />
+              </div>
+
               <ThemeSelector />
 
               <Button
                 variant="outline"
                 size="sm"
                 nativeButton={false}
-                className="px-3 max-lg:hidden"
+                className="px-3"
                 render={<Link to="/docs" />}
               >
                 <HugeiconsIcon
@@ -164,13 +223,19 @@ export function Nav() {
             </div>
 
             <div className="flex items-center gap-1 sm:hidden">
+              <MobileSectionMenu
+                activeSection={activeSection}
+                onSelect={setActiveSection}
+                mobile
+              />
+
               <ThemeSelector mobile />
 
               <Button
                 variant="outline"
                 size="sm"
                 nativeButton={false}
-                className="h-8 rounded-full px-2.5 text-[12px]"
+                className="h-8 px-2.5 text-[12px]"
                 render={<Link to="/docs" />}
               >
                 Docs
@@ -179,7 +244,7 @@ export function Nav() {
               <Button
                 size="sm"
                 nativeButton={false}
-                className="h-8 rounded-full px-3 text-[12px]"
+                className="h-8 px-3 text-[12px]"
                 onMouseEnter={() => startArrowAnimation(mobileAppArrowRef)}
                 onMouseLeave={() => stopArrowAnimation(mobileAppArrowRef)}
                 onFocus={() => startArrowAnimation(mobileAppArrowRef)}
@@ -197,28 +262,6 @@ export function Nav() {
                 />
               </Button>
             </div>
-          </div>
-
-          <div className="border-t border-border/60 px-2 py-1.5 lg:hidden">
-            <nav className="flex flex-wrap items-center justify-center gap-1">
-              {sections.map(section => (
-                <a
-                  key={`mobile-${section.href}`}
-                  href={section.href}
-                  onClick={() => setActiveSection(section.href)}
-                  aria-current={
-                    activeSection === section.href ? "page" : undefined
-                  }
-                  className={
-                    activeSection === section.href
-                      ? "shrink-0 rounded-full border border-border/90 bg-card/75 px-2.5 py-1 text-[10px] font-medium text-foreground/95 transition-colors"
-                      : "shrink-0 rounded-full border border-border/70 bg-card/60 px-2.5 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-                  }
-                >
-                  {section.label}
-                </a>
-              ))}
-            </nav>
           </div>
         </div>
       </div>

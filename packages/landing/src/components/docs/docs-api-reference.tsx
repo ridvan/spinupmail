@@ -1,11 +1,17 @@
 import { startTransition, useEffect, useState } from "react";
 import { getApiEndpointSpecById } from "./content/api-reference";
+import { formatCodeLanguageLabel } from "./docs-code-meta";
 import type { ReactNode } from "react";
 import type {
   ApiEndpointSpec,
   ApiErrorSpec,
   ApiFieldSpec,
 } from "./content/api-reference";
+import {
+  getDocsHighlighter,
+  getDocsTheme,
+  normalizeDocsLanguage,
+} from "@/lib/docs-shiki";
 import { cn } from "@/lib/utils";
 
 const requirementTone: Record<string, string> = {
@@ -199,6 +205,7 @@ function ApiCodePanel({
   const [copied, setCopied] = useState(false);
   const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(true);
+  const languageLabel = formatCodeLanguageLabel(language);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -228,10 +235,10 @@ function ApiCodePanel({
 
     const highlightCode = async () => {
       try {
-        const { codeToHtml } = await import("shiki");
-        const html = await codeToHtml(code, {
-          lang: normalizeCodeLanguage(language),
-          theme: isDark ? "github-dark-default" : "github-light",
+        const highlighter = await getDocsHighlighter();
+        const html = highlighter.codeToHtml(code, {
+          lang: normalizeDocsLanguage(language),
+          theme: getDocsTheme(isDark),
         });
 
         if (cancelled) return;
@@ -271,9 +278,7 @@ function ApiCodePanel({
     <div className="docs-code-shell">
       <div className="docs-code-toolbar">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="docs-code-language-badge">
-            {language.slice(0, 2)}
-          </span>
+          <span className="docs-code-language-badge">{languageLabel}</span>
           <span className="docs-code-title">{title}</span>
         </div>
 
@@ -304,22 +309,89 @@ function ApiCodePanel({
   );
 }
 
-function normalizeCodeLanguage(language: string) {
-  const normalizedLanguage = language.toLowerCase();
+const apiExampleTitlesBySpecId: Partial<
+  Record<
+    ApiEndpointSpec["id"],
+    {
+      request: string;
+      response?: string;
+    }
+  >
+> = {
+  "get-domains": {
+    request: "Request to list configured inbound domains",
+    response: "Configured inbound domains and default selection",
+  },
+  "get-organization-stats": {
+    request: "Request to list organization counts",
+    response: "Organization-level member, address, and email counts",
+  },
+  "get-organization-email-activity": {
+    request: "Request daily email activity for an organization",
+    response: "Daily email counts in the selected timezone",
+  },
+  "get-organization-email-summary": {
+    request: "Request organization email summary metrics",
+    response: "Organization email and attachment summary metrics",
+  },
+  "get-email-addresses": {
+    request: "Request email addresses for an organization",
+    response: "Email addresses that belong to an organization",
+  },
+  "get-recent-address-activity": {
+    request: "Request recent inbox activity",
+    response: "Recently active inboxes for the organization",
+  },
+  "post-email-address": {
+    request: "Request to create a new email address",
+    response: "The newly created email address",
+  },
+  "patch-email-address": {
+    request: "Request to update an existing email address",
+    response: "The updated email address",
+  },
+  "delete-email-address": {
+    request: "Request to delete an email address",
+    response: "Deleted email address confirmation",
+  },
+  "get-emails": {
+    request: "Request emails for a specific inbox",
+    response: "Emails that match the requested inbox",
+  },
+  "get-email-detail": {
+    request: "Request detailed email content",
+    response: "Parsed email body, headers, and attachment metadata",
+  },
+  "get-email-raw": {
+    request: "Request raw MIME source for an email",
+  },
+  "get-email-attachment": {
+    request: "Request a binary attachment download",
+  },
+  "delete-email": {
+    request: "Request to delete a stored email",
+    response: "Deleted email confirmation",
+  },
+};
 
-  switch (normalizedLanguage) {
-    case "shell":
-    case "sh":
-      return "bash";
-    case "plaintext":
-      return "text";
-    default:
-      return normalizedLanguage;
-  }
+function getApiExampleTitles(spec: ApiEndpointSpec): {
+  requestTitle: string;
+  responseTitle: string;
+} {
+  const fromMap = apiExampleTitlesBySpecId[spec.id];
+
+  return {
+    requestTitle: fromMap?.request ?? `Request to ${spec.method} ${spec.path}`,
+    responseTitle:
+      fromMap?.response ?? `Response payload for ${spec.method} ${spec.path}`,
+  };
 }
 
 export function ApiEndpointReference({ specId }: { specId: string }) {
   const spec = getApiEndpointSpecById(specId);
+  const { requestTitle, responseTitle } = spec
+    ? getApiExampleTitles(spec)
+    : { requestTitle: "", responseTitle: "" };
 
   if (!spec) {
     return (
@@ -338,7 +410,9 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
         <div className="docs-api-summary-header">
           <div className="flex flex-wrap items-center gap-2">
             <ApiMethodBadge method={spec.method} />
-            <code className="text-[15px] text-foreground">{spec.path}</code>
+            <code className="font-mono text-[15px] text-foreground">
+              {spec.path}
+            </code>
           </div>
         </div>
 
@@ -413,7 +487,7 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
           <ApiCodePanel
             code={spec.exampleRequest}
             language="bash"
-            title={`${spec.method.toLowerCase()}.sh`}
+            title={requestTitle}
           />
         </section>
 
@@ -423,7 +497,7 @@ export function ApiEndpointReference({ specId }: { specId: string }) {
             <ApiCodePanel
               code={spec.exampleResponse}
               language="json"
-              title="response.json"
+              title={responseTitle}
             />
           </section>
         ) : null}

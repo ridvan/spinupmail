@@ -140,7 +140,7 @@ export function AnimatedTerminalCode({
         {output?.length ? (
           <motion.div
             className={cn(
-              "rounded-sm border border-border/60 bg-muted/15 px-3 py-2.5",
+              "rounded-sm border border-border/60 bg-muted/15 px-3 py-2.5 font-mono",
               outputClassName
             )}
             initial={reduceMotion ? false : { opacity: 0, y: 4 }}

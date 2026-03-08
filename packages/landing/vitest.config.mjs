@@ -9,6 +9,7 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import rehypeSlug from "rehype-slug";
 import viteTsConfigPaths from "vite-tsconfig-paths";
+import { getDocsHighlighter } from "./shiki-docs.mjs";
 
 const DOCS_DIR = join(fileURLToPath(import.meta.url), "../src/content/docs");
 
@@ -51,13 +52,19 @@ const mdxPlugin = mdx({
       {
         keepBackground: false,
         defaultLang: {
-          block: "txt",
-          inline: "txt",
+          block: "text",
+          inline: "text",
         },
         theme: {
           dark: "one-dark-pro",
           light: "github-light",
         },
+        tokensMap: {
+          env: "dotenv",
+          sh: "bash",
+          shell: "bash",
+        },
+        getHighlighter: () => getDocsHighlighter(),
         onVisitLine(/** @type {{ children: Array<unknown> }} */ node) {
           if (node.children.length === 0) {
             node.children = [{ type: "text", value: " " }];
