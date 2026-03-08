@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { AppHonoEnv } from "@/app/types";
+import { handleAuthRequest } from "./handler";
 import { resendVerificationSchema } from "./schemas";
 import { resendVerificationEmail } from "./service";
 
@@ -21,10 +22,7 @@ export const createAuthHttpRouter = () => {
     }
   );
 
-  router.all("/auth/*", async c => {
-    const auth = c.get("auth");
-    return auth.handler(c.req.raw);
-  });
+  router.all("/auth/*", handleAuthRequest);
 
   return router;
 };

@@ -22,14 +22,41 @@ const collectErrorMessages = (
   }
 };
 
-export const isAddressConflictError = (error: unknown) =>
+const hasNestedErrorMessage = (error: unknown, pattern: RegExp) =>
   (() => {
     const messages: string[] = [];
     collectErrorMessages(error, messages);
-    return messages.some(message =>
-      /unique constraint failed:\s*email_addresses\.address/i.test(message)
-    );
+    return messages.some(message => pattern.test(message));
   })();
+
+export const isAddressConflictError = (error: unknown) =>
+  hasNestedErrorMessage(
+    error,
+    /unique constraint failed:\s*email_addresses\.address/i
+  );
+
+export const isAuthUserEmailConflictError = (error: unknown) =>
+  hasNestedErrorMessage(
+    error,
+    /unique constraint failed:\s*users?\.(?:normalized_email|email)/i
+  );
+
+export const getAuthUserEmailConflictResponse = (
+  error: unknown
+): {
+  status: 400;
+  body: { code: "USER_ALREADY_EXISTS"; message: string };
+} | null => {
+  if (!isAuthUserEmailConflictError(error)) return null;
+
+  return {
+    status: 400,
+    body: {
+      code: "USER_ALREADY_EXISTS",
+      message: "An account already exists for this email",
+    },
+  };
+};
 
 export const getAuthFailureResponse = (
   error: unknown

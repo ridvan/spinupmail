@@ -30,6 +30,16 @@ describe("createAuth", () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
 
     const auth = createAuth() as {
+      user?: {
+        additionalFields?: {
+          normalizedEmail?: {
+            type?: string;
+            required?: boolean;
+            input?: boolean;
+            returned?: boolean;
+          };
+        };
+      };
       plugins?: Array<{
         id?: string;
         init?: () => {
@@ -64,6 +74,12 @@ describe("createAuth", () => {
     expect(auth.plugins?.map(plugin => plugin.id)).toContain(
       "email-qualification"
     );
+    expect(auth.user?.additionalFields?.normalizedEmail).toEqual({
+      type: "string",
+      required: false,
+      input: false,
+      returned: false,
+    });
 
     const createdUser = await qualificationPlugin
       ?.init?.()

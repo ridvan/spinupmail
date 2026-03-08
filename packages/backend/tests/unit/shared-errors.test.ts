@@ -1,4 +1,8 @@
-import { isAddressConflictError } from "@/shared/errors";
+import {
+  getAuthUserEmailConflictResponse,
+  isAddressConflictError,
+  isAuthUserEmailConflictError,
+} from "@/shared/errors";
 
 describe("shared errors", () => {
   it("detects unique address conflicts from nested drizzle+d1 causes", () => {
@@ -27,5 +31,28 @@ describe("shared errors", () => {
     };
 
     expect(isAddressConflictError(error)).toBe(false);
+  });
+
+  it("detects auth user email conflicts from nested drizzle+d1 causes", () => {
+    const error = {
+      message: 'Failed query: insert into users ... params: ["foo@gmail.com"]',
+      cause: {
+        message:
+          "D1_ERROR: UNIQUE constraint failed:\n  users.normalized_email: SQLITE_CONSTRAINT",
+        cause: {
+          message:
+            "UNIQUE constraint failed:\n  users.normalized_email: SQLITE_CONSTRAINT",
+        },
+      },
+    };
+
+    expect(isAuthUserEmailConflictError(error)).toBe(true);
+    expect(getAuthUserEmailConflictResponse(error)).toEqual({
+      status: 400,
+      body: {
+        code: "USER_ALREADY_EXISTS",
+        message: "An account already exists for this email",
+      },
+    });
   });
 });

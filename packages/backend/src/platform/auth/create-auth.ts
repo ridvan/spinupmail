@@ -165,6 +165,12 @@ function createAuth(
             enabled: true,
           },
           additionalFields: {
+            normalizedEmail: {
+              type: "string",
+              required: false,
+              input: false,
+              returned: false,
+            },
             timezone: {
               type: "string",
               required: false,
