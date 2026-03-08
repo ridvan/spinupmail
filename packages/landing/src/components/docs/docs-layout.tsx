@@ -19,18 +19,6 @@ export function DocsLayout({
 }: DocsLayoutProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
-
-  const toggleTheme = () => {
-    if (typeof document === "undefined") return;
-
-    setIsDark(current => {
-      const next = !current;
-      document.documentElement.classList.toggle("dark", next);
-      window.localStorage.setItem("spinupmail-theme", next ? "dark" : "light");
-      return next;
-    });
-  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -48,25 +36,10 @@ export function DocsLayout({
     setMobileSidebarOpen(false);
   }, [currentSlug]);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const savedTheme = window.localStorage.getItem("spinupmail-theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    const shouldUseDark = savedTheme ? savedTheme === "dark" : prefersDark;
-
-    document.documentElement.classList.toggle("dark", shouldUseDark);
-    setIsDark(shouldUseDark);
-  }, []);
-
   return (
     <div className="docs-shell min-h-screen bg-background text-foreground">
       <DocsHeader
         currentSlug={currentSlug}
-        isDark={isDark}
-        onToggleTheme={toggleTheme}
         onToggleMobileSidebar={() => setMobileSidebarOpen(state => !state)}
       />
 

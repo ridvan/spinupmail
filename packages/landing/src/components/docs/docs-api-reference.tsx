@@ -1,6 +1,6 @@
-import {  startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { getApiEndpointSpecById } from "./content/api-reference";
-import type {ReactNode} from "react";
+import type { ReactNode } from "react";
 import type {
   ApiEndpointSpec,
   ApiErrorSpec,
@@ -9,8 +9,8 @@ import type {
 import { cn } from "@/lib/utils";
 
 const requirementTone: Record<string, string> = {
-  required: "border-emerald-400/35 bg-emerald-400/12 text-emerald-200",
-  optional: "border-white/16 bg-white/6 text-white/72",
+  required: "docs-api-chip docs-api-chip-required",
+  optional: "docs-api-chip docs-api-chip-optional",
 };
 
 function ApiRequirementBadge({ required = false }: { required?: boolean }) {
@@ -30,10 +30,10 @@ function ApiRequirementBadge({ required = false }: { required?: boolean }) {
 
 function ApiMethodBadge({ method }: { method: ApiEndpointSpec["method"] }) {
   const toneClassName = {
-    GET: "border-emerald-400/35 bg-emerald-400/12 text-emerald-200",
-    POST: "border-sky-400/35 bg-sky-400/12 text-sky-200",
-    PATCH: "border-amber-400/35 bg-amber-400/12 text-amber-200",
-    DELETE: "border-rose-400/35 bg-rose-400/12 text-rose-200",
+    GET: "docs-api-chip docs-api-method-badge docs-api-method-badge-get",
+    POST: "docs-api-chip docs-api-method-badge docs-api-method-badge-post",
+    PATCH: "docs-api-chip docs-api-method-badge docs-api-method-badge-patch",
+    DELETE: "docs-api-chip docs-api-method-badge docs-api-method-badge-delete",
   } as const;
 
   return (
@@ -198,6 +198,28 @@ function ApiCodePanel({
 }) {
   const [copied, setCopied] = useState(false);
   const [highlightedCode, setHighlightedCode] = useState<string | null>(null);
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const root = document.documentElement;
+    const syncTheme = () => {
+      setIsDark(root.classList.contains("dark"));
+    };
+
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -209,7 +231,7 @@ function ApiCodePanel({
         const { codeToHtml } = await import("shiki");
         const html = await codeToHtml(code, {
           lang: normalizeCodeLanguage(language),
-          theme: "github-dark-default",
+          theme: isDark ? "github-dark-default" : "github-light",
         });
 
         if (cancelled) return;
@@ -231,7 +253,7 @@ function ApiCodePanel({
     return () => {
       cancelled = true;
     };
-  }, [code, language]);
+  }, [code, isDark, language]);
 
   const onCopy = async () => {
     if (typeof window === "undefined") return;
@@ -249,21 +271,17 @@ function ApiCodePanel({
     <div className="docs-code-shell">
       <div className="docs-code-toolbar">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-6 min-w-6 items-center justify-center border border-white/20 bg-white/10 px-1.5 font-mono text-[12px] font-semibold uppercase tracking-tight text-white/90">
+          <span className="docs-code-language-badge">
             {language.slice(0, 2)}
           </span>
-          <span className="truncate text-[13px] font-medium tracking-tight text-white/85">
-            {title}
-          </span>
+          <span className="docs-code-title">{title}</span>
         </div>
 
         <button
           type="button"
           className={cn(
-            "rounded-md border px-2 py-1 text-[11px] transition-colors",
-            copied
-              ? "border-white/25 bg-white/14 text-white"
-              : "border-white/15 bg-black/80 text-white/70 hover:border-white/25 hover:text-white"
+            "docs-code-copy-button",
+            copied && "docs-code-copy-button-copied"
           )}
           onClick={() => void onCopy()}
           aria-label={`Copy ${title}`}

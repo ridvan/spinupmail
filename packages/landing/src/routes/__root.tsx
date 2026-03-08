@@ -20,12 +20,12 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Spinupmail — Self-host disposable emails on Cloudflare",
+        title: "Self-host disposable emails on Cloudflare | SpinupMail",
       },
       {
         name: "description",
         content:
-          "Create unlimited email addresses with attachment support for you/your team, access via dashboard or API. Set TTL, allowed senders, auto-cleanup, and more.",
+          "Create unlimited, highly configurable email addresses with attachment support for you/your team, hosted on Cloudflare.",
       },
     ],
     links: [
@@ -51,8 +51,9 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
+        <script src="/theme-init.js" />
         <HeadContent />
       </head>
       <body>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ChevronRightIconHandle } from "@/components/ui/chevron-right";
 import { ChevronRightIcon } from "@/components/ui/chevron-right";
+import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
 import { landingLinks } from "@/lib/links";
 
@@ -90,13 +91,16 @@ export function Nav() {
               className="group inline-flex min-w-0 items-center gap-1.5 px-1 py-1"
             >
               <img
+                src="/logo-black.png"
+                alt="Spinupmail logo"
+                className="size-6 object-contain dark:hidden sm:size-7"
+              />
+              <img
                 src="/logo-transparent.png"
                 alt="Spinupmail logo"
-                className="size-6 object-contain sm:size-7"
+                className="hidden size-6 object-contain dark:block sm:size-7"
               />
-              <span className="truncate text-[13px] font-semibold tracking-tight sm:text-sm">
-                Spinupmail
-              </span>
+              <span className="truncate text-sm font-semibold">SpinupMail</span>
             </a>
 
             <nav className="hidden items-center gap-1 lg:flex">
@@ -120,6 +124,8 @@ export function Nav() {
             </nav>
 
             <div className="hidden items-center gap-1.5 sm:flex">
+              <ThemeSelector />
+
               <Button
                 variant="outline"
                 size="sm"
@@ -158,6 +164,8 @@ export function Nav() {
             </div>
 
             <div className="flex items-center gap-1 sm:hidden">
+              <ThemeSelector mobile />
+
               <Button
                 variant="outline"
                 size="sm"

@@ -1,20 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { GithubIcon, Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons";
+import { GithubIcon } from "@hugeicons/core-free-icons";
+import { ThemeSelector } from "@/components/theme-selector";
 import { landingLinks } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
 type DocsHeaderProps = {
   currentSlug?: string;
-  isDark: boolean;
-  onToggleTheme: () => void;
   onToggleMobileSidebar: () => void;
 };
 
 export function DocsHeader({
   currentSlug,
-  isDark,
-  onToggleTheme,
   onToggleMobileSidebar,
 }: DocsHeaderProps) {
   return (
@@ -26,13 +23,16 @@ export function DocsHeader({
             className="group inline-flex items-center gap-1 px-1 py-1.5"
           >
             <img
+              src="/logo-black.png"
+              alt="Spinupmail"
+              className="size-7 object-contain dark:hidden"
+            />
+            <img
               src="/logo-transparent.png"
               alt="Spinupmail"
-              className="size-7 object-contain"
+              className="hidden size-7 object-contain dark:block"
             />
-            <span className="text-sm font-semibold tracking-tight">
-              Spinupmail
-            </span>
+            <span className="text-sm font-semibold">SpinupMail</span>
             <span className="ml-1.5 border border-border/70 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
               Docs
             </span>
@@ -54,11 +54,16 @@ export function DocsHeader({
             className="group inline-flex items-center gap-1 px-1 py-1.5 lg:hidden"
           >
             <img
+              src="/logo-black.png"
+              alt="Spinupmail"
+              className="size-7 object-contain dark:hidden"
+            />
+            <img
               src="/logo-transparent.png"
               alt="Spinupmail"
-              className="size-7 object-contain"
+              className="hidden size-7 object-contain dark:block"
             />
-            <span className="text-sm font-semibold tracking-tight">Docs</span>
+            <span className="text-sm font-semibold">SpinupMail</span>
           </Link>
 
           <div className="hidden h-full items-stretch lg:flex">
@@ -114,20 +119,9 @@ export function DocsHeader({
                   strokeWidth={1.8}
                 />
               </a>
-              <button
-                type="button"
-                onClick={onToggleTheme}
-                className="inline-flex h-14 w-14 items-center justify-center border-l border-border/60 text-muted-foreground transition-colors hover:bg-card/25 hover:text-foreground"
-                aria-label={
-                  isDark ? "Switch to light mode" : "Switch to dark mode"
-                }
-              >
-                <HugeiconsIcon
-                  icon={isDark ? Sun03Icon : Moon02Icon}
-                  className="size-4"
-                  strokeWidth={1.8}
-                />
-              </button>
+              <div className="flex h-14 w-14 items-center justify-center border-l border-border/60">
+                <ThemeSelector chromeless />
+              </div>
             </div>
           </div>
 
@@ -146,20 +140,7 @@ export function DocsHeader({
               />
             </a>
 
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              className="inline-flex size-8 items-center justify-center border border-border/70 text-muted-foreground transition-colors hover:bg-card/25 hover:text-foreground"
-              aria-label={
-                isDark ? "Switch to light mode" : "Switch to dark mode"
-              }
-            >
-              <HugeiconsIcon
-                icon={isDark ? Sun03Icon : Moon02Icon}
-                className="size-4"
-                strokeWidth={1.8}
-              />
-            </button>
+            <ThemeSelector mobile chromeless />
           </div>
         </div>
       </div>

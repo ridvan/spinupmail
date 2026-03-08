@@ -10,7 +10,7 @@ import { TrustPipeline } from "@/components/landing/trust-pipeline";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
-function HomePage() {
+export function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Nav />

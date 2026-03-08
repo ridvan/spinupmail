@@ -104,7 +104,7 @@ export function AnimatedTerminalCode({
               ) : (
                 <>
                   {line.prompt ? (
-                    <span className="select-none text-muted-foreground/45">
+                    <span className="select-none text-muted-foreground/72 dark:text-muted-foreground/45">
                       ${" "}
                     </span>
                   ) : null}
@@ -122,7 +122,7 @@ export function AnimatedTerminalCode({
                   !reduceMotion &&
                   index === lastCodeLineIndex ? (
                     <motion.span
-                      className="ml-0.5 inline-block h-[0.95em] w-[0.6ch] bg-foreground/35 align-middle"
+                      className="ml-0.5 inline-block h-[0.95em] w-[0.6ch] bg-foreground/45 dark:bg-foreground/35 align-middle"
                       animate={{ opacity: [0.18, 0.82, 0.18] }}
                       transition={{
                         duration: 1.1,
@@ -153,7 +153,9 @@ export function AnimatedTerminalCode({
                   key={`${sequenceKey}-${index}`}
                   className="flex items-center gap-2"
                 >
-                  <span className="text-muted-foreground/50">+</span>
+                  <span className="text-muted-foreground/72 dark:text-muted-foreground/50">
+                    +
+                  </span>
                   <span>{item}</span>
                 </div>
               ))}

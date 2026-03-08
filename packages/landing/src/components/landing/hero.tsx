@@ -6,6 +6,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { motion, useReducedMotion } from "motion/react";
 import { useRef } from "react";
+import type { ReactNode } from "react";
 import type { ArrowUpRightIconHandle } from "@/components/ui/arrow-up-right";
 import type { ChevronRightIconHandle } from "@/components/ui/chevron-right";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ const techStack = [
   {
     name: "Drizzle",
     logo: "/logos/drizzle.svg",
-    logoClassName: "h-7 w-auto brightness-0 invert opacity-90",
+    logoClassName: "h-7 w-auto opacity-90 dark:invert",
   },
   {
     name: "Hono",
@@ -66,9 +67,36 @@ const techStack = [
   {
     name: "TanStack Start",
     logo: "/logos/tanstack.svg",
-    logoClassName: "h-4 w-auto",
+    logoClassName: "h-4 w-auto brightness-0 opacity-85 dark:invert",
   },
 ] as const;
+
+function TechLogo({
+  logo,
+  logoClassName,
+  name,
+  renderLogo,
+}: {
+  logo?: string;
+  logoClassName?: string;
+  name: string;
+  renderLogo?: () => ReactNode;
+}) {
+  if (renderLogo) {
+    return renderLogo();
+  }
+
+  if (!logo) return null;
+
+  return (
+    <img
+      src={logo}
+      alt={`${name} logo`}
+      loading="lazy"
+      className={cn("max-h-full object-contain", logoClassName)}
+    />
+  );
+}
 
 export function Hero() {
   const reduceMotion = useReducedMotion();
@@ -140,7 +168,7 @@ export function Hero() {
               for teams on{" "}
               <span className="inline-flex items-baseline gap-[0.16em] whitespace-nowrap">
                 <motion.span
-                  className="inline-flex shrink-0 text-foreground/65 dark:text-white/80"
+                  className="inline-flex shrink-0 text-foreground/52 dark:text-white/78"
                   {...cloudMotion}
                 >
                   <CloudflareCloudIcon
@@ -148,7 +176,9 @@ export function Hero() {
                     className="h-[0.82em] w-auto"
                   />
                 </motion.span>
-                <span>Cloudflare</span>
+                <span className="text-foreground/68 dark:text-foreground/82">
+                  Cloudflare
+                </span>
               </span>
             </span>
           </h1>
@@ -199,7 +229,7 @@ export function Hero() {
             >
               <HugeiconsIcon
                 icon={GithubIcon}
-                className="size-4 text-muted-foreground/75"
+                className="size-4 text-foreground/82 dark:text-muted-foreground/75"
                 aria-hidden="true"
               />
               View on GitHub
@@ -229,15 +259,7 @@ export function Hero() {
                 className="inline-flex h-7 items-center gap-1.5 text-[13px] text-foreground/85"
               >
                 <span className="inline-flex h-6 w-8 shrink-0 items-center justify-center">
-                  <img
-                    src={tech.logo}
-                    alt={`${tech.name} logo`}
-                    loading="lazy"
-                    className={cn(
-                      "max-h-full object-contain",
-                      tech.logoClassName
-                    )}
-                  />
+                  <TechLogo {...tech} />
                 </span>
                 <span className="leading-none">{tech.name}</span>
               </span>
@@ -263,7 +285,7 @@ export function Hero() {
 
 function InboxPreview({ reduceMotion }: { reduceMotion: boolean }) {
   return (
-    <div className="bg-card shadow-2xl shadow-black/30">
+    <div className="bg-card shadow-[0_20px_44px_-30px_rgba(0,0,0,0.22)] dark:shadow-[0_26px_56px_-34px_rgba(0,0,0,0.34)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <HugeiconsIcon

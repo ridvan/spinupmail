@@ -51,14 +51,21 @@ type ApiExample = {
   lines: ReadonlyArray<TerminalLine>;
 };
 
+const methodBadgeClassName: Record<ApiExample["method"], string> = {
+  GET: "border-foreground/18 text-foreground/72 dark:border-white/18 dark:text-white/72",
+  POST: "border-foreground/18 text-foreground/72 dark:border-white/18 dark:text-white/72",
+  DELETE:
+    "border-foreground/18 text-foreground/72 dark:border-white/18 dark:text-white/72",
+};
+
 const toneClassName: Record<TokenTone, string> = {
-  base: "text-foreground/88",
-  muted: "text-muted-foreground/78",
-  comment: "text-muted-foreground/42",
-  flag: "text-muted-foreground/62",
-  string: "text-foreground/72",
-  value: "text-foreground/82",
-  jsonKey: "text-muted-foreground/62",
+  base: "text-foreground/90 dark:text-foreground/88",
+  muted: "text-foreground/74 dark:text-muted-foreground/78",
+  comment: "text-muted-foreground/72 dark:text-muted-foreground/42",
+  flag: "text-foreground/68 dark:text-muted-foreground/62",
+  string: "text-foreground/76 dark:text-foreground/72",
+  value: "text-foreground/84 dark:text-foreground/82",
+  jsonKey: "text-foreground/68 dark:text-muted-foreground/62",
 };
 
 const apiExamples: ReadonlyArray<ApiExample> = [
@@ -67,7 +74,7 @@ const apiExamples: ReadonlyArray<ApiExample> = [
     label: "Create address",
     method: "POST",
     path: "/api/email-addresses",
-    note: "Provision a disposable inbox with TTL and sender controls.",
+    note: "Create an email address with TTL and sender controls.",
     lines: [
       {
         kind: "code",
@@ -414,11 +421,21 @@ export function ApiShowcase() {
               aria-labelledby={`api-example-tab-${activeExample.id}`}
               className="p-4"
             >
-              <p className="mb-1 font-mono text-[10px] text-muted-foreground/55">
-                {activeExample.method} {activeExample.path}
-              </p>
+              <div className="mb-1 flex items-center gap-2 font-mono text-[10px]">
+                <span
+                  className={cn(
+                    "inline-flex border px-1.5 font-semibold tracking-[0.08em]",
+                    methodBadgeClassName[activeExample.method]
+                  )}
+                >
+                  {activeExample.method}
+                </span>
+                <span className="text-foreground/74 dark:text-muted-foreground/55">
+                  {activeExample.path}
+                </span>
+              </div>
 
-              <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground/55">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-foreground/62 dark:text-muted-foreground/55">
                 {activeExample.note}
               </p>
 

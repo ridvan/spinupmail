@@ -106,21 +106,17 @@ function DocsMdxPre({ className, children, ...props }: ComponentProps<"pre">) {
     <div className="docs-code-shell">
       <div className="docs-code-toolbar">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-6 min-w-6 items-center justify-center border border-white/20 bg-white/10 px-1.5 font-mono text-[12px] font-semibold uppercase tracking-tight text-white/90">
+          <span className="docs-code-language-badge">
             {language.slice(0, 2)}
           </span>
-          <span className="truncate text-[13px] font-medium tracking-tight text-white/85">
-            {snippetTitle}
-          </span>
+          <span className="docs-code-title">{snippetTitle}</span>
         </div>
 
         <button
           type="button"
           className={cn(
-            "rounded-md border px-2 py-1 text-[11px] transition-colors",
-            copied
-              ? "border-white/25 bg-white/14 text-white"
-              : "border-white/15 bg-black/80 text-white/70 hover:border-white/25 hover:text-white"
+            "docs-code-copy-button",
+            copied && "docs-code-copy-button-copied"
           )}
           onClick={() => void handleCopy()}
           aria-label={`Copy ${snippetTitle} snippet`}

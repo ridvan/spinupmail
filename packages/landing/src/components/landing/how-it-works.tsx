@@ -58,11 +58,11 @@ type TerminalStep = {
 };
 
 const toneClassName: Record<TerminalTokenTone, string> = {
-  base: "text-foreground/88",
-  muted: "text-muted-foreground/72",
-  comment: "text-muted-foreground/42",
-  flag: "text-muted-foreground/62",
-  value: "text-foreground/78",
+  base: "text-foreground/90 dark:text-foreground/88",
+  muted: "text-foreground/72 dark:text-muted-foreground/72",
+  comment: "text-muted-foreground/72 dark:text-muted-foreground/42",
+  flag: "text-foreground/66 dark:text-muted-foreground/62",
+  value: "text-foreground/82 dark:text-foreground/78",
 };
 
 const terminalSteps: ReadonlyArray<TerminalStep> = [
