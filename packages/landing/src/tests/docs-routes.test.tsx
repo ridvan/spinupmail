@@ -34,7 +34,7 @@ describe("docs routes", () => {
     expect(screen.getByRole("heading", { name: "API Overview" })).toBeTruthy();
   });
 
-  it("renders the API reference content users need", () => {
+  it("renders the address API reference content users need", () => {
     render(<DocsSlugPageContent slug="api-email-addresses" />);
 
     expect(screen.getAllByText("allowedFromDomains").length).toBeGreaterThan(0);
@@ -44,14 +44,20 @@ describe("docs routes", () => {
     expect(
       screen.getAllByText("maxReceivedEmailAction").length
     ).toBeGreaterThan(0);
+  });
 
+  it("renders the organization API scope requirements", () => {
     render(<DocsSlugPageContent slug="api-organizations" />);
+
     expect(
       screen.getAllByText("x-org-id header is required for api key usage")
         .length
     ).toBeGreaterThan(0);
+  });
 
+  it("renders the email API error contracts", () => {
     render(<DocsSlugPageContent slug="api-emails" />);
+
     expect(screen.getByText("address or addressId is required")).toBeTruthy();
     expect(screen.getByText("raw source not available")).toBeTruthy();
   });
