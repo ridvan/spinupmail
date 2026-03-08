@@ -305,19 +305,23 @@ export const refreshDisposableEmailDomains = async (
   }
 
   refreshInFlight = (async () => {
-    const currentManifest = await readManifest(env, {
-      bypassCache: options?.force,
-    });
-
-    const acquired = await acquireRefreshLock(env);
-    if (!acquired) {
-      return readManifest(env, { bypassCache: true });
-    }
+    let acquired = false;
 
     try {
+      const currentManifest = await readManifest(env, {
+        bypassCache: options?.force,
+      });
+
+      acquired = await acquireRefreshLock(env);
+      if (!acquired) {
+        return readManifest(env, { bypassCache: true });
+      }
+
       return await refreshWithManifest(env, currentManifest);
     } finally {
-      await releaseRefreshLock(env);
+      if (acquired) {
+        await releaseRefreshLock(env);
+      }
       refreshInFlight = null;
     }
   })();

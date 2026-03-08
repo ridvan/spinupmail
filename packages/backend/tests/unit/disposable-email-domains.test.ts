@@ -91,6 +91,37 @@ describe("disposable email domains", () => {
     expect(runInBackground).toHaveBeenCalledTimes(1);
   });
 
+  it("clears refreshInFlight after a failed lock acquisition", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => buildResponse("remote-temp.test\n"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const {
+      refreshDisposableEmailDomains,
+      resetDisposableEmailDomainCachesForTests,
+    } = await import("@/platform/auth/disposable-email-domains");
+
+    const env = {
+      SUM_KV: new FakeKvNamespace(),
+    } as unknown as CloudflareBindings;
+
+    resetDisposableEmailDomainCachesForTests();
+    await env.SUM_KV.put(
+      "auth:disposable-email-domains:refresh-lock",
+      "held-by-another-isolate"
+    );
+
+    await expect(refreshDisposableEmailDomains(env)).resolves.toBeNull();
+
+    await env.SUM_KV.delete("auth:disposable-email-domains:refresh-lock");
+
+    await expect(refreshDisposableEmailDomains(env)).resolves.toMatchObject({
+      domainCount: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("never blocks configured service domains from EMAIL_DOMAINS", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
