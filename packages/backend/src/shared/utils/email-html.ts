@@ -92,6 +92,11 @@ type InlineAttachment = {
   inlinePath: string;
 };
 
+type SrcsetCandidate = {
+  descriptor: string;
+  url: string;
+};
+
 type HtmlNode = {
   attribs?: Record<string, string>;
   children?: HtmlNode[];
@@ -136,6 +141,8 @@ const normalizeCssUrl = (value: string) => {
   return trimmed;
 };
 
+const SRCSET_DESCRIPTOR_PATTERN = /^\d+(?:\.\d+)?[wx]$/i;
+
 const isRemoteUrl = (value: string) =>
   value.startsWith("http://") ||
   value.startsWith("https://") ||
@@ -168,6 +175,76 @@ const sanitizeCssUrl = (value: string, options: CssSanitizeOptions) => {
   if (hasExplicitScheme(lowered)) return null;
 
   return normalized;
+};
+
+const parseSrcsetCandidate = (value: string): SrcsetCandidate | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return {
+      descriptor: "",
+      url: parts[0] ?? "",
+    };
+  }
+
+  if (parts.length === 2 && SRCSET_DESCRIPTOR_PATTERN.test(parts[1] ?? "")) {
+    return {
+      descriptor: parts[1] ?? "",
+      url: parts[0] ?? "",
+    };
+  }
+
+  return null;
+};
+
+const parseSrcset = (value: string) => {
+  const segments = value.split(",");
+  const candidates: SrcsetCandidate[] = [];
+  let buffer = "";
+
+  for (const segment of segments) {
+    buffer = buffer ? `${buffer},${segment}` : segment;
+
+    const candidate = parseSrcsetCandidate(buffer);
+    if (!candidate) continue;
+
+    if (
+      candidate.url.toLowerCase().startsWith("data:") &&
+      !candidate.url.includes(",")
+    ) {
+      continue;
+    }
+
+    candidates.push(candidate);
+    buffer = "";
+  }
+
+  if (buffer.trim()) {
+    const candidate = parseSrcsetCandidate(buffer);
+    if (!candidate) return null;
+    candidates.push(candidate);
+  }
+
+  return candidates;
+};
+
+const sanitizeSrcset = (value: string, options: CssSanitizeOptions) => {
+  const candidates = parseSrcset(value);
+  if (!candidates || candidates.length === 0) return null;
+
+  const sanitizedCandidates = candidates.flatMap(candidate => {
+    const safeUrl = sanitizeCssUrl(candidate.url, options);
+    if (!safeUrl) return [];
+
+    return candidate.descriptor
+      ? `${safeUrl} ${candidate.descriptor}`
+      : safeUrl;
+  });
+
+  if (sanitizedCandidates.length === 0) return null;
+  return sanitizedCandidates.join(", ");
 };
 
 const serializeCssUrl = (value: string) => `"${value.replaceAll('"', '\\"')}"`;
@@ -427,6 +504,22 @@ const rewriteHtmlAssetAttribute = (
   delete element.attribs[attributeName];
 };
 
+const rewriteHtmlSrcsetAttribute = (
+  element: HtmlElement,
+  options: CssSanitizeOptions
+) => {
+  const attributeValue = element.attribs.srcset;
+  if (!attributeValue) return;
+
+  const sanitized = sanitizeSrcset(attributeValue, options);
+  if (sanitized) {
+    element.attribs.srcset = sanitized;
+    return;
+  }
+
+  delete element.attribs.srcset;
+};
+
 const transformHtmlChildren = (
   nodes: HtmlNode[],
   options: CssSanitizeOptions
@@ -442,9 +535,7 @@ const transformHtmlChildren = (
     node.children = transformHtmlChildren(node.children ?? [], options);
     sanitizeStyleAttribute(node, options);
 
-    if (node.attribs.srcset) {
-      delete node.attribs.srcset;
-    }
+    rewriteHtmlSrcsetAttribute(node, options);
 
     rewriteHtmlAssetAttribute(node, "background", options.rewriteUrl);
     rewriteHtmlAssetAttribute(node, "poster", options.rewriteUrl);
@@ -492,7 +583,7 @@ export const sanitizeEmailHtml = (html: string) => {
       "*": EMAIL_GLOBAL_ALLOWED_ATTRIBUTES,
       a: ["href", "name", "rel", "target", "title"],
       col: ["span"],
-      img: ["alt", "border", "height", "src", "title", "width"],
+      img: ["alt", "border", "height", "src", "srcset", "title", "width"],
       ol: ["start", "type"],
       table: ["cellpadding", "cellspacing"],
       td: ["cellpadding", "cellspacing", "colspan", "nowrap", "rowspan"],

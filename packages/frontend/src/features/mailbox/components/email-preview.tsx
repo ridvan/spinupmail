@@ -96,6 +96,45 @@ export const EmailPreview = ({
           emailId: email?.id ?? null,
           remoteContentBlocked: false,
         };
+  const currentEmailId = email?.id ?? null;
+
+  const handleAllowRemoteContent = React.useCallback(() => {
+    if (!currentEmailId) return;
+
+    setRemoteContentState({
+      allowRemoteContent: true,
+      emailId: currentEmailId,
+      remoteContentBlocked: activeRemoteContentState.remoteContentBlocked,
+    });
+  }, [activeRemoteContentState.remoteContentBlocked, currentEmailId]);
+
+  const handleRemoteContentBlockedChange = React.useCallback(
+    (blocked: boolean) => {
+      if (!currentEmailId) return;
+
+      setRemoteContentState(current => {
+        const nextState = {
+          allowRemoteContent:
+            current.emailId === currentEmailId
+              ? current.allowRemoteContent
+              : false,
+          emailId: currentEmailId,
+          remoteContentBlocked: blocked,
+        };
+
+        if (
+          current.allowRemoteContent === nextState.allowRemoteContent &&
+          current.emailId === nextState.emailId &&
+          current.remoteContentBlocked === nextState.remoteContentBlocked
+        ) {
+          return current;
+        }
+
+        return nextState;
+      });
+    },
+    [currentEmailId]
+  );
 
   if (isLoading) {
     return (
@@ -141,35 +180,6 @@ export const EmailPreview = ({
     } catch {
       // Error shown from mutation state.
     }
-  };
-
-  const handleAllowRemoteContent = () => {
-    setRemoteContentState({
-      allowRemoteContent: true,
-      emailId: email.id,
-      remoteContentBlocked: activeRemoteContentState.remoteContentBlocked,
-    });
-  };
-
-  const handleRemoteContentBlockedChange = (blocked: boolean) => {
-    setRemoteContentState(current => {
-      const nextState = {
-        allowRemoteContent:
-          current.emailId === email.id ? current.allowRemoteContent : false,
-        emailId: email.id,
-        remoteContentBlocked: blocked,
-      };
-
-      if (
-        current.allowRemoteContent === nextState.allowRemoteContent &&
-        current.emailId === nextState.emailId &&
-        current.remoteContentBlocked === nextState.remoteContentBlocked
-      ) {
-        return current;
-      }
-
-      return nextState;
-    });
   };
 
   return (

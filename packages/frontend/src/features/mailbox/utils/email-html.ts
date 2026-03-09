@@ -74,6 +74,7 @@ const EMAIL_ALLOWED_ATTRIBUTES = [
   "role",
   "rowspan",
   "src",
+  "srcset",
   "start",
   "style",
   "target",
@@ -190,6 +191,91 @@ const sanitizeRemoteAssetUrl = (
 
   if (hasExplicitScheme(lowered)) return null;
   return normalized;
+};
+
+type SrcsetCandidate = {
+  descriptor: string;
+  url: string;
+};
+
+const SRCSET_DESCRIPTOR_PATTERN = /^\d+(?:\.\d+)?[wx]$/i;
+
+const parseSrcsetCandidate = (value: string): SrcsetCandidate | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return {
+      descriptor: "",
+      url: parts[0] ?? "",
+    };
+  }
+
+  if (parts.length === 2 && SRCSET_DESCRIPTOR_PATTERN.test(parts[1] ?? "")) {
+    return {
+      descriptor: parts[1] ?? "",
+      url: parts[0] ?? "",
+    };
+  }
+
+  return null;
+};
+
+const parseSrcset = (value: string) => {
+  const segments = value.split(",");
+  const candidates: SrcsetCandidate[] = [];
+  let buffer = "";
+
+  for (const segment of segments) {
+    buffer = buffer ? `${buffer},${segment}` : segment;
+
+    const candidate = parseSrcsetCandidate(buffer);
+    if (!candidate) continue;
+
+    if (
+      candidate.url.toLowerCase().startsWith("data:") &&
+      !candidate.url.includes(",")
+    ) {
+      continue;
+    }
+
+    candidates.push(candidate);
+    buffer = "";
+  }
+
+  if (buffer.trim()) {
+    const candidate = parseSrcsetCandidate(buffer);
+    if (!candidate) return null;
+    candidates.push(candidate);
+  }
+
+  return candidates;
+};
+
+const sanitizeSrcset = (
+  value: string,
+  allowRemoteUrls: boolean,
+  onRemoteBlocked: () => void
+) => {
+  const candidates = parseSrcset(value);
+  if (!candidates || candidates.length === 0) return null;
+
+  const sanitizedCandidates = candidates.flatMap(candidate => {
+    const safeUrl = sanitizeRemoteAssetUrl(
+      candidate.url,
+      allowRemoteUrls,
+      onRemoteBlocked
+    );
+    if (!safeUrl) return [];
+
+    return candidate.descriptor
+      ? `${safeUrl} ${candidate.descriptor}`
+      : safeUrl;
+  });
+
+  if (sanitizedCandidates.length === 0) return null;
+  return sanitizedCandidates.join(", ");
 };
 
 const serializeCssUrl = (value: string) => `"${value.replaceAll('"', '\\"')}"`;
@@ -445,9 +531,19 @@ export const prepareEmailHtmlForRender = ({
       : originalDocument;
 
   parsed.querySelectorAll<HTMLElement>("*").forEach(element => {
-    if (element.hasAttribute("srcset")) {
-      element.removeAttribute("srcset");
-      onRemoteBlocked();
+    const srcsetValue = element.getAttribute("srcset");
+    if (srcsetValue) {
+      const sanitizedSrcset = sanitizeSrcset(
+        srcsetValue,
+        allowRemoteContent,
+        onRemoteBlocked
+      );
+
+      if (sanitizedSrcset) {
+        element.setAttribute("srcset", sanitizedSrcset);
+      } else {
+        element.removeAttribute("srcset");
+      }
     }
 
     const tagName = element.tagName.toLowerCase();

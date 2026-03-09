@@ -9,6 +9,7 @@ import {
   rewriteEmailHtmlForRendering,
 } from "@/shared/utils/email-html";
 import {
+  buildInlineContentDisposition,
   buildContentDisposition,
   getUtf8ByteLength,
   sanitizeFilename,
@@ -457,7 +458,7 @@ export const getEmailAttachment = async ({
   return new Response(object.body as unknown as BodyInit, {
     headers: buildAttachmentHeaders({
       contentDisposition: isInlineRequest
-        ? `inline; filename="${filename}"`
+        ? buildInlineContentDisposition(filename)
         : buildContentDisposition(filename),
       contentType: attachmentRow.contentType || "application/octet-stream",
       size: attachmentRow.size,

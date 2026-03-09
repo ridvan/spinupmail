@@ -188,7 +188,7 @@ describe("emails service", () => {
       messageId: "message-1",
       headers: "[]",
       bodyHtml:
-        '<style>.hero{background-image:url("cid:bg-1")}</style><img src="cid:image-1" /><img src="cid:missing" />',
+        '<style>.hero{background-image:url("cid:bg-1")}</style><img src="cid:image-1" srcset="cid:image-1 1x, cid:bg-1 2x, cid:missing 3x" /><img src="cid:missing" />',
       bodyText: "Hello",
       raw: null,
       rawSize: 123,
@@ -233,6 +233,9 @@ describe("emails service", () => {
     expect(result.body.html).toContain(
       "/api/emails/email-1/attachments/att-bg?inline=1"
     );
+    expect(result.body.html).toContain(
+      'srcset="/api/emails/email-1/attachments/att-image?inline=1 1x, /api/emails/email-1/attachments/att-bg?inline=1 2x"'
+    );
     expect(result.body.html).not.toContain("cid:missing");
   });
 
@@ -266,7 +269,7 @@ describe("emails service", () => {
     mocks.findAttachmentByIdsAndOrganization.mockResolvedValue({
       r2Key: "email-attachments/org/address/email/att-image.png",
       contentType: "image/png",
-      filename: "hero.png",
+      filename: "画像.png",
       size: 5,
     });
 
@@ -291,6 +294,9 @@ describe("emails service", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-disposition")).toContain("inline");
+    expect(response.headers.get("content-disposition")).toContain(
+      "filename*=UTF-8''%E7%94%BB%E5%83%8F.png"
+    );
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await response.text()).toBe("hello");

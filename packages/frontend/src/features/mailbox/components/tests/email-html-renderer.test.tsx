@@ -109,4 +109,47 @@ describe("EmailHtmlRenderer", () => {
     ).toBe(true);
     expect(onRemoteContentBlockedChange).toHaveBeenLastCalledWith(false);
   });
+
+  it("blocks remote srcset candidates by default and restores them when enabled", async () => {
+    const onRemoteContentBlockedChange = vi.fn();
+    const { rerender } = render(
+      <EmailHtmlRenderer
+        html={
+          '<img srcset="https://example.com/pixel-1x.png 1x, https://example.com/pixel-2x.png 2x" />'
+        }
+        onRemoteContentBlockedChange={onRemoteContentBlockedChange}
+      />
+    );
+
+    const host = screen.getByTestId("email-html-renderer");
+
+    await waitFor(() => {
+      expect(host.shadowRoot?.querySelector("img")).toBeTruthy();
+    });
+
+    expect(
+      host.shadowRoot?.querySelector("img")?.getAttribute("srcset")
+    ).toBeNull();
+    expect(onRemoteContentBlockedChange).toHaveBeenLastCalledWith(true);
+
+    rerender(
+      <EmailHtmlRenderer
+        allowRemoteContent
+        html={
+          '<img srcset="https://example.com/pixel-1x.png 1x, https://example.com/pixel-2x.png 2x" />'
+        }
+        onRemoteContentBlockedChange={onRemoteContentBlockedChange}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        host.shadowRoot?.querySelector("img")?.getAttribute("srcset")
+      ).toBe(
+        "https://example.com/pixel-1x.png 1x, https://example.com/pixel-2x.png 2x"
+      );
+    });
+
+    expect(onRemoteContentBlockedChange).toHaveBeenLastCalledWith(false);
+  });
 });

@@ -11,13 +11,16 @@ export const sanitizeFilename = (value: string | null | undefined) => {
 };
 
 const escapeContentDispositionFilename = (value: string) =>
-  value.replace(/["\\\r\n]/g, "_");
+  value.replace(/["\\\r\n]/g, "_").replace(/[^\x20-\x7E]/g, "_");
 
 export const buildContentDisposition = (filename: string) => {
   const encoded = encodeURIComponent(filename);
   const fallback = escapeContentDispositionFilename(filename);
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 };
+
+export const buildInlineContentDisposition = (filename: string) =>
+  buildContentDisposition(filename).replace(/^attachment;/i, "inline;");
 
 export const getUtf8ByteLength = (value: string) =>
   new TextEncoder().encode(value).byteLength;
