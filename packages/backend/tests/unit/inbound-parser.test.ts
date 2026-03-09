@@ -2,6 +2,7 @@ import fc from "fast-check";
 import {
   capTextForStorage,
   extractBodiesFromRaw,
+  repairLikelyMisdecodedUtf8,
   readRawWithLimit,
   sanitizeEmailHtml,
 } from "@/modules/inbound-email/parser";
@@ -43,6 +44,30 @@ describe("inbound email parser", () => {
     expect(html).not.toContain("<script>");
   });
 
+  it("preserves safe email styles while dropping unsafe CSS constructs", () => {
+    const html = sanitizeEmailHtml(
+      [
+        "<html><head>",
+        "<style>",
+        ".hero { color: #111; background-image: url('https://example.com/hero.png'); }",
+        "@import url('https://example.com/fonts.css');",
+        ".bad { behavior: url(#default#VML); }",
+        "</style>",
+        "</head><body>",
+        '<table class="hero" style="margin:0; background-image:url(\'https://example.com/card.png\'); behavior:url(#bad);">',
+        "<tr><td>Hello</td></tr>",
+        "</table>",
+        "</body></html>",
+      ].join("")
+    );
+
+    expect(html).toContain("<style>");
+    expect(html).toContain("background-image:url");
+    expect(html).not.toContain("@import");
+    expect(html).not.toContain("behavior:");
+    expect(html).toContain('class="hero"');
+  });
+
   it("extracts text and attachments from multipart raw MIME", async () => {
     const raw = [
       "From: sender@example.com",
@@ -71,6 +96,19 @@ describe("inbound email parser", () => {
     expect(parsed.attachments).toHaveLength(1);
     expect(parsed.attachments[0]?.filename).toBe("report.txt");
     expect(parsed.attachments[0]?.size).toBe(5);
+  });
+
+  it("repairs common utf8 mojibake in decoded html and text", () => {
+    const repairedHtml = repairLikelyMisdecodedUtf8(
+      "<html><body><p>â€” Example App Team</p><p>Â© 2026 Example App</p></body></html>"
+    );
+    const repairedText = repairLikelyMisdecodedUtf8("â€” Example App Team");
+
+    expect(repairedHtml).toContain("— Example App Team");
+    expect(repairedHtml).toContain("© 2026 Example App");
+    expect(repairedHtml).not.toContain("â€”");
+    expect(repairedHtml).not.toContain("Â©");
+    expect(repairedText).toBe("— Example App Team");
   });
 
   it("safely handles malformed MIME payloads", async () => {

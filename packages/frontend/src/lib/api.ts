@@ -5,7 +5,7 @@ type ApiError = {
   details?: string;
 };
 
-const getApiUrl = (path: string) => `${API_BASE}${path}`;
+export const resolveApiUrl = (path: string) => `${API_BASE}${path}`;
 
 const appendOrganizationCacheKey = (
   path: string,
@@ -22,7 +22,7 @@ const apiFetch = async <T>(
   organizationId?: string | null
 ) => {
   const scopedPath = appendOrganizationCacheKey(path, organizationId);
-  const response = await fetch(getApiUrl(scopedPath), {
+  const response = await fetch(resolveApiUrl(scopedPath), {
     credentials: "include",
     cache: "no-store",
     headers: {
@@ -117,6 +117,7 @@ export type EmailAttachment = {
   size: number;
   disposition: string | null;
   contentId: string | null;
+  inlinePath: string;
   downloadPath: string;
 };
 
@@ -465,7 +466,7 @@ export const downloadEmailAttachment = async (params: {
     `/api/emails/${params.emailId}/attachments/${params.attachmentId}`,
     params.organizationId
   );
-  const response = await fetch(getApiUrl(scopedPath), {
+  const response = await fetch(resolveApiUrl(scopedPath), {
     credentials: "include",
     method: "GET",
     cache: "no-store",

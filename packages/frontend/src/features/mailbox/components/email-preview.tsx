@@ -14,21 +14,26 @@ import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
-import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
+import { EmailHtmlRenderer } from "@/features/mailbox/components/email-html-renderer";
 import {
   downloadEmailAttachment,
   type EmailAttachment,
   type EmailDetail,
 } from "@/lib/api";
-import { buildEmailPreview } from "@/features/mailbox/utils/build-email-preview";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
 type EmailPreviewProps = {
   email: EmailDetail | null;
   isLoading?: boolean;
+};
+
+type RemoteContentState = {
+  allowRemoteContent: boolean;
+  emailId: string | null;
+  remoteContentBlocked: boolean;
 };
 
 const formatDate = (value: string | null, timeZone: string) => {
@@ -61,7 +66,6 @@ export const EmailPreview = ({
   email,
   isLoading = false,
 }: EmailPreviewProps) => {
-  const { theme } = useTheme();
   const { effectiveTimeZone } = useTimezone();
   const { activeOrganizationId } = useAuth();
   const deleteMutation = useDeleteEmailMutation(email?.addressId ?? null);
@@ -77,19 +81,21 @@ export const EmailPreview = ({
   const [attachmentError, setAttachmentError] = React.useState<string | null>(
     null
   );
-  const previewTheme =
-    theme === "system"
-      ? typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
-  const previewBackgroundColor =
-    previewTheme === "dark" ? "#121212" : "#ffffff";
-  const emailPreviewDoc = React.useMemo(
-    () => (email?.html ? buildEmailPreview(email.html, previewTheme) : null),
-    [email?.html, previewTheme]
-  );
+  const [remoteContentState, setRemoteContentState] =
+    React.useState<RemoteContentState>({
+      allowRemoteContent: false,
+      emailId: email?.id ?? null,
+      remoteContentBlocked: false,
+    });
+
+  const activeRemoteContentState =
+    remoteContentState.emailId === (email?.id ?? null)
+      ? remoteContentState
+      : {
+          allowRemoteContent: false,
+          emailId: email?.id ?? null,
+          remoteContentBlocked: false,
+        };
 
   if (isLoading) {
     return (
@@ -137,6 +143,35 @@ export const EmailPreview = ({
     }
   };
 
+  const handleAllowRemoteContent = () => {
+    setRemoteContentState({
+      allowRemoteContent: true,
+      emailId: email.id,
+      remoteContentBlocked: activeRemoteContentState.remoteContentBlocked,
+    });
+  };
+
+  const handleRemoteContentBlockedChange = (blocked: boolean) => {
+    setRemoteContentState(current => {
+      const nextState = {
+        allowRemoteContent:
+          current.emailId === email.id ? current.allowRemoteContent : false,
+        emailId: email.id,
+        remoteContentBlocked: blocked,
+      };
+
+      if (
+        current.allowRemoteContent === nextState.allowRemoteContent &&
+        current.emailId === nextState.emailId &&
+        current.remoteContentBlocked === nextState.remoteContentBlocked
+      ) {
+        return current;
+      }
+
+      return nextState;
+    });
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -169,20 +204,33 @@ export const EmailPreview = ({
       </div>
       <Separator />
 
-      {emailPreviewDoc ? (
-        <div
-          className="relative h-96 overflow-hidden rounded-md border border-border/70"
-          style={{ backgroundColor: previewBackgroundColor }}
-        >
-          <iframe
-            className="h-full w-full"
-            key={`${email.id}:${previewTheme}`}
-            loading="eager"
-            referrerPolicy="no-referrer"
-            sandbox=""
-            srcDoc={emailPreviewDoc}
-            title="Email preview"
-          />
+      {email.html ? (
+        <div className="space-y-2">
+          {activeRemoteContentState.remoteContentBlocked &&
+          !activeRemoteContentState.allowRemoteContent ? (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                Remote images and CSS backgrounds are blocked until you load
+                them for this email.
+              </p>
+              <Button
+                className="shrink-0"
+                onClick={handleAllowRemoteContent}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Load remote content
+              </Button>
+            </div>
+          ) : null}
+          <div className="relative h-96 overflow-auto rounded-md border border-border/70 bg-background">
+            <EmailHtmlRenderer
+              allowRemoteContent={activeRemoteContentState.allowRemoteContent}
+              html={email.html}
+              onRemoteContentBlockedChange={handleRemoteContentBlockedChange}
+            />
+          </div>
         </div>
       ) : email.text ? (
         <Textarea

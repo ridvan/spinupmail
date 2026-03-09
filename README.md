@@ -390,4 +390,4 @@ rule to your Worker.
 
 - Email addresses **must** be created before email is sent. Unknown addresses
   are rejected.
-- HTML is sanitized on the backend and rendered inside a sandboxed iframe.
+- HTML is sanitized on the backend, re-checked on the frontend, and rendered inside a Shadow DOM container instead of an iframe.

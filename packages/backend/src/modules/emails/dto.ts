@@ -14,4 +14,5 @@ export const toAttachmentResponse = (attachment: {
   disposition: attachment.disposition,
   contentId: attachment.contentId,
   downloadPath: `/api/emails/${attachment.emailId}/attachments/${attachment.id}`,
+  inlinePath: `/api/emails/${attachment.emailId}/attachments/${attachment.id}?inline=1`,
 });

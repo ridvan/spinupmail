@@ -1,5 +1,4 @@
 import PostalMime from "postal-mime";
-import sanitizeHtml from "sanitize-html";
 import type {
   PostalAttachmentContent,
   PostalAttachmentEncoding,
@@ -7,6 +6,8 @@ import type {
   CfReadableStream,
 } from "./types";
 import { sanitizeFilename } from "@/shared/utils/string";
+
+export { sanitizeEmailHtml } from "@/shared/utils/email-html";
 
 export const readRawWithLimit = async (
   stream: ReadableStream<Uint8Array> | CfReadableStream,
@@ -85,64 +86,74 @@ const attachmentContentToBytes = (
   return new Uint8Array(content);
 };
 
-export const sanitizeEmailHtml = (html: string) =>
-  sanitizeHtml(html, {
-    allowedTags: [
-      "a",
-      "b",
-      "strong",
-      "i",
-      "em",
-      "u",
-      "s",
-      "br",
-      "p",
-      "div",
-      "span",
-      "pre",
-      "code",
-      "blockquote",
-      "ul",
-      "ol",
-      "li",
-      "table",
-      "thead",
-      "tbody",
-      "tfoot",
-      "tr",
-      "th",
-      "td",
-      "img",
-      "hr",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "h5",
-      "h6",
-    ],
-    allowedAttributes: {
-      a: ["href", "name", "target", "rel", "title"],
-      img: ["src", "alt", "title", "width", "height"],
-      "*": ["title", "style"],
-    },
-    allowedSchemes: ["http", "https", "mailto", "data"],
-    allowedSchemesByTag: {
-      img: ["data"],
-    },
-    allowProtocolRelative: false,
-    disallowedTagsMode: "discard",
-    transformTags: {
-      a: (_tagName, attribs) => ({
-        tagName: "a",
-        attribs: {
-          ...attribs,
-          rel: "noopener noreferrer nofollow",
-          target: "_blank",
-        },
-      }),
-    },
-  });
+const WINDOWS_1252_BYTE_BY_CHAR = new Map<string, number>([
+  ["€", 0x80],
+  ["‚", 0x82],
+  ["ƒ", 0x83],
+  ["„", 0x84],
+  ["…", 0x85],
+  ["†", 0x86],
+  ["‡", 0x87],
+  ["ˆ", 0x88],
+  ["‰", 0x89],
+  ["Š", 0x8a],
+  ["‹", 0x8b],
+  ["Œ", 0x8c],
+  ["Ž", 0x8e],
+  ["‘", 0x91],
+  ["’", 0x92],
+  ["“", 0x93],
+  ["”", 0x94],
+  ["•", 0x95],
+  ["–", 0x96],
+  ["—", 0x97],
+  ["˜", 0x98],
+  ["™", 0x99],
+  ["š", 0x9a],
+  ["›", 0x9b],
+  ["œ", 0x9c],
+  ["ž", 0x9e],
+  ["Ÿ", 0x9f],
+]);
+
+const countLikelyMojibakeMarkers = (value: string) =>
+  (value.match(/[ÃÂâÐÑð]/g) ?? []).length;
+
+const encodeWindows1252Byte = (character: string) => {
+  const mapped = WINDOWS_1252_BYTE_BY_CHAR.get(character);
+  if (mapped !== undefined) return mapped;
+
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined || codePoint > 0xff) return null;
+  return codePoint;
+};
+
+const repairLikelyMisdecodedUtf8 = (value: string | undefined) => {
+  if (!value) return value;
+
+  const originalMarkerCount = countLikelyMojibakeMarkers(value);
+  if (originalMarkerCount === 0) return value;
+
+  const encodedBytes = Array.from(value, encodeWindows1252Byte);
+  if (encodedBytes.some(byte => byte === null)) {
+    return value;
+  }
+
+  const latin1Bytes = Uint8Array.from(encodedBytes as number[]);
+  const repaired = new TextDecoder("utf-8", {
+    fatal: false,
+    ignoreBOM: false,
+  }).decode(latin1Bytes);
+
+  if (!repaired || repaired.includes("\uFFFD")) {
+    return value;
+  }
+
+  const repairedMarkerCount = countLikelyMojibakeMarkers(repaired);
+  return repairedMarkerCount < originalMarkerCount ? repaired : value;
+};
+
+export { repairLikelyMisdecodedUtf8 };
 
 export const capTextForStorage = (
   value: string | undefined,
@@ -160,11 +171,11 @@ export const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
     const parsed = await parser.parse(rawBytes);
     const html =
       typeof parsed.html === "string" && parsed.html.trim().length > 0
-        ? parsed.html
+        ? repairLikelyMisdecodedUtf8(parsed.html)
         : undefined;
     const text =
       typeof parsed.text === "string" && parsed.text.trim().length > 0
-        ? parsed.text
+        ? repairLikelyMisdecodedUtf8(parsed.text)
         : undefined;
     const attachments = (parsed.attachments ?? [])
       .map((attachment): ParsedEmailAttachment | null => {

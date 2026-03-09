@@ -17,5 +17,12 @@ export const emailDetailQuerySchema = z
   })
   .passthrough();
 
+export const emailAttachmentQuerySchema = z
+  .object({
+    inline: z.string().optional(),
+  })
+  .passthrough();
+
 export type ListEmailsQuery = z.infer<typeof listEmailsQuerySchema>;
 export type EmailDetailQuery = z.infer<typeof emailDetailQuerySchema>;
+export type EmailAttachmentQuery = z.infer<typeof emailAttachmentQuerySchema>;

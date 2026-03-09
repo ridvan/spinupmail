@@ -8,7 +8,11 @@ import {
   getEmailRaw,
   listEmails,
 } from "./service";
-import { emailDetailQuerySchema, listEmailsQuerySchema } from "./schemas";
+import {
+  emailAttachmentQuerySchema,
+  emailDetailQuerySchema,
+  listEmailsQuerySchema,
+} from "./schemas";
 
 export const createEmailsRouter = () => {
   const router = new Hono<AppHonoEnv>();
@@ -68,18 +72,24 @@ export const createEmailsRouter = () => {
     return getEmailRaw({ env: c.env, organizationId, emailId });
   });
 
-  router.get("/emails/:id/attachments/:attachmentId", async c => {
-    const organizationId = c.get("organizationId");
-    const emailId = c.req.param("id");
-    const attachmentId = c.req.param("attachmentId");
+  router.get(
+    "/emails/:id/attachments/:attachmentId",
+    zValidator("query", emailAttachmentQuerySchema),
+    async c => {
+      const organizationId = c.get("organizationId");
+      const emailId = c.req.param("id");
+      const attachmentId = c.req.param("attachmentId");
+      const query = c.req.valid("query");
 
-    return getEmailAttachment({
-      env: c.env,
-      organizationId,
-      emailId,
-      attachmentId,
-    });
-  });
+      return getEmailAttachment({
+        env: c.env,
+        organizationId,
+        emailId,
+        attachmentId,
+        queryPayload: query,
+      });
+    }
+  );
 
   return router;
 };

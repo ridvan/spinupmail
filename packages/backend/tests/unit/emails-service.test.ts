@@ -1,4 +1,5 @@
 import {
+  getEmailDetail,
   getEmailAttachment,
   getEmailRaw,
   listEmails,
@@ -6,6 +7,8 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
+  findEmailAttachmentsByEmailAndOrganization: vi.fn(),
+  findEmailDetailByIdAndOrganization: vi.fn(),
   findEmailRawSourceByIdAndOrganization: vi.fn(),
   findAttachmentByIdsAndOrganization: vi.fn(),
 }));
@@ -20,8 +23,9 @@ vi.mock("@/modules/emails/repo", () => ({
   findAddressByValueAndOrganization: vi.fn(),
   listEmailsForAddress: vi.fn(),
   findAttachmentCountsForEmails: vi.fn(),
-  findEmailDetailByIdAndOrganization: vi.fn(),
-  findEmailAttachmentsByEmailAndOrganization: vi.fn(),
+  findEmailAttachmentsByEmailAndOrganization:
+    mocks.findEmailAttachmentsByEmailAndOrganization,
+  findEmailDetailByIdAndOrganization: mocks.findEmailDetailByIdAndOrganization,
   findEmailRawSourceByIdAndOrganization:
     mocks.findEmailRawSourceByIdAndOrganization,
   findAttachmentByIdsAndOrganization: mocks.findAttachmentByIdsAndOrganization,
@@ -32,6 +36,7 @@ vi.mock("@/modules/emails/repo", () => ({
 
 describe("emails service", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
   });
 
@@ -109,6 +114,7 @@ describe("emails service", () => {
       organizationId: "org-1",
       emailId: "email-1",
       attachmentId: "att-1",
+      queryPayload: {},
     });
 
     expect(response.status).toBe(503);
@@ -129,6 +135,7 @@ describe("emails service", () => {
       organizationId: "org-1",
       emailId: "email-1",
       attachmentId: "att-1",
+      queryPayload: {},
     });
 
     expect(response.status).toBe(404);
@@ -159,11 +166,133 @@ describe("emails service", () => {
       organizationId: "org-1",
       emailId: "email-1",
       attachmentId: "att-1",
+      queryPayload: {},
     });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/plain");
     expect(response.headers.get("content-disposition")).toContain("report");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await response.text()).toBe("hello");
+  });
+
+  it("rewrites cid references to inline attachment URLs on email detail", async () => {
+    mocks.findEmailDetailByIdAndOrganization.mockResolvedValue({
+      id: "email-1",
+      addressId: "address-1",
+      address: "inbox@example.com",
+      to: "inbox@example.com",
+      from: "sender@example.com",
+      subject: "Hello",
+      messageId: "message-1",
+      headers: "[]",
+      bodyHtml:
+        '<style>.hero{background-image:url("cid:bg-1")}</style><img src="cid:image-1" /><img src="cid:missing" />',
+      bodyText: "Hello",
+      raw: null,
+      rawSize: 123,
+      rawTruncated: false,
+      receivedAt: new Date("2026-03-09T00:00:00.000Z"),
+    });
+    mocks.findEmailAttachmentsByEmailAndOrganization.mockResolvedValue([
+      {
+        id: "att-image",
+        emailId: "email-1",
+        filename: "hero.png",
+        contentType: "image/png",
+        size: 12,
+        disposition: "inline",
+        contentId: "<image-1>",
+      },
+      {
+        id: "att-bg",
+        emailId: "email-1",
+        filename: "bg.png",
+        contentType: "image/png",
+        size: 10,
+        disposition: "inline",
+        contentId: "bg-1",
+      },
+    ]);
+
+    const result = await getEmailDetail({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+      queryPayload: {},
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.attachments[0]?.inlinePath).toBe(
+      "/api/emails/email-1/attachments/att-image?inline=1"
+    );
+    expect(result.body.html).toContain(
+      "/api/emails/email-1/attachments/att-image?inline=1"
+    );
+    expect(result.body.html).toContain(
+      "/api/emails/email-1/attachments/att-bg?inline=1"
+    );
+    expect(result.body.html).not.toContain("cid:missing");
+  });
+
+  it("rejects inline rendering for non-image attachments", async () => {
+    mocks.findAttachmentByIdsAndOrganization.mockResolvedValue({
+      r2Key: "email-attachments/org/address/email/att-report.pdf",
+      contentType: "application/pdf",
+      filename: "report.pdf",
+      size: 42,
+    });
+
+    const response = await getEmailAttachment({
+      env: {
+        R2_BUCKET: {
+          get: vi.fn(),
+        },
+      } as unknown as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+      attachmentId: "att-1",
+      queryPayload: { inline: "1" },
+    });
+
+    expect(response.status).toBe(415);
+    expect(await response.json()).toEqual({
+      error: "attachment content cannot be rendered inline",
+    });
+  });
+
+  it("serves inline image attachments with hardened headers", async () => {
+    mocks.findAttachmentByIdsAndOrganization.mockResolvedValue({
+      r2Key: "email-attachments/org/address/email/att-image.png",
+      contentType: "image/png",
+      filename: "hero.png",
+      size: 5,
+    });
+
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("hello"));
+        controller.close();
+      },
+    });
+
+    const response = await getEmailAttachment({
+      env: {
+        R2_BUCKET: {
+          get: vi.fn().mockResolvedValue({ body }),
+        },
+      } as unknown as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+      attachmentId: "att-1",
+      queryPayload: { inline: "1" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("inline");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(await response.text()).toBe("hello");
   });
 });

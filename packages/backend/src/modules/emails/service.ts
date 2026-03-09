@@ -5,6 +5,10 @@ import {
 } from "@/shared/constants";
 import { parseBooleanEnv } from "@/shared/env";
 import {
+  isSafeInlineImageContentType,
+  rewriteEmailHtmlForRendering,
+} from "@/shared/utils/email-html";
+import {
   buildContentDisposition,
   getUtf8ByteLength,
   sanitizeFilename,
@@ -14,8 +18,10 @@ import { chunkArray, getRawEmailR2Key } from "@/shared/utils/r2";
 import { normalizeAddress } from "@/shared/validation";
 import { getDb } from "@/platform/db/client";
 import {
+  emailAttachmentQuerySchema,
   emailDetailQuerySchema,
   listEmailsQuerySchema,
+  type EmailAttachmentQuery,
   type EmailDetailQuery,
   type ListEmailsQuery,
 } from "./schemas";
@@ -47,6 +53,12 @@ const parseDetailQuery = (payload: unknown): EmailDetailQuery => {
   return parsed.data;
 };
 
+const parseAttachmentQuery = (payload: unknown): EmailAttachmentQuery => {
+  const parsed = emailAttachmentQuerySchema.safeParse(payload);
+  if (!parsed.success) return {};
+  return parsed.data;
+};
+
 const getRawDownloadPath = (
   env: CloudflareBindings,
   row: { id: string; raw: string | null }
@@ -55,6 +67,23 @@ const getRawDownloadPath = (
   const rawInR2Enabled = parseBooleanEnv(env.EMAIL_STORE_RAW_IN_R2, false);
   return hasRawInDb || rawInR2Enabled ? `/api/emails/${row.id}/raw` : undefined;
 };
+
+const buildAttachmentHeaders = ({
+  contentDisposition,
+  contentType,
+  size,
+}: {
+  contentDisposition: string;
+  contentType: string;
+  size: number;
+}) => ({
+  "Content-Type": contentType || "application/octet-stream",
+  "Content-Disposition": contentDisposition,
+  "Content-Length": String(size),
+  "Cache-Control": "private, max-age=0, must-revalidate",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+});
 
 export const listEmails = async ({
   env,
@@ -261,6 +290,12 @@ export const getEmailDetail = async ({
   }
 
   const rawDownloadPath = getRawDownloadPath(env, row);
+  const attachments = attachmentRows.map(attachment =>
+    toAttachmentResponse(attachment)
+  );
+  const html = row.bodyHtml
+    ? rewriteEmailHtmlForRendering(row.bodyHtml, attachments)
+    : row.bodyHtml;
   const base = {
     id: row.id,
     addressId: row.addressId,
@@ -270,14 +305,12 @@ export const getEmailDetail = async ({
     subject: row.subject,
     messageId: row.messageId,
     headers: parsedHeaders,
-    html: row.bodyHtml,
+    html,
     text: row.bodyText,
     rawSize: row.rawSize,
     rawTruncated: row.rawTruncated,
     ...(rawDownloadPath ? { rawDownloadPath } : {}),
-    attachments: attachmentRows.map(attachment =>
-      toAttachmentResponse(attachment)
-    ),
+    attachments,
     receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
     receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
   };
@@ -359,12 +392,17 @@ export const getEmailAttachment = async ({
   organizationId,
   emailId,
   attachmentId,
+  queryPayload,
 }: {
   env: CloudflareBindings;
   organizationId: string;
   emailId: string;
   attachmentId: string;
+  queryPayload: unknown;
 }) => {
+  const query = parseAttachmentQuery(queryPayload);
+  const isInlineRequest = query.inline === "true" || query.inline === "1";
+
   if (!env.R2_BUCKET) {
     return new Response(
       JSON.stringify({ error: "Attachment storage is not configured" }),
@@ -390,6 +428,19 @@ export const getEmailAttachment = async ({
     });
   }
 
+  if (
+    isInlineRequest &&
+    !isSafeInlineImageContentType(attachmentRow.contentType)
+  ) {
+    return new Response(
+      JSON.stringify({ error: "attachment content cannot be rendered inline" }),
+      {
+        status: 415,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   const object = await env.R2_BUCKET.get(attachmentRow.r2Key);
   if (!object?.body) {
     return new Response(
@@ -401,14 +452,15 @@ export const getEmailAttachment = async ({
     );
   }
 
+  const filename = sanitizeFilename(attachmentRow.filename);
+
   return new Response(object.body as unknown as BodyInit, {
-    headers: {
-      "Content-Type": attachmentRow.contentType || "application/octet-stream",
-      "Content-Disposition": buildContentDisposition(
-        sanitizeFilename(attachmentRow.filename)
-      ),
-      "Content-Length": String(attachmentRow.size),
-      "Cache-Control": "private, max-age=0, must-revalidate",
-    },
+    headers: buildAttachmentHeaders({
+      contentDisposition: isInlineRequest
+        ? `inline; filename="${filename}"`
+        : buildContentDisposition(filename),
+      contentType: attachmentRow.contentType || "application/octet-stream",
+      size: attachmentRow.size,
+    }),
   });
 };
