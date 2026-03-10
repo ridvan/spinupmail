@@ -109,6 +109,41 @@ describe("emails service", () => {
     });
   });
 
+  it("falls back to from address for senderLabel when sender is null", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.listEmailsForAddress.mockResolvedValue([
+      {
+        id: "email-1",
+        addressId: "address-1",
+        to: "inbox@example.com",
+        sender: null,
+        from: "noname@example.com",
+        subject: "Hello",
+        messageId: null,
+        rawSize: 50,
+        rawTruncated: false,
+        receivedAt: new Date("2026-03-09T00:00:00.000Z"),
+        hasHtml: 0,
+        hasText: 1,
+      },
+    ]);
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: { addressId: "address-1" },
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.items[0]).toMatchObject({
+      sender: null,
+      senderLabel: "noname@example.com",
+    });
+  });
+
   it("streams raw email from DB when stored inline", async () => {
     mocks.findEmailRawSourceByIdAndOrganization.mockResolvedValue({
       id: "email-1",
