@@ -13,6 +13,12 @@ import { Button } from "@/components/ui/button";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
@@ -64,6 +70,9 @@ const formatBytes = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+const formatSenderLine = (email: EmailDetail) =>
+  email.sender || email.from || "Unknown sender";
 
 export const EmailPreview = ({
   email,
@@ -192,28 +201,42 @@ export const EmailPreview = ({
           <p className="text-base font-semibold">
             {email.subject || "No subject"}
           </p>
-          <p className="text-xs text-muted-foreground">From {email.from}</p>
+          <p className="text-xs text-muted-foreground">
+            Sender: {formatSenderLine(email)}
+          </p>
+          <p className="text-xs text-muted-foreground">From: {email.from}</p>
+        </div>
+        <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground">
             {formatDate(email.receivedAt, effectiveTimeZone)}
           </p>
+          <TooltipProvider delay={120}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    className="cursor-pointer"
+                    aria-label="Delete"
+                    disabled={deleteMutation.isPending}
+                    onMouseEnter={() => {
+                      deleteIconRef.current?.startAnimation();
+                    }}
+                    onMouseLeave={() => {
+                      deleteIconRef.current?.stopAnimation();
+                    }}
+                    onClick={() => setPendingDeleteEmailId(email.id)}
+                  />
+                }
+              >
+                <DeleteIcon ref={deleteIconRef} size={16} aria-hidden="true" />
+              </TooltipTrigger>
+              <TooltipContent side="top">Delete</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="cursor-pointer"
-          disabled={deleteMutation.isPending}
-          onMouseEnter={() => {
-            deleteIconRef.current?.startAnimation();
-          }}
-          onMouseLeave={() => {
-            deleteIconRef.current?.stopAnimation();
-          }}
-          onClick={() => setPendingDeleteEmailId(email.id)}
-        >
-          <DeleteIcon ref={deleteIconRef} size={16} aria-hidden="true" />
-          Delete
-        </Button>
       </div>
       <Separator />
 

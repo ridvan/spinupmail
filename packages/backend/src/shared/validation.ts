@@ -3,6 +3,25 @@ import { normalizeDomain } from "./env";
 export const normalizeAddress = (address: string) =>
   address.trim().toLowerCase();
 
+const stripWrappingQuotes = (value: string) => {
+  if (value.length < 2) return value;
+
+  const startsWithQuote = value.startsWith('"');
+  const endsWithQuote = value.endsWith('"');
+  return startsWithQuote && endsWithQuote ? value.slice(1, -1) : value;
+};
+
+const cleanMailboxValue = (value: string) =>
+  stripWrappingQuotes(value.trim().replace(/^mailto:/i, ""));
+
+export type ParsedSenderIdentity = {
+  raw: string;
+  name: string | null;
+  address: string | null;
+  label: string;
+  formatted: string;
+};
+
 export const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -218,19 +237,52 @@ export const buildAddressMetaForStorage = (
 };
 
 export const extractSenderDomain = (value: string | null | undefined) => {
-  if (!value) return null;
+  const parsed = parseSenderIdentity(value);
+  const candidate = parsed?.address ?? null;
+  if (!candidate) return null;
 
-  const raw = value.trim();
-  if (!raw) return null;
-
-  const angleAddress = raw.match(/<\s*([^<>]+)\s*>/)?.[1];
-  const firstAddress = (angleAddress ?? raw).split(",")[0]?.trim() ?? "";
-  const candidate = firstAddress.replace(/^mailto:/i, "");
   const atIndex = candidate.lastIndexOf("@");
   if (atIndex === -1 || atIndex === candidate.length - 1) return null;
 
   const domain = normalizeDomain(candidate.slice(atIndex + 1));
   return domain.length > 0 ? domain : null;
+};
+
+export const parseSenderIdentity = (
+  value: string | null | undefined
+): ParsedSenderIdentity | null => {
+  if (!value) return null;
+
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const angleAddressMatch = raw.match(/<\s*([^<>]+)\s*>/);
+  const addressCandidate = cleanMailboxValue(
+    angleAddressMatch?.[1] ?? raw.split(",")[0]?.trim() ?? ""
+  );
+  const address =
+    addressCandidate.length > 0 && addressCandidate.includes("@")
+      ? addressCandidate
+      : null;
+
+  const nameCandidate = angleAddressMatch
+    ? cleanMailboxValue(raw.slice(0, angleAddressMatch.index).trim())
+    : "";
+  const normalizedName =
+    nameCandidate.length > 0 && nameCandidate !== address
+      ? nameCandidate
+      : null;
+  const label = normalizedName ?? address ?? raw;
+  const formatted =
+    normalizedName && address ? `${normalizedName} <${address}>` : label;
+
+  return {
+    raw,
+    name: normalizedName,
+    address,
+    label,
+    formatted,
+  };
 };
 
 export const isSenderDomainAllowed = (

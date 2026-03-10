@@ -17,6 +17,8 @@ export const emailListItemSchema = z.object({
   addressId: z.string().min(1),
   to: z.string().min(1),
   from: z.string().min(1),
+  sender: z.string().nullable().optional(),
+  senderLabel: z.string().min(1),
   subject: z.string().nullable().optional(),
   messageId: z.string().nullable().optional(),
   rawSize: z.number().nullable().optional(),

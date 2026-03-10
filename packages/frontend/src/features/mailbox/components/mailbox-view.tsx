@@ -283,7 +283,7 @@ export const MailboxView = ({
                   </p>
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-muted-foreground">
-                      {email.from}
+                      {email.senderLabel}
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {formatRelativeDate(email.receivedAt, effectiveTimeZone)}

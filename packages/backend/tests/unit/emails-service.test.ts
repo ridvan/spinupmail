@@ -7,6 +7,10 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
+  findAddressByIdAndOrganization: vi.fn(),
+  findAddressByValueAndOrganization: vi.fn(),
+  listEmailsForAddress: vi.fn(),
+  findAttachmentCountsForEmails: vi.fn(),
   findEmailAttachmentsByEmailAndOrganization: vi.fn(),
   findEmailDetailByIdAndOrganization: vi.fn(),
   findEmailRawSourceByIdAndOrganization: vi.fn(),
@@ -19,10 +23,10 @@ vi.mock("@/platform/db/client", () => ({
 
 vi.mock("@/modules/emails/repo", () => ({
   decrementAddressEmailCount: vi.fn(),
-  findAddressByIdAndOrganization: vi.fn(),
-  findAddressByValueAndOrganization: vi.fn(),
-  listEmailsForAddress: vi.fn(),
-  findAttachmentCountsForEmails: vi.fn(),
+  findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
+  findAddressByValueAndOrganization: mocks.findAddressByValueAndOrganization,
+  listEmailsForAddress: mocks.listEmailsForAddress,
+  findAttachmentCountsForEmails: mocks.findAttachmentCountsForEmails,
   findEmailAttachmentsByEmailAndOrganization:
     mocks.findEmailAttachmentsByEmailAndOrganization,
   findEmailDetailByIdAndOrganization: mocks.findEmailDetailByIdAndOrganization,
@@ -38,6 +42,7 @@ describe("emails service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
+    mocks.findAttachmentCountsForEmails.mockResolvedValue([]);
   });
 
   it("requires address or addressId when listing emails", async () => {
@@ -62,6 +67,46 @@ describe("emails service", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "email not found" });
+  });
+
+  it("returns parsed sender fields when listing emails", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.listEmailsForAddress.mockResolvedValue([
+      {
+        id: "email-1",
+        addressId: "address-1",
+        to: "inbox@example.com",
+        sender: "John Smith <john@example.com>",
+        from: "john@example.com",
+        subject: "Hello",
+        messageId: "message-1",
+        rawSize: 123,
+        rawTruncated: false,
+        receivedAt: new Date("2026-03-09T00:00:00.000Z"),
+        hasHtml: 1,
+        hasText: 0,
+      },
+    ]);
+    mocks.findAttachmentCountsForEmails.mockResolvedValue([
+      { emailId: "email-1", count: 2 },
+    ]);
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: { addressId: "address-1" },
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.items[0]).toMatchObject({
+      from: "john@example.com",
+      sender: "John Smith <john@example.com>",
+      senderLabel: "John Smith",
+      attachmentCount: 2,
+    });
   });
 
   it("streams raw email from DB when stored inline", async () => {
@@ -183,7 +228,8 @@ describe("emails service", () => {
       addressId: "address-1",
       address: "inbox@example.com",
       to: "inbox@example.com",
-      from: "sender@example.com",
+      sender: "John Smith <john@example.com>",
+      from: "john@example.com",
       subject: "Hello",
       messageId: "message-1",
       headers: "[]",
@@ -227,6 +273,8 @@ describe("emails service", () => {
     expect(result.body.attachments[0]?.inlinePath).toBe(
       "/api/emails/email-1/attachments/att-image?inline=1"
     );
+    expect(result.body.sender).toBe("John Smith <john@example.com>");
+    expect(result.body.senderLabel).toBe("John Smith");
     expect(result.body.html).toContain(
       "/api/emails/email-1/attachments/att-image?inline=1"
     );

@@ -8,6 +8,13 @@
       "when": 1773172808963,
       "tag": "0000_broad_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1773176805299,
+      "tag": "0001_minor_red_ghost",
+      "breakpoints": true
     }
   ]
 }

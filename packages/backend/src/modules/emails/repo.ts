@@ -71,6 +71,7 @@ export const listEmailsForAddress = ({
     .select({
       id: emails.id,
       addressId: emails.addressId,
+      sender: emails.sender,
       to: emails.to,
       from: emails.from,
       subject: emails.subject,
@@ -121,6 +122,7 @@ export const findEmailDetailByIdAndOrganization = (
       id: emails.id,
       addressId: emails.addressId,
       address: emailAddresses.address,
+      sender: emails.sender,
       to: emails.to,
       from: emails.from,
       subject: emails.subject,

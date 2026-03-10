@@ -21,6 +21,7 @@ export const insertInboundEmail = (
     id: string;
     addressId: string;
     messageId?: string;
+    sender?: string;
     from: string;
     to: string;
     subject?: string;

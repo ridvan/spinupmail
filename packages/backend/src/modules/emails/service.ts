@@ -16,7 +16,7 @@ import {
 } from "@/shared/utils/string";
 import { clampNumber, parseOptionalTimestamp } from "@/shared/utils/dates";
 import { chunkArray, getRawEmailR2Key } from "@/shared/utils/r2";
-import { normalizeAddress } from "@/shared/validation";
+import { normalizeAddress, parseSenderIdentity } from "@/shared/validation";
 import { getDb } from "@/platform/db/client";
 import {
   emailAttachmentQuerySchema,
@@ -153,21 +153,27 @@ export const listEmails = async ({
     attachmentCountByEmail.set(row.emailId, Number(row.count) || 0);
   }
 
-  const items = rows.map(row => ({
-    id: row.id,
-    addressId: row.addressId,
-    to: row.to,
-    from: row.from,
-    subject: row.subject,
-    messageId: row.messageId,
-    rawSize: row.rawSize,
-    rawTruncated: row.rawTruncated,
-    hasHtml: Number(row.hasHtml) > 0,
-    hasText: Number(row.hasText) > 0,
-    attachmentCount: attachmentCountByEmail.get(row.id) ?? 0,
-    receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
-    receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
-  }));
+  const items = rows.map(row => {
+    const sender = parseSenderIdentity(row.sender);
+
+    return {
+      id: row.id,
+      addressId: row.addressId,
+      to: row.to,
+      from: row.from,
+      sender: row.sender ?? null,
+      senderLabel: sender?.label ?? row.sender ?? row.from,
+      subject: row.subject,
+      messageId: row.messageId,
+      rawSize: row.rawSize,
+      rawTruncated: row.rawTruncated,
+      hasHtml: Number(row.hasHtml) > 0,
+      hasText: Number(row.hasText) > 0,
+      attachmentCount: attachmentCountByEmail.get(row.id) ?? 0,
+      receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
+      receivedAtMs: row.receivedAt ? row.receivedAt.getTime() : null,
+    };
+  });
 
   return {
     status: 200 as const,
@@ -297,12 +303,15 @@ export const getEmailDetail = async ({
   const html = row.bodyHtml
     ? rewriteEmailHtmlForRendering(row.bodyHtml, attachments)
     : row.bodyHtml;
+  const sender = parseSenderIdentity(row.sender);
   const base = {
     id: row.id,
     addressId: row.addressId,
     address: row.address,
     to: row.to,
     from: row.from,
+    sender: row.sender ?? null,
+    senderLabel: sender?.label ?? row.sender ?? row.from,
     subject: row.subject,
     messageId: row.messageId,
     headers: parsedHeaders,

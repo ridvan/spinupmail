@@ -126,6 +126,8 @@ export type EmailListItem = {
   addressId: string;
   to: string;
   from: string;
+  sender?: string | null;
+  senderLabel: string;
   subject?: string | null;
   messageId?: string | null;
   rawSize?: number | null;
@@ -143,6 +145,8 @@ export type EmailDetail = {
   address?: string;
   to: string;
   from: string;
+  sender?: string | null;
+  senderLabel: string;
   subject?: string | null;
   messageId?: string | null;
   headers: unknown;

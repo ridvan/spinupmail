@@ -59,7 +59,7 @@ vi.mock("@/modules/inbound-email/policy", () => ({
 
 const buildMessage = () => {
   const headers = new Headers([
-    ["from", "sender@example.com"],
+    ["from", '"John Smith" <sender@example.com>'],
     ["subject", "Hello"],
     ["message-id", "msg-1"],
   ]);
@@ -264,6 +264,13 @@ describe("inbound email handler", () => {
     );
 
     expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(1);
+    expect(mocks.insertInboundEmail).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        sender: "John Smith <sender@example.com>",
+        from: "sender@example.com",
+      })
+    );
     expect(mocks.persistRawEmailToR2).toHaveBeenCalledTimes(1);
     expect(mocks.persistAttachments).toHaveBeenCalledTimes(1);
     expect(ctx.waitUntil).toHaveBeenCalledTimes(2);

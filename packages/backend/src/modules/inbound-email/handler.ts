@@ -13,6 +13,7 @@ import {
   getMaxReceivedEmailActionFromMeta,
   getMaxReceivedEmailCountFromMeta,
   normalizeAddress,
+  parseSenderIdentity,
   parseAddressMeta,
 } from "@/shared/validation";
 import { toStoredHeadersJson } from "./dto";
@@ -117,7 +118,9 @@ export const handleIncomingEmail = async (
     const headersJson = toStoredHeadersJson(message.headers, storeHeadersInDb);
     const receivedAt = new Date();
     const emailId = crypto.randomUUID();
-    const fromValue = message.from ?? message.headers.get("from") ?? "unknown";
+    const senderHeaderValue = message.headers.get("from");
+    const senderValue = parseSenderIdentity(senderHeaderValue)?.formatted;
+    const fromValue = message.from ?? "unknown";
     const toValue = message.to || recipient;
 
     // Reserve count slots as close to insert as possible to minimize drift
@@ -190,6 +193,7 @@ export const handleIncomingEmail = async (
       id: emailId,
       addressId: addressRow.id,
       messageId: message.headers.get("message-id") ?? undefined,
+      sender: senderValue,
       from: fromValue,
       to: toValue,
       subject: message.headers.get("subject") ?? undefined,

@@ -48,6 +48,8 @@ describe("EmailPreview", () => {
           addressId: "address-1",
           to: "inbox@example.com",
           from: "sender@example.com",
+          sender: "John Smith <sender@example.com>",
+          senderLabel: "John Smith",
           subject: "Remote content",
           headers: [],
           html: '<img src="https://example.com/pixel.png" />',
@@ -93,6 +95,8 @@ describe("EmailPreview", () => {
           addressId: "address-1",
           to: "inbox@example.com",
           from: "sender@example.com",
+          sender: "John Smith <sender@example.com>",
+          senderLabel: "John Smith",
           subject: "Text only",
           headers: [],
           html: null,
@@ -112,5 +116,66 @@ describe("EmailPreview", () => {
     expect(
       screen.queryByRole("button", { name: "Load remote content" })
     ).toBeNull();
+  });
+
+  it("renders sender separately from the actual from value", () => {
+    render(
+      <EmailPreview
+        email={{
+          id: "email-3",
+          addressId: "address-1",
+          to: "inbox@example.com",
+          from: "sender@example.com",
+          sender: "John Smith <sender@example.com>",
+          senderLabel: "John Smith",
+          subject: "Sender details",
+          headers: [],
+          html: null,
+          text: "Hello",
+          raw: null,
+          rawSize: 10,
+          rawTruncated: false,
+          rawDownloadPath: undefined,
+          attachments: [],
+          receivedAt: "2026-03-09T00:00:00.000Z",
+          receivedAtMs: 1741478400000,
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText("Sender: John Smith <sender@example.com>")
+    ).toBeTruthy();
+    expect(screen.getByText("From: sender@example.com")).toBeTruthy();
+  });
+
+  it("shows an icon-only delete button", () => {
+    render(
+      <EmailPreview
+        email={{
+          id: "email-4",
+          addressId: "address-1",
+          to: "inbox@example.com",
+          from: "sender@example.com",
+          sender: "John Smith <sender@example.com>",
+          senderLabel: "John Smith",
+          subject: "Delete action",
+          headers: [],
+          html: null,
+          text: "Hello",
+          raw: null,
+          rawSize: 10,
+          rawTruncated: false,
+          rawDownloadPath: undefined,
+          attachments: [],
+          receivedAt: "2026-03-09T00:00:00.000Z",
+          receivedAtMs: 1741478400000,
+        }}
+      />
+    );
+
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    expect(screen.queryByText(/^Delete$/)).toBeNull();
+    expect(deleteButton).toBeTruthy();
   });
 });

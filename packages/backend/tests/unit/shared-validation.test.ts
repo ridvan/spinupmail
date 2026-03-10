@@ -8,6 +8,7 @@ import {
   hasReservedLocalPartKeyword,
   isSenderDomainAllowed,
   normalizeAllowedFromDomains,
+  parseSenderIdentity,
   parseAddressMeta,
   sanitizeLocalPart,
 } from "@/shared/validation";
@@ -24,6 +25,23 @@ describe("shared validation helpers", () => {
     );
     expect(extractSenderDomain("sender@mail.foo.test")).toBe("mail.foo.test");
     expect(extractSenderDomain("invalid")).toBeNull();
+  });
+
+  it("parses display names and addresses from From headers", () => {
+    expect(parseSenderIdentity('"John Smith" <aasd@aasd.com>')).toEqual({
+      raw: '"John Smith" <aasd@aasd.com>',
+      name: "John Smith",
+      address: "aasd@aasd.com",
+      label: "John Smith",
+      formatted: "John Smith <aasd@aasd.com>",
+    });
+    expect(parseSenderIdentity("aasd@aasd.com")).toEqual({
+      raw: "aasd@aasd.com",
+      name: null,
+      address: "aasd@aasd.com",
+      label: "aasd@aasd.com",
+      formatted: "aasd@aasd.com",
+    });
   });
 
   it("normalizes allow-lists and validates subdomain matches", () => {

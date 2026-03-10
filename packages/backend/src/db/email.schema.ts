@@ -49,6 +49,7 @@ export const emails = sqliteTable(
       .notNull()
       .references(() => emailAddresses.id, { onDelete: "cascade" }),
     messageId: text("message_id"),
+    sender: text("sender"),
     from: text("from").notNull(),
     to: text("to").notNull(),
     subject: text("subject"),
