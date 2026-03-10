@@ -152,4 +152,26 @@ describe("EmailHtmlRenderer", () => {
 
     expect(onRemoteContentBlockedChange).toHaveBeenLastCalledWith(false);
   });
+
+  it("preserves col span attributes for table-based email layouts", async () => {
+    render(
+      <EmailHtmlRenderer
+        html={[
+          "<table><colgroup>",
+          '<col span="2" style="background:#f4f6f8" />',
+          "</colgroup><tr><td>Hello</td><td>World</td></tr></table>",
+        ].join("")}
+      />
+    );
+
+    const host = screen.getByTestId("email-html-renderer");
+
+    await waitFor(() => {
+      expect(host.shadowRoot?.querySelector("col")).toBeTruthy();
+    });
+
+    expect(host.shadowRoot?.querySelector("col")?.getAttribute("span")).toBe(
+      "2"
+    );
+  });
 });

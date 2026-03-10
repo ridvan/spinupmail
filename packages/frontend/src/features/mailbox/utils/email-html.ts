@@ -73,6 +73,7 @@ const EMAIL_ALLOWED_ATTRIBUTES = [
   "rel",
   "role",
   "rowspan",
+  "span",
   "src",
   "srcset",
   "start",
