@@ -19,6 +19,8 @@ export function useLocalStorage<T>(
   key: string,
   initialValue: T
 ): [T, (value: T | ((prev: T) => T)) => void] {
+  const initialValueRef = React.useRef(initialValue);
+
   const subscribe = React.useCallback(
     (onStoreChange: () => void) => {
       if (typeof window === "undefined") {
@@ -49,14 +51,14 @@ export function useLocalStorage<T>(
   );
 
   const getSnapshot = React.useCallback(
-    () => readLocalStorageValue<T>(key, initialValue),
-    [key, initialValue]
+    () => readLocalStorageValue<T>(key, initialValueRef.current),
+    [key]
   );
 
   const storedValue = React.useSyncExternalStore(
     subscribe,
     getSnapshot,
-    () => initialValue
+    () => initialValueRef.current
   );
 
   const setValue = React.useCallback(
