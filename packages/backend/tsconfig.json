@@ -11,7 +11,8 @@
     "lib": ["ESNext"],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
-    "tsBuildInfoFile": "./node_modules/.tsbuildinfo.landing"
+    "tsBuildInfoFile": "./node_modules/.tsbuildinfo.landing",
+    "types": ["node"]
   },
   "include": ["src", "src/env.d.ts", "worker-configuration.d.ts"]
 }

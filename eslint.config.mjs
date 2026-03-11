@@ -24,6 +24,7 @@ export default [
       "**/coverage/**",
       "packages/backend/.wrangler/**",
       "packages/backend/drizzle/**",
+      "packages/backend/worker-configuration.d.ts",
     ],
   },
   {

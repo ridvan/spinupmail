@@ -58,8 +58,6 @@ export function useLocalStorage<T>(
     getSnapshot,
     () => initialValue
   );
-  const storedValueRef = React.useRef(storedValue);
-  storedValueRef.current = storedValue;
 
   const setValue = React.useCallback(
     (value: T | ((prev: T) => T)) => {
@@ -67,12 +65,11 @@ export function useLocalStorage<T>(
         return;
       }
 
-      const prevValue = storedValueRef.current;
+      const prevValue = getSnapshot();
       const nextValue =
         typeof value === "function"
           ? (value as (prev: T) => T)(prevValue)
           : value;
-      storedValueRef.current = nextValue;
 
       try {
         window.localStorage.setItem(key, JSON.stringify(nextValue));
@@ -85,7 +82,7 @@ export function useLocalStorage<T>(
         // Ignore write errors (quota exceeded, incognito, etc.)
       }
     },
-    [key]
+    [getSnapshot, key]
   );
 
   return [storedValue, setValue];
