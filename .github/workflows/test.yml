@@ -58,7 +58,5 @@ jobs:
       - name: Install Playwright (chromium)
         run: pnpm -C packages/e2e exec playwright install chromium
 
-      - name: E2E smoke shard
-        env:
-          RUN_E2E: "1"
-        run: pnpm -C packages/e2e test:smoke
+      - name: E2E tests
+        run: pnpm -C packages/e2e test
