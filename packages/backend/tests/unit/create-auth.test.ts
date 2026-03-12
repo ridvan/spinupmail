@@ -99,4 +99,20 @@ describe("createAuth", () => {
       })
     ).toBe(true);
   });
+
+  it("enables test utils and keeps captcha when E2E helpers are turned on", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth({
+      ENABLE_E2E_TEST_UTILS: "1",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+    } as CloudflareBindings) as {
+      plugins?: Array<{
+        id?: string;
+      }>;
+    };
+
+    expect(auth.plugins?.map(plugin => plugin.id)).toContain("test-utils");
+    expect(auth.plugins?.map(plugin => plugin.id)).toContain("captcha");
+  });
 });

@@ -53,3 +53,19 @@ export const parseBooleanEnv = (
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
 };
+
+const readProcessEnv = (key: string) => {
+  if (typeof process === "undefined" || !process.env) return undefined;
+  return process.env[key];
+};
+
+export const isE2ETestUtilsEnabled = (
+  env?: Pick<CloudflareBindings, "ENABLE_E2E_TEST_UTILS">
+) =>
+  parseBooleanEnv(
+    env?.ENABLE_E2E_TEST_UTILS ?? readProcessEnv("ENABLE_E2E_TEST_UTILS")
+  );
+
+export const getE2ETestSecret = (
+  env?: Pick<CloudflareBindings, "E2E_TEST_SECRET">
+) => env?.E2E_TEST_SECRET ?? readProcessEnv("E2E_TEST_SECRET");

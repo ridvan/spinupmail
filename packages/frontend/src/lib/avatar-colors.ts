@@ -1,3 +1,5 @@
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
 const hashString = (value: string) => {
   let hash = 0;
 
@@ -24,15 +26,57 @@ const DARK_AVATAR_PALETTES = [
 
 export type AvatarColorMode = "light" | "dark";
 
+const DEFAULT_LIGHT_AVATAR_PALETTE = [...LIGHT_AVATAR_PALETTES[0]];
+const DEFAULT_DARK_AVATAR_PALETTE = [...DARK_AVATAR_PALETTES[0]];
+
+const normalizeAvatarSeed = (seed: string | null | undefined) => {
+  if (typeof seed === "string" && seed.trim().length > 0) {
+    return seed;
+  }
+
+  return "avatar-fallback";
+};
+
+const normalizeAvatarPalette = (
+  palette: readonly string[] | undefined,
+  fallbackPalette: readonly string[]
+) => {
+  if (!palette || palette.length === 0) {
+    return [...fallbackPalette];
+  }
+
+  const sanitizedPalette = palette.filter(
+    (color): color is string =>
+      typeof color === "string" && HEX_COLOR.test(color)
+  );
+
+  if (
+    sanitizedPalette.length === palette.length &&
+    sanitizedPalette.length > 0
+  ) {
+    return sanitizedPalette;
+  }
+
+  return [...fallbackPalette];
+};
+
 export const getAvatarColors = (
-  seed: string,
+  seed: string | null | undefined,
   mode: AvatarColorMode = "dark"
 ): string[] => {
-  const hash = hashString(seed);
+  const normalizedSeed = normalizeAvatarSeed(seed);
+  const hash = hashString(normalizedSeed);
   const palettes =
     mode === "light" ? LIGHT_AVATAR_PALETTES : DARK_AVATAR_PALETTES;
-  const palette = palettes[hash % palettes.length];
-  const offset = (hash >> 3) % palette.length;
+  const fallbackPalette =
+    mode === "light"
+      ? DEFAULT_LIGHT_AVATAR_PALETTE
+      : DEFAULT_DARK_AVATAR_PALETTE;
+  const palette = normalizeAvatarPalette(
+    palettes[hash % palettes.length],
+    fallbackPalette
+  );
+  const offset = (hash >>> 3) % palette.length;
 
   return palette.map((_, index) => palette[(index + offset) % palette.length]);
 };

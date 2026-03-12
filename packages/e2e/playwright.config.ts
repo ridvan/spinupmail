@@ -1,6 +1,17 @@
+import { randomUUID } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
 const runE2E = process.env.RUN_E2E !== "0";
+const e2eTestSecret = process.env.E2E_TEST_SECRET ?? randomUUID();
+const turnstileSiteKey = "1x00000000000000000000AA";
+const turnstileSecretKey = "1x0000000000000000000000000000000AA";
+
+process.env.E2E_TEST_SECRET = e2eTestSecret;
+
+const backendCommand =
+  `pnpm -C ../backend exec wrangler dev --config wrangler.e2e.toml ` +
+  `--ip 127.0.0.1 --port 8787 --var E2E_TEST_SECRET:${e2eTestSecret} ` +
+  `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey}`;
 
 export default defineConfig({
   testDir: "./tests",
@@ -23,22 +34,21 @@ export default defineConfig({
   webServer: runE2E
     ? [
         {
-          command: "pnpm -C ../backend dev --ip 127.0.0.1 --port 8787",
+          command: backendCommand,
           url: "http://127.0.0.1:8787/health",
           timeout: 120_000,
-          reuseExistingServer: !process.env.CI,
-          env: {
-            BETTER_AUTH_SECRET: "test-secret-for-e2e",
-            BETTER_AUTH_BASE_URL: "http://127.0.0.1:8787/api/auth",
-            TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
-            RESEND_API_KEY: "re_test_key",
-          },
+          reuseExistingServer: false,
         },
         {
           command: "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173",
           url: "http://127.0.0.1:5173/sign-in",
           timeout: 120_000,
           reuseExistingServer: !process.env.CI,
+          env: {
+            VITE_API_BASE_URL: "http://127.0.0.1:8787",
+            VITE_AUTH_BASE_URL: "http://127.0.0.1:8787/api/auth",
+            VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
+          },
         },
       ]
     : undefined,

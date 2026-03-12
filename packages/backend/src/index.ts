@@ -11,6 +11,7 @@ import { createDomainsRouter } from "@/modules/domains/router";
 import { createOrganizationsRouter } from "@/modules/organizations/router";
 import { createEmailAddressesRouter } from "@/modules/email-addresses/router";
 import { createEmailsRouter } from "@/modules/emails/router";
+import { createE2EAuthTestRouter } from "@/modules/e2e-auth/router";
 import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 
 type AppFactoryOptions = {
@@ -27,6 +28,7 @@ export const createApp = (options: AppFactoryOptions = {}) => {
   registerCorsMiddleware(app);
   registerAuthInitializationMiddleware(app, options.createAuthFactory);
 
+  app.route("/api", createE2EAuthTestRouter());
   app.route("/api", createAuthHttpRouter());
 
   app.use("/api/domains", requireAuth);
