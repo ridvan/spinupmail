@@ -15,13 +15,16 @@ const backendCommand =
   `--ip 127.0.0.1 --port 8787 --var E2E_TEST_SECRET:${e2eTestSecret} ` +
   `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey} ` +
   `--var BETTER_AUTH_BASE_URL:${betterAuthBaseUrl}`;
+const frontendCommand = process.env.CI
+  ? "pnpm -C ../frontend build && pnpm -C ../frontend exec vite preview --host 127.0.0.1 --port 5173 --strictPort"
+  : "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173";
 
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 1 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
   timeout: 60_000,
   expect: {
@@ -43,7 +46,7 @@ export default defineConfig({
           reuseExistingServer: false,
         },
         {
-          command: "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173",
+          command: frontendCommand,
           url: "http://127.0.0.1:5173/sign-in",
           timeout: 120_000,
           reuseExistingServer: !process.env.CI,

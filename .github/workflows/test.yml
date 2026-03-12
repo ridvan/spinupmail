@@ -55,8 +55,34 @@ jobs:
       - name: Frontend component tests
         run: pnpm run test:component
 
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Install Playwright (chromium)
         run: pnpm -C packages/e2e exec playwright install chromium
 
-      - name: E2E tests
-        run: pnpm -C packages/e2e test
+      - name: E2E shard ${{ matrix.shard }}
+        run: pnpm -C packages/e2e test -- --shard=${{ matrix.shard }}

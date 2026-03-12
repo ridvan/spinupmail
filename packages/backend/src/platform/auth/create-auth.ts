@@ -91,8 +91,12 @@ function createAuth(
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
-  const sendVerificationEmail = createResendVerificationEmailSender(env);
-  const sendResetPassword = createResendResetPasswordEmailSender(env);
+  const sendVerificationEmail = enableE2ETestUtils
+    ? async () => undefined
+    : createResendVerificationEmailSender(env);
+  const sendResetPassword = enableE2ETestUtils
+    ? async () => undefined
+    : createResendResetPasswordEmailSender(env);
 
   return betterAuth({
     secret: env?.BETTER_AUTH_SECRET,
