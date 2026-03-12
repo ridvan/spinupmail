@@ -5,22 +5,25 @@ const runE2E = process.env.RUN_E2E !== "0";
 const e2eTestSecret = process.env.E2E_TEST_SECRET ?? randomUUID();
 const turnstileSiteKey = "1x00000000000000000000AA";
 const turnstileSecretKey = "1x0000000000000000000000000000000AA";
+const betterAuthBaseUrl = "http://127.0.0.1:8787/api/auth";
 
 process.env.E2E_TEST_SECRET = e2eTestSecret;
 
 const backendCommand =
+  `pnpm -C ../backend run db:migrate:e2e && ` +
   `pnpm -C ../backend exec wrangler dev --config wrangler.e2e.toml ` +
   `--ip 127.0.0.1 --port 8787 --var E2E_TEST_SECRET:${e2eTestSecret} ` +
-  `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey}`;
+  `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey} ` +
+  `--var BETTER_AUTH_BASE_URL:${betterAuthBaseUrl}`;
 
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
-  timeout: 60_000,
+  timeout: 10_000,
   expect: {
     timeout: 10_000,
   },
@@ -46,7 +49,7 @@ export default defineConfig({
           reuseExistingServer: !process.env.CI,
           env: {
             VITE_API_BASE_URL: "http://127.0.0.1:8787",
-            VITE_AUTH_BASE_URL: "http://127.0.0.1:8787/api/auth",
+            VITE_AUTH_BASE_URL: betterAuthBaseUrl,
             VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
           },
         },

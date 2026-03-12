@@ -12,6 +12,7 @@
     "auth:update": "pnpm run auth:generate && pnpm run auth:format",
     "db:generate": "drizzle-kit generate",
     "db:migrate:dev": "pnpm exec wrangler d1 migrations apply SUM_DB --local",
+    "db:migrate:e2e": "pnpm exec wrangler d1 migrations apply SUM_DB --local --config wrangler.e2e.toml",
     "db:migrate:prod": "CI=1 pnpm exec wrangler d1 migrations apply SUM_DB --remote",
     "db:studio:dev": "drizzle-kit studio",
     "db:studio:prod": "NODE_ENV=production drizzle-kit studio",
