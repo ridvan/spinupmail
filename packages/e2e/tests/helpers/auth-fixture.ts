@@ -95,6 +95,11 @@ type CleanupResponse = {
   status: boolean;
 };
 
+export const runE2E = process.env.RUN_E2E !== "0";
+
+export const uniqueEmail = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+
 export type AuthSeedHelper = {
   createCredentialUser: (
     options?: CredentialSeedOptions
@@ -107,6 +112,26 @@ export type AuthSeedHelper = {
     options: MailboxEmailSeedOptions
   ) => Promise<MailboxEmailSeedResponse>;
 };
+
+export type SignInWithOrganizationOptions = {
+  email?: string;
+  name?: string;
+  organizationName?: string;
+  role?: string;
+};
+
+export const signInWithOrganization = (
+  authSeed: AuthSeedHelper,
+  options?: SignInWithOrganizationOptions
+) =>
+  authSeed.signInWithSeededSession({
+    email: options?.email,
+    name: options?.name,
+    organization: {
+      name: options?.organizationName,
+      role: options?.role ?? "admin",
+    },
+  });
 
 const installTurnstileStub = async (context: BrowserContext) => {
   await context.addInitScript(dummyToken => {

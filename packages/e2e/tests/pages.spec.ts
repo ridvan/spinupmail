@@ -1,28 +1,11 @@
 import type { Page } from "@playwright/test";
-import { test, expect, type AuthSeedHelper } from "./helpers/auth-fixture";
-
-const runE2E = process.env.RUN_E2E !== "0";
-const uniqueEmail = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-
-const signInWithOrganization = async (
-  authSeed: AuthSeedHelper,
-  options?: {
-    email?: string;
-    name?: string;
-    organizationName?: string;
-    role?: string;
-  }
-) => {
-  await authSeed.signInWithSeededSession({
-    email: options?.email,
-    name: options?.name,
-    organization: {
-      name: options?.organizationName,
-      role: options?.role ?? "admin",
-    },
-  });
-};
+import {
+  test,
+  expect,
+  runE2E,
+  uniqueEmail,
+  signInWithOrganization,
+} from "./helpers/auth-fixture";
 
 const cardTitle = (page: Page, text: string) =>
   page.locator('[data-slot="card-title"]').filter({ hasText: text }).first();

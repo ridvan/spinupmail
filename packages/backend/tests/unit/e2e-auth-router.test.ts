@@ -60,6 +60,25 @@ describe("e2e auth router", () => {
     expect(response.status).toBe(404);
   });
 
+  it("returns 404 when E2E helpers are enabled without a configured secret", async () => {
+    const { app, env } = createApp({}, { E2E_TEST_SECRET: "" });
+
+    const response = await app.request(
+      "/api/test/auth/session",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-e2e-test-secret": "top-secret",
+        },
+        body: JSON.stringify({}),
+      },
+      env
+    );
+
+    expect(response.status).toBe(404);
+  });
+
   it("rejects requests with a missing or incorrect secret", async () => {
     const { app, env } = createApp();
 

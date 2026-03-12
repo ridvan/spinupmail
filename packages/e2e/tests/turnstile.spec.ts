@@ -1,8 +1,4 @@
-import { expect, test } from "./helpers/auth-fixture";
-
-const runE2E = process.env.RUN_E2E !== "0";
-const uniqueEmail = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+import { expect, test, runE2E, uniqueEmail } from "./helpers/auth-fixture";
 
 test.describe("spinupmail turnstile", () => {
   test.skip(!runE2E, "Set RUN_E2E=1 to run browser smoke tests.");

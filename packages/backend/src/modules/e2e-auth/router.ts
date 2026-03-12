@@ -96,7 +96,7 @@ const requireE2EAccess = async (
 
   const expectedSecret = getE2ETestSecret(c.env)?.trim();
   if (!expectedSecret) {
-    return c.json({ error: "e2e test secret is not configured" }, 500);
+    return c.notFound();
   }
 
   const providedSecret = c.req.header("x-e2e-test-secret")?.trim();
