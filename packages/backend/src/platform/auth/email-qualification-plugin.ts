@@ -1,6 +1,9 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth/types";
-import { assertAllowedAuthEmailDomain } from "./auth-domain-restriction";
+import {
+  assertAllowedAuthEmailDomain,
+  getInvalidAuthEmailError,
+} from "./auth-domain-restriction";
 import { qualifyEmailAddress } from "./disposable-email-domains";
 
 const EMAIL_QUALIFICATION_PATHS = new Set(["/sign-up/email", "/change-email"]);
@@ -19,10 +22,7 @@ const getEmailQualificationError = (reason: "invalid" | "disposable") => {
     });
   }
 
-  return new APIError("BAD_REQUEST", {
-    message: "Enter a valid email address",
-    code: "INVALID_EMAIL",
-  });
+  return getInvalidAuthEmailError();
 };
 
 const extractRequestEmail = (path: string, body: unknown, query: unknown) => {
