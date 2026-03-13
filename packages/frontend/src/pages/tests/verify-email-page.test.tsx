@@ -47,7 +47,7 @@ describe("VerifyEmailPage", () => {
     expect(screen.getByText("Verification token is missing.")).toBeTruthy();
   });
 
-  it("verifies the email and redirects to the callback path", async () => {
+  it("verifies a signup email and redirects to the callback path", async () => {
     const callbackURL = encodeURIComponent(
       `${window.location.origin}/mailbox?view=inbox`
     );
@@ -57,7 +57,9 @@ describe("VerifyEmailPage", () => {
         { path: "/verify-email", element: <VerifyEmailPage /> },
         { path: "/mailbox", element: <div>mailbox</div> },
       ],
-      initialEntries: [`/verify-email?token=abc123&callbackURL=${callbackURL}`],
+      initialEntries: [
+        `/verify-email?token=abc123&flow=signup&callbackURL=${callbackURL}`,
+      ],
     });
 
     await waitFor(() =>
@@ -73,11 +75,16 @@ describe("VerifyEmailPage", () => {
       )
     );
 
-    expect(mockedGetSession).toHaveBeenCalledWith({
-      query: {
-        disableCookieCache: true,
+    expect(mockedGetSession).toHaveBeenCalledWith(
+      {
+        query: {
+          disableCookieCache: true,
+        },
       },
-    });
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
     expect(mockedToastSuccess).toHaveBeenCalledWith(
       "Email verified successfully. You can create an organization or join one to get started."
     );
@@ -99,7 +106,9 @@ describe("VerifyEmailPage", () => {
         { path: "/verify-email", element: <VerifyEmailPage /> },
         { path: "/settings", element: <div>settings</div> },
       ],
-      initialEntries: [`/verify-email?token=abc123&callbackURL=${callbackURL}`],
+      initialEntries: [
+        `/verify-email?token=abc123&flow=signup&callbackURL=${callbackURL}`,
+      ],
     });
 
     await waitFor(() =>
@@ -142,6 +151,32 @@ describe("VerifyEmailPage", () => {
           "We could not verify your email right now. Try again or request a new link."
         )
       ).toBeTruthy()
+    );
+  });
+
+  it("shows a change-email specific success toast", async () => {
+    const callbackURL = encodeURIComponent(
+      `${window.location.origin}/settings`
+    );
+
+    const { router } = renderWithRouter({
+      routes: [
+        { path: "/verify-email", element: <VerifyEmailPage /> },
+        { path: "/settings", element: <div>settings</div> },
+      ],
+      initialEntries: [
+        `/verify-email?token=abc123&flow=change-email&callbackURL=${callbackURL}`,
+      ],
+    });
+
+    await waitFor(() =>
+      expect(mockedToastSuccess).toHaveBeenCalledWith(
+        "Email verified successfully. Your email address has been updated."
+      )
+    );
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/settings")
     );
   });
 });

@@ -43,6 +43,25 @@ const getVerificationErrorMessage = (errorCode?: string) => {
   }
 };
 
+const getVerificationFlow = (value: string | null) => {
+  if (value === "signup" || value === "change-email") return value;
+  return null;
+};
+
+const getVerificationSuccessMessage = (
+  flow: ReturnType<typeof getVerificationFlow>
+) => {
+  if (flow === "signup") {
+    return "Email verified successfully. You can create an organization or join one to get started.";
+  }
+
+  if (flow === "change-email") {
+    return "Email verified successfully. Your email address has been updated.";
+  }
+
+  return "Email verified successfully.";
+};
+
 export const VerifyEmailPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -59,6 +78,7 @@ export const VerifyEmailPage = () => {
     () => getSafeRedirectPath(searchParams.get("callbackURL")),
     [searchParams]
   );
+  const flow = getVerificationFlow(searchParams.get("flow"));
   const errorMessage = token
     ? verificationErrorMessage
     : "Verification token is missing.";
@@ -89,19 +109,22 @@ export const VerifyEmailPage = () => {
           return;
         }
 
-        const session = await authClient.getSession({
-          query: {
-            disableCookieCache: true,
+        const session = await authClient.getSession(
+          {
+            query: {
+              disableCookieCache: true,
+            },
           },
-        });
+          {
+            signal: controller.signal,
+          }
+        );
         if (session.error || !session.data?.session || !session.data?.user) {
           setVerificationErrorMessage(getVerificationErrorMessage());
           return;
         }
 
-        toast.success(
-          "Email verified successfully. You can create an organization or join one to get started."
-        );
+        toast.success(getVerificationSuccessMessage(flow));
         await navigate(redirectPath, { replace: true });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -115,7 +138,7 @@ export const VerifyEmailPage = () => {
     return () => {
       controller.abort();
     };
-  }, [navigate, redirectPath, token]);
+  }, [flow, navigate, redirectPath, token]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">

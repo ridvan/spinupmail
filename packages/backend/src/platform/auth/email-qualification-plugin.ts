@@ -159,7 +159,10 @@ export const createEmailQualificationPlugin = (
             }
           }
 
-          if (AUTH_DOMAIN_RESTRICTION_PATHS.has(context.path)) {
+          if (
+            AUTH_DOMAIN_RESTRICTION_PATHS.has(context.path) &&
+            !EMAIL_QUALIFICATION_PATHS.has(context.path)
+          ) {
             assertAllowedAuthEmailDomain(rawEmail, env);
           }
         }),

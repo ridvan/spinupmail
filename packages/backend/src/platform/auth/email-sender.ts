@@ -246,8 +246,11 @@ const getEmailLogoUrl = (env?: EmailBrandingEnv) => {
   return `${origin}/logo-transparent.png`;
 };
 
+type VerificationFlow = "signup" | "change-email";
+
 const buildAppVerificationUrl = (
   verificationUrl: string,
+  flow: VerificationFlow,
   env?: EmailBrandingEnv
 ) => {
   const appOrigin = getPrimaryAppOrigin(env);
@@ -265,6 +268,7 @@ const buildAppVerificationUrl = (
 
   const appVerificationUrl = new URL("/verify-email", appOrigin);
   appVerificationUrl.searchParams.set("token", token);
+  appVerificationUrl.searchParams.set("flow", flow);
 
   const callbackURL = parsedVerificationUrl.searchParams.get("callbackURL");
   if (callbackURL) {
@@ -569,7 +573,10 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
 
     const resend = new Resend(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
-    const appVerificationUrl = buildAppVerificationUrl(url, env);
+    const flow: VerificationFlow = isChangeEmailVerification
+      ? "change-email"
+      : "signup";
+    const appVerificationUrl = buildAppVerificationUrl(url, flow, env);
 
     try {
       await resend.emails.send({
@@ -592,7 +599,7 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
     } catch (error) {
       console.error("[auth] Failed to send verification email via Resend", {
         recipient: maskEmailForLogs(user.email),
-        flow: isChangeEmailVerification ? "change-email" : "signup",
+        flow,
         error,
       });
     }
