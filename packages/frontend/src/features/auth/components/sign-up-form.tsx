@@ -66,9 +66,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
           ...value,
           captchaToken,
         });
-        toast.success(
-          "Verification email sent. Check your inbox, then sign in."
-        );
+        toast.success("Verification email sent. Check your inbox to continue.");
       } finally {
         turnstileRef.current?.reset();
       }

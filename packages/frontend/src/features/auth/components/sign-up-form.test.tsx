@@ -85,7 +85,7 @@ describe("SignUpForm", () => {
       })
     );
     expect(mockedToastSuccess).toHaveBeenCalledWith(
-      "Verification email sent. Check your inbox, then sign in."
+      "Verification email sent. Check your inbox to continue."
     );
     expect(onSuccess).toHaveBeenCalled();
   });

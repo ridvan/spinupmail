@@ -6,6 +6,7 @@ import {
   uniqueEmail,
   signInWithOrganization,
 } from "./helpers/auth-fixture";
+import { e2eBackendBaseUrl } from "./helpers/e2e-urls";
 
 const navButton = (page: Page, text: string) =>
   page
@@ -188,8 +189,7 @@ test.describe("spinupmail app behaviors", () => {
       )
       .toEqual({
         remoteImageSrc: null,
-        localImageSrc:
-          "http://127.0.0.1:8787/api/emails/e1/attachments/a1?inline=1",
+        localImageSrc: `${e2eBackendBaseUrl}/api/emails/e1/attachments/a1?inline=1`,
       });
 
     await page.getByRole("button", { name: "Load remote content" }).click();

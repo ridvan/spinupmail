@@ -34,6 +34,7 @@ import { SignInPage } from "@/pages/sign-in-page";
 import { SignInTwoFactorPage } from "@/pages/sign-in-two-factor-page";
 import { SignupPage } from "@/pages/signup-page";
 import { TermsOfServicePage } from "@/pages/terms-of-service-page";
+import { VerifyEmailPage } from "@/pages/verify-email-page";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -106,6 +107,13 @@ const routes: RouteObject[] = [
     element: <ResetPasswordPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Reset Password" },
+  },
+  {
+    path: "/verify-email",
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <VerifyEmailPage />,
+    errorElement: <RouteErrorPage />,
+    handle: { title: "Verify Email" },
   },
   {
     path: "/terms",

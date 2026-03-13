@@ -1,5 +1,6 @@
 declare global {
   interface CloudflareBindings {
+    AUTH_ALLOWED_EMAIL_DOMAIN?: string;
     BETTER_AUTH_SECRET?: string;
     ENABLE_E2E_TEST_UTILS?: string;
     E2E_TEST_SECRET?: string;

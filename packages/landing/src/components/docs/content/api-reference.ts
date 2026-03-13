@@ -282,7 +282,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       {
         status: 500,
         error: "No email domains configured",
-        when: "The Worker has no EMAIL_DOMAIN or EMAIL_DOMAINS value configured.",
+        when: "The Worker has no EMAIL_DOMAINS value configured.",
       },
     ],
     exampleRequest: `curl "https://api.spinupmail.com/api/domains" \\
@@ -935,7 +935,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 400,
-        error: "EMAIL_DOMAIN is not configured",
+        error: "EMAIL_DOMAINS is not configured",
         when: "The Worker has no configured domains.",
       },
       {

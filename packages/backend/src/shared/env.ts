@@ -16,12 +16,15 @@ export const getAllowedDomains = (env: CloudflareBindings) => {
     env.EMAIL_DOMAINS?.split(",")
       .map(domain => normalizeDomain(domain))
       .filter(Boolean) ?? [];
-  const fallbackDomain = env.EMAIL_DOMAIN
-    ? normalizeDomain(env.EMAIL_DOMAIN)
-    : undefined;
-  const fallback = fallbackDomain ? [fallbackDomain] : [];
-  const combined = [...rawList, ...fallback];
-  return Array.from(new Set(combined));
+  return Array.from(new Set(rawList));
+};
+
+export const getAuthAllowedEmailDomain = (
+  env?: Pick<CloudflareBindings, "AUTH_ALLOWED_EMAIL_DOMAIN">
+) => {
+  const configured = env?.AUTH_ALLOWED_EMAIL_DOMAIN?.trim();
+  if (!configured) return undefined;
+  return normalizeDomain(configured);
 };
 
 export const getMaxAddressesPerOrganization = (env: CloudflareBindings) => {

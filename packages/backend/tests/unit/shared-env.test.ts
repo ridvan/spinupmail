@@ -1,4 +1,5 @@
 import {
+  getAuthAllowedEmailDomain,
   getAllowedDomains,
   getMaxAddressesPerOrganization,
   normalizeDomain,
@@ -11,10 +12,9 @@ describe("shared env helpers", () => {
     expect(normalizeDomain(" @Example.COM. ")).toBe("example.com");
   });
 
-  it("merges EMAIL_DOMAINS with EMAIL_DOMAIN fallback and deduplicates", () => {
+  it("normalizes EMAIL_DOMAINS values and deduplicates them", () => {
     const env = {
       EMAIL_DOMAINS: "Example.com,foo.test,@bar.io.,foo.test",
-      EMAIL_DOMAIN: "BAR.io",
     } as unknown as CloudflareBindings;
 
     expect(getAllowedDomains(env)).toEqual([
@@ -22,6 +22,15 @@ describe("shared env helpers", () => {
       "foo.test",
       "bar.io",
     ]);
+  });
+
+  it("normalizes the optional auth email domain restriction", () => {
+    expect(
+      getAuthAllowedEmailDomain({
+        AUTH_ALLOWED_EMAIL_DOMAIN: " @Example.COM. ",
+      } as CloudflareBindings)
+    ).toBe("example.com");
+    expect(getAuthAllowedEmailDomain({} as CloudflareBindings)).toBeUndefined();
   });
 
   it("parses positive numbers and rejects invalid values", () => {

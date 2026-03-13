@@ -216,7 +216,7 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "Cloudflare resources D1 KV R2 wrangler bindings EMAIL_DOMAINS EMAIL_DOMAIN",
+      "Cloudflare resources D1 KV R2 wrangler bindings EMAIL_DOMAINS AUTH_ALLOWED_EMAIL_DOMAIN",
     codeText:
       "wrangler d1 create wrangler kv namespace create wrangler r2 bucket create wrangler.toml",
   },

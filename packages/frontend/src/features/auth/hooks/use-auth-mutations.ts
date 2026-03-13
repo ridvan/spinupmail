@@ -40,20 +40,11 @@ export class AuthMutationError extends Error {
   }
 }
 
-const getSignInCallbackURL = () => {
-  if (typeof window === "undefined") return undefined;
-  return window.location.href;
-};
-
-const getSignUpCallbackURL = () => {
+const getPostVerificationCallbackURL = () => {
   if (typeof window === "undefined") return undefined;
   const currentUrl = new URL(window.location.href);
-  const loginUrl = new URL("/sign-in", window.location.origin);
-  const next = currentUrl.searchParams.get("next");
-  if (next) {
-    loginUrl.searchParams.set("next", next);
-  }
-  return loginUrl.toString();
+  const nextPath = safeNextPath(currentUrl.searchParams.get("next"));
+  return new URL(nextPath, window.location.origin).toString();
 };
 
 const getSocialAuthCallbackURL = () => {
@@ -69,14 +60,7 @@ const getSocialAuthErrorCallbackURL = () => {
 };
 
 const getResendVerificationCallbackURL = () => {
-  if (typeof window === "undefined") return undefined;
-  const url = new URL("/sign-in", window.location.origin);
-  const current = new URL(window.location.href);
-  const next = current.searchParams.get("next");
-  if (next) {
-    url.searchParams.set("next", next);
-  }
-  return url.toString();
+  return getPostVerificationCallbackURL();
 };
 
 const getResetPasswordRedirectURL = () => {
@@ -91,7 +75,7 @@ export const useSignInMutation = () => {
         {
           email: values.email.trim(),
           password: values.password,
-          callbackURL: getSignInCallbackURL(),
+          callbackURL: getPostVerificationCallbackURL(),
         },
         {
           headers: {
@@ -128,7 +112,7 @@ export const useSignUpMutation = () => {
           name: values.name.trim(),
           email: values.email.trim(),
           password: values.password,
-          callbackURL: getSignUpCallbackURL(),
+          callbackURL: getPostVerificationCallbackURL(),
         },
         {
           headers: {

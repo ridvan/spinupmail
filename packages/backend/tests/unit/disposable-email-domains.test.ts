@@ -139,7 +139,6 @@ describe("disposable email domains", () => {
     const env = {
       SUM_KV: new FakeKvNamespace(),
       EMAIL_DOMAINS: "spinupmail.com,spinuptest.com",
-      EMAIL_DOMAIN: "spinupmail.com",
     } as unknown as CloudflareBindings;
 
     await expect(isDisposableEmailDomain("spinupmail.com", env)).resolves.toBe(

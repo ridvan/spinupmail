@@ -1,0 +1,160 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { AuthLayout } from "@/features/auth/components/auth-layout";
+import { authClient } from "@/lib/auth";
+import { cn } from "@/lib/utils";
+
+const getSafeRedirectPath = (value: string | null) => {
+  if (!value) return "/";
+
+  try {
+    const parsed = value.startsWith("/")
+      ? new URL(value, window.location.origin)
+      : new URL(value);
+    if (parsed.origin !== window.location.origin) return "/";
+
+    // Old verification links pointed back to /sign-in. Now that verification
+    // auto-signs the user in, unwrap those callbacks to the real destination.
+    if (parsed.pathname === "/sign-in") {
+      const next = parsed.searchParams.get("next");
+      if (next?.startsWith("/") && !next.startsWith("//")) {
+        return next;
+      }
+      return "/";
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/";
+  }
+};
+
+const getVerificationErrorMessage = (errorCode?: string) => {
+  switch (errorCode) {
+    case "INVALID_TOKEN":
+    case "TOKEN_EXPIRED":
+      return "This verification link is invalid or expired.";
+    case "USER_NOT_FOUND":
+      return "We could not find an account for this verification link.";
+    default:
+      return "We could not verify your email right now. Try again or request a new link.";
+  }
+};
+
+export const VerifyEmailPage = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [verificationErrorMessage, setVerificationErrorMessage] = useState<
+    string | null
+  >(null);
+
+  const token = useMemo(() => {
+    const value = searchParams.get("token");
+    return value && value.trim().length > 0 ? value.trim() : null;
+  }, [searchParams]);
+
+  const redirectPath = useMemo(
+    () => getSafeRedirectPath(searchParams.get("callbackURL")),
+    [searchParams]
+  );
+  const errorMessage = token
+    ? verificationErrorMessage
+    : "Verification token is missing.";
+
+  useEffect(() => {
+    if (!token) return;
+
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const result = await authClient.verifyEmail(
+          {
+            query: {
+              token,
+            },
+          },
+          {
+            signal: controller.signal,
+            cache: "no-store",
+          }
+        );
+
+        if (result.error) {
+          setVerificationErrorMessage(
+            getVerificationErrorMessage(result.error.code)
+          );
+          return;
+        }
+
+        const session = await authClient.getSession({
+          query: {
+            disableCookieCache: true,
+          },
+        });
+        if (session.error || !session.data?.session || !session.data?.user) {
+          setVerificationErrorMessage(getVerificationErrorMessage());
+          return;
+        }
+
+        toast.success(
+          "Email verified successfully. You can create an organization or join one to get started."
+        );
+        await navigate(redirectPath, { replace: true });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setVerificationErrorMessage(getVerificationErrorMessage());
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [navigate, redirectPath, token]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+      <AuthLayout
+        subtitle={
+          errorMessage
+            ? "We were unable to complete email verification."
+            : "Confirming your email address and signing you in."
+        }
+        footer={
+          <>
+            Need a new link?{" "}
+            <Link className="text-neutral-300 hover:text-white" to="/sign-in">
+              Back to sign in
+            </Link>
+          </>
+        }
+      >
+        {errorMessage ? (
+          <div className="space-y-4">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+            <Link
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+              to="/sign-in"
+            >
+              Go to sign in
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-400">
+              Please wait while we verify your email and redirect you.
+            </p>
+            <Button className="w-full" disabled type="button">
+              Verifying email...
+            </Button>
+          </div>
+        )}
+      </AuthLayout>
+    </div>
+  );
+};

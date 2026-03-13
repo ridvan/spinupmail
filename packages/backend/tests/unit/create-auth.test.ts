@@ -61,6 +61,17 @@ describe("createAuth", () => {
           }>;
         };
       }>;
+      socialProviders?: {
+        google?: {
+          hd?: string;
+          mapProfileToUser?: (profile: {
+            email?: string;
+          }) => Promise<Record<string, never>>;
+        };
+      };
+      emailVerification?: {
+        autoSignInAfterVerification?: boolean;
+      };
     };
 
     expect(betterAuthMock).toHaveBeenCalledTimes(1);
@@ -98,6 +109,11 @@ describe("createAuth", () => {
         path: "/change-email",
       })
     ).toBe(true);
+    expect(
+      qualificationPlugin?.hooks?.before?.[0]?.matcher?.({
+        path: "/sign-in/email",
+      })
+    ).toBe(true);
   });
 
   it("enables test utils and keeps captcha when E2E helpers are turned on", async () => {
@@ -114,5 +130,48 @@ describe("createAuth", () => {
 
     expect(auth.plugins?.map(plugin => plugin.id)).toContain("test-utils");
     expect(auth.plugins?.map(plugin => plugin.id)).toContain("captcha");
+  });
+
+  it("configures Google hosted domain restrictions when enabled", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth({
+      AUTH_ALLOWED_EMAIL_DOMAIN: "@Example.com.",
+      GOOGLE_CLIENT_ID: "google-client-id",
+      GOOGLE_CLIENT_SECRET: "google-client-secret",
+    } as CloudflareBindings) as {
+      socialProviders?: {
+        google?: {
+          hd?: string;
+          mapProfileToUser?: (profile: {
+            email?: string;
+          }) => Promise<Record<string, never>>;
+        };
+      };
+      emailVerification?: {
+        autoSignInAfterVerification?: boolean;
+      };
+    };
+
+    expect(auth.socialProviders?.google?.hd).toBe("example.com");
+    let thrownError: unknown;
+    try {
+      auth.socialProviders?.google?.mapProfileToUser?.({
+        email: "user@other.com",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+    expect(thrownError).toMatchObject({
+      body: {
+        code: "AUTH_EMAIL_DOMAIN_NOT_ALLOWED",
+      },
+    });
+    expect(
+      auth.socialProviders?.google?.mapProfileToUser?.({
+        email: "user@example.com",
+      }) ?? Promise.resolve({})
+    ).toEqual({});
+    expect(auth.emailVerification?.autoSignInAfterVerification).toBe(true);
   });
 });

@@ -376,7 +376,7 @@ export const SignInForm = ({
           <div className="space-y-1">
             <p className="font-medium text-emerald-100">Verify your email</p>
             <p className="text-emerald-50/85">
-              Use the link in the email to verify, then sign in.
+              Use the link in the email to verify your address.
             </p>
           </div>
         </div>

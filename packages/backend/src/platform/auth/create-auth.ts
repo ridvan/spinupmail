@@ -14,13 +14,14 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../../db";
+import { assertAllowedAuthEmailDomain } from "./auth-domain-restriction";
 import { createEmailQualificationPlugin } from "./email-qualification-plugin";
 import {
   APP_NAME,
   createResendResetPasswordEmailSender,
   createResendVerificationEmailSender,
 } from "./email-sender";
-import { isE2ETestUtilsEnabled } from "@/shared/env";
+import { getAuthAllowedEmailDomain, isE2ETestUtilsEnabled } from "@/shared/env";
 
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_DERIVED_KEY_BYTES = 64;
@@ -88,6 +89,7 @@ function createAuth(
   const googleClientId = env?.GOOGLE_CLIENT_ID?.trim();
   const googleClientSecret = env?.GOOGLE_CLIENT_SECRET?.trim();
   const hasGoogleOAuth = Boolean(googleClientId) && Boolean(googleClientSecret);
+  const authAllowedEmailDomain = getAuthAllowedEmailDomain(env);
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
@@ -135,6 +137,7 @@ function createAuth(
           },
         },
         emailVerification: {
+          autoSignInAfterVerification: true,
           sendVerificationEmail,
           sendOnSignUp: true,
           sendOnSignIn: false,
@@ -146,6 +149,14 @@ function createAuth(
                 clientSecret: googleClientSecret!,
                 prompt: "select_account",
                 accessType: "offline",
+                hd: authAllowedEmailDomain,
+                mapProfileToUser: profile => {
+                  if (typeof profile.email === "string") {
+                    assertAllowedAuthEmailDomain(profile.email, env);
+                  }
+
+                  return {};
+                },
               },
             }
           : undefined,

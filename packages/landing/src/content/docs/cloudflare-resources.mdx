@@ -42,4 +42,4 @@ EMAIL_ATTACHMENT_MAX_BYTES = "10485760"
 
 ## Domain configuration strategy
 
-Use `EMAIL_DOMAINS` as the primary source of truth. Keep `EMAIL_DOMAIN` only as a legacy fallback.
+Use `EMAIL_DOMAINS` as the source of truth for inbound domains. If you want auth restricted to one company domain, also set `AUTH_ALLOWED_EMAIL_DOMAIN`.

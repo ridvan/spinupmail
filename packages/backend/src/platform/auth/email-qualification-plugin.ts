@@ -1,8 +1,14 @@
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth/types";
+import { assertAllowedAuthEmailDomain } from "./auth-domain-restriction";
 import { qualifyEmailAddress } from "./disposable-email-domains";
 
 const EMAIL_QUALIFICATION_PATHS = new Set(["/sign-up/email", "/change-email"]);
+const AUTH_DOMAIN_RESTRICTION_PATHS = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/change-email",
+]);
 
 const getEmailQualificationError = (reason: "invalid" | "disposable") => {
   if (reason === "disposable") {
@@ -59,6 +65,11 @@ export const createEmailQualificationPlugin = (
                   throw getEmailQualificationError(qualification.reason);
                 }
 
+                assertAllowedAuthEmailDomain(
+                  qualification.normalizedEmail,
+                  env
+                );
+
                 return {
                   data: {
                     ...user,
@@ -85,6 +96,11 @@ export const createEmailQualificationPlugin = (
                   throw getEmailQualificationError(qualification.reason);
                 }
 
+                assertAllowedAuthEmailDomain(
+                  qualification.normalizedEmail,
+                  env
+                );
+
                 return {
                   data: {
                     ...user,
@@ -102,7 +118,9 @@ export const createEmailQualificationPlugin = (
     before: [
       {
         matcher: ({ path }) =>
-          typeof path === "string" && EMAIL_QUALIFICATION_PATHS.has(path),
+          typeof path === "string" &&
+          (EMAIL_QUALIFICATION_PATHS.has(path) ||
+            AUTH_DOMAIN_RESTRICTION_PATHS.has(path)),
         handler: createAuthMiddleware(async context => {
           const rawEmail = extractRequestEmail(
             context.path,
@@ -111,30 +129,38 @@ export const createEmailQualificationPlugin = (
           );
           if (!rawEmail) return;
 
-          const qualification = await qualifyEmailAddress(rawEmail, env, {
-            runInBackground: promise =>
-              context.context.runInBackground(promise),
-          });
-          if (!qualification.ok) {
-            throw getEmailQualificationError(qualification.reason);
+          if (EMAIL_QUALIFICATION_PATHS.has(context.path)) {
+            const qualification = await qualifyEmailAddress(rawEmail, env, {
+              runInBackground: promise =>
+                context.context.runInBackground(promise),
+            });
+            if (!qualification.ok) {
+              throw getEmailQualificationError(qualification.reason);
+            }
+
+            assertAllowedAuthEmailDomain(qualification.normalizedEmail, env);
+
+            const existingUser = (await context.context.adapter.findOne({
+              model: "user",
+              where: [
+                {
+                  field: "normalizedEmail",
+                  value: qualification.normalizedEmail,
+                },
+              ],
+            })) as { id?: string } | null;
+
+            const currentUserId = context.context.session?.user?.id;
+            if (existingUser?.id && existingUser.id !== currentUserId) {
+              throw new APIError("BAD_REQUEST", {
+                message: "An account already exists for this email",
+                code: "USER_ALREADY_EXISTS",
+              });
+            }
           }
 
-          const existingUser = (await context.context.adapter.findOne({
-            model: "user",
-            where: [
-              {
-                field: "normalizedEmail",
-                value: qualification.normalizedEmail,
-              },
-            ],
-          })) as { id?: string } | null;
-
-          const currentUserId = context.context.session?.user?.id;
-          if (existingUser?.id && existingUser.id !== currentUserId) {
-            throw new APIError("BAD_REQUEST", {
-              message: "An account already exists for this email",
-              code: "USER_ALREADY_EXISTS",
-            });
+          if (AUTH_DOMAIN_RESTRICTION_PATHS.has(context.path)) {
+            assertAllowedAuthEmailDomain(rawEmail, env);
           }
         }),
       },

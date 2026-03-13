@@ -5,8 +5,9 @@ import {
   type BrowserContext,
   type TestInfo,
 } from "@playwright/test";
+import { e2eBackendBaseUrl } from "./e2e-urls";
 
-const BACKEND_BASE_URL = "http://127.0.0.1:8787";
+const BACKEND_BASE_URL = e2eBackendBaseUrl;
 const E2E_TEST_SECRET = process.env.E2E_TEST_SECRET;
 
 if (!E2E_TEST_SECRET) {

@@ -202,15 +202,6 @@ const canSendAuthEmail = async ({
 };
 
 const getPrimaryAppOrigin = (env?: EmailBrandingEnv) => {
-  const fromAuthBaseUrl = env?.BETTER_AUTH_BASE_URL?.trim();
-  if (fromAuthBaseUrl) {
-    try {
-      return new URL(fromAuthBaseUrl).origin;
-    } catch {
-      // Continue to fallback.
-    }
-  }
-
   const fromCorsOrigin = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .find(Boolean);
@@ -218,6 +209,15 @@ const getPrimaryAppOrigin = (env?: EmailBrandingEnv) => {
   if (fromCorsOrigin) {
     try {
       return new URL(fromCorsOrigin).origin;
+    } catch {
+      // Continue to fallback.
+    }
+  }
+
+  const fromAuthBaseUrl = env?.BETTER_AUTH_BASE_URL?.trim();
+  if (fromAuthBaseUrl) {
+    try {
+      return new URL(fromAuthBaseUrl).origin;
     } catch {
       // Continue to fallback.
     }
@@ -244,6 +244,34 @@ const getEmailLogoUrl = (env?: EmailBrandingEnv) => {
   const origin = getPrimaryAppOrigin(env);
   if (!origin || isLocalOrigin(origin)) return null;
   return `${origin}/logo-transparent.png`;
+};
+
+const buildAppVerificationUrl = (
+  verificationUrl: string,
+  env?: EmailBrandingEnv
+) => {
+  const appOrigin = getPrimaryAppOrigin(env);
+  if (!appOrigin) return verificationUrl;
+
+  let parsedVerificationUrl: URL;
+  try {
+    parsedVerificationUrl = new URL(verificationUrl);
+  } catch {
+    return verificationUrl;
+  }
+
+  const token = parsedVerificationUrl.searchParams.get("token");
+  if (!token) return verificationUrl;
+
+  const appVerificationUrl = new URL("/verify-email", appOrigin);
+  appVerificationUrl.searchParams.set("token", token);
+
+  const callbackURL = parsedVerificationUrl.searchParams.get("callbackURL");
+  if (callbackURL) {
+    appVerificationUrl.searchParams.set("callbackURL", callbackURL);
+  }
+
+  return appVerificationUrl.toString();
 };
 
 const buildEmailLogoMarkup = (logoUrl: string | null) => {
@@ -541,6 +569,7 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
 
     const resend = new Resend(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
+    const appVerificationUrl = buildAppVerificationUrl(url, env);
 
     try {
       await resend.emails.send({
@@ -550,11 +579,15 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
           ? `Confirm your new ${APP_NAME} email`
           : `Verify your ${APP_NAME} email`,
         text: isChangeEmailVerification
-          ? buildChangeEmailVerificationText(url, user.email)
-          : buildVerificationEmailText(url),
+          ? buildChangeEmailVerificationText(appVerificationUrl, user.email)
+          : buildVerificationEmailText(appVerificationUrl),
         html: isChangeEmailVerification
-          ? buildChangeEmailVerificationHtml(url, user.email, logoUrl)
-          : buildVerificationEmailHtml(url, logoUrl),
+          ? buildChangeEmailVerificationHtml(
+              appVerificationUrl,
+              user.email,
+              logoUrl
+            )
+          : buildVerificationEmailHtml(appVerificationUrl, logoUrl),
       });
     } catch (error) {
       console.error("[auth] Failed to send verification email via Resend", {

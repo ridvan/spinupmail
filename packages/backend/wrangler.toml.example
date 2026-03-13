@@ -33,8 +33,8 @@ preview_bucket_name = "YOUR_R2_PREVIEW_BUCKET_NAME"
 name = "EMAIL"
 
 [vars]
-EMAIL_DOMAIN = "example.com"
 EMAIL_DOMAINS = "example.com,example-test.com"
+AUTH_ALLOWED_EMAIL_DOMAIN = "example.com"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
 RESEND_FROM_EMAIL = "Spinupmail <verify@example.com>"
 # Configure secrets via `wrangler secret put`:

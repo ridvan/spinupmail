@@ -253,7 +253,7 @@ export const createEmailAddress = async ({
   if (!domain || allowedDomains.length === 0) {
     return {
       status: 400 as const,
-      body: { error: "EMAIL_DOMAIN is not configured" },
+      body: { error: "EMAIL_DOMAINS is not configured" },
     };
   }
 
@@ -564,7 +564,7 @@ export const updateEmailAddress = async ({
   if (allowedDomains.length === 0) {
     return {
       status: 400 as const,
-      body: { error: "EMAIL_DOMAIN is not configured" },
+      body: { error: "EMAIL_DOMAINS is not configured" },
     };
   }
 

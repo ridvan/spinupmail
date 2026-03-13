@@ -84,8 +84,8 @@ Edit `packages/backend/wrangler.toml` with:
 - `[[kv_namespaces]].id`
 - `[[r2_buckets]].bucket_name` (e.g. `spinupmail-attachments`)
 - `[[r2_buckets]].preview_bucket_name` (e.g. `spinupmail-attachments-preview`)
-- `[vars].EMAIL_DOMAIN` (single domain fallback)
-- `[vars].EMAIL_DOMAINS` (comma-separated list, recommended)
+- `[vars].EMAIL_DOMAINS` (comma-separated inbound domains)
+- Optional: `[vars].AUTH_ALLOWED_EMAIL_DOMAIN` (restrict auth to one email domain)
 - Optional:
   - `[vars].EMAIL_MAX_BYTES`
   - `[vars].EMAIL_BODY_MAX_BYTES`
@@ -165,6 +165,7 @@ Important:
 
 - `CORS_ORIGIN` must include your frontend origin(s) (for example `http://localhost:5173` and your production app origin), because Better Auth validates callback URLs against trusted origins.
 - Frontend does not need separate Google env vars for this OAuth redirect flow.
+- If you set `AUTH_ALLOWED_EMAIL_DOMAIN`, Spinupmail will reject email/password sign-up and sign-in outside that domain and will pass the same domain to Google OAuth using the hosted-domain hint (`hd`).
 
 ## 4. Database Migrations
 
@@ -205,11 +206,9 @@ In `packages/backend/wrangler.toml`:
 ```
 [vars]
 EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
+AUTH_ALLOWED_EMAIL_DOMAIN = "spinupmail.com"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
 ```
-
-`EMAIL_DOMAIN` is still supported as a fallback, but `EMAIL_DOMAINS` is the
-recommended source of truth.
 
 ### 2) Email Routing rules
 

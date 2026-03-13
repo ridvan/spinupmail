@@ -1,22 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+import { e2eAuthBaseUrl, e2eBackendBaseUrl } from "./tests/helpers/e2e-urls";
 
 const runE2E = process.env.RUN_E2E !== "0";
 const e2eTestSecret = process.env.E2E_TEST_SECRET ?? randomUUID();
 const turnstileSiteKey = "1x00000000000000000000AA";
 const turnstileSecretKey = "1x0000000000000000000000000000000AA";
 const betterAuthSecret = "spinupmail-e2e-better-auth-secret";
-const betterAuthBaseUrl = "http://127.0.0.1:8787/api/auth";
 
 process.env.E2E_TEST_SECRET = e2eTestSecret;
 
 const backendCommand =
   `pnpm -C ../backend run db:migrate:e2e && ` +
   `pnpm -C ../backend exec wrangler dev --config wrangler.e2e.toml ` +
-  `--ip 127.0.0.1 --port 8787 --var E2E_TEST_SECRET:${e2eTestSecret} ` +
+  `--ip 127.0.0.1 --port ${new URL(e2eBackendBaseUrl).port} --var E2E_TEST_SECRET:${e2eTestSecret} ` +
   `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey} ` +
   `--var BETTER_AUTH_SECRET:${betterAuthSecret} ` +
-  `--var BETTER_AUTH_BASE_URL:${betterAuthBaseUrl}`;
+  `--var BETTER_AUTH_BASE_URL:${e2eAuthBaseUrl}`;
 const frontendCommand = process.env.CI
   ? "pnpm -C ../frontend build && pnpm -C ../frontend exec vite preview --host 127.0.0.1 --port 5173 --strictPort"
   : "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173";
@@ -43,7 +43,7 @@ export default defineConfig({
     ? [
         {
           command: backendCommand,
-          url: "http://127.0.0.1:8787/health",
+          url: `${e2eBackendBaseUrl}/health`,
           timeout: 120_000,
           reuseExistingServer: false,
         },
@@ -53,8 +53,8 @@ export default defineConfig({
           timeout: 120_000,
           reuseExistingServer: !process.env.CI,
           env: {
-            VITE_API_BASE_URL: "http://127.0.0.1:8787",
-            VITE_AUTH_BASE_URL: betterAuthBaseUrl,
+            VITE_API_BASE_URL: e2eBackendBaseUrl,
+            VITE_AUTH_BASE_URL: e2eAuthBaseUrl,
             VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
           },
         },
