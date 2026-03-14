@@ -8,21 +8,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-
-type RouteHandle = {
-  title?: string;
-};
-
-const resolvePageTitle = (matches: UIMatch[]) => {
-  for (const match of [...matches].reverse()) {
-    const handle = match.handle as RouteHandle | undefined;
-    if (handle?.title) {
-      return handle.title;
-    }
-  }
-
-  return "Workspace";
-};
+import { resolveRouteTitle } from "@/lib/route-title";
 
 export const ProtectedLayoutPage = () => {
   const navigate = useNavigate();
@@ -31,7 +17,7 @@ export const ProtectedLayoutPage = () => {
 
   const [signOutError, setSignOutError] = React.useState<string | null>(null);
 
-  const pageTitle = resolvePageTitle(matches);
+  const pageTitle = resolveRouteTitle(matches as UIMatch[]);
 
   React.useEffect(() => {
     if (isLoading || user) return;

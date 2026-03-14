@@ -36,6 +36,10 @@ import { SignupPage } from "@/pages/signup-page";
 import { TermsOfServicePage } from "@/pages/terms-of-service-page";
 import { VerifyEmailPage } from "@/pages/verify-email-page";
 import { APP_NAME } from "@/lib/app";
+import {
+  matchesManageDocumentTitle,
+  resolveDocumentTitle,
+} from "@/lib/route-title";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -56,23 +60,12 @@ const hydrationFallbackElement = (
   </div>
 );
 
-type RouteHandle = {
-  title?: string;
-};
-
-const resolveDocumentTitle = (matches: DataRouteMatch[]) => {
-  for (const match of [...matches].reverse()) {
-    const handle = match.route.handle as RouteHandle | undefined;
-    if (handle?.title) {
-      return `${handle.title} | ${APP_NAME}`;
-    }
+const syncDocumentTitle = (matches: DataRouteMatch[]) => {
+  if (matchesManageDocumentTitle(matches)) {
+    return;
   }
 
-  return APP_NAME;
-};
-
-const syncDocumentTitle = (matches: DataRouteMatch[]) => {
-  document.title = resolveDocumentTitle(matches);
+  document.title = resolveDocumentTitle(matches, APP_NAME);
 };
 
 const routes: RouteObject[] = [
@@ -151,17 +144,17 @@ const routes: RouteObject[] = [
       {
         path: "inbox",
         element: <InboxPage />,
-        handle: { title: "Inbox" },
+        handle: { title: "Inbox", managesDocumentTitle: true },
       },
       {
         path: "inbox/:addressId",
         element: <InboxPage />,
-        handle: { title: "Address List" },
+        handle: { title: "Address List", managesDocumentTitle: true },
       },
       {
         path: "inbox/:addressId/:mailId",
         element: <InboxPage />,
-        handle: { title: "View Email" },
+        handle: { title: "View Email", managesDocumentTitle: true },
       },
       {
         path: "addresses",
