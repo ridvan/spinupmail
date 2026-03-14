@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MailboxPage } from "@/pages/mailbox-page";
 import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
@@ -94,6 +94,7 @@ describe("MailboxPage", () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: addresses,
       isLoading: false,
+      isFetching: false,
       error: null,
     } as unknown as ReturnType<typeof useAllAddressesQuery>);
 
@@ -109,6 +110,7 @@ describe("MailboxPage", () => {
             items: addressId ? (emailsByAddress[addressId] ?? []) : [],
           },
           isLoading: false,
+          isFetching: false,
           error: null,
         }) as unknown as ReturnType<typeof useMailboxEmailsQuery>
     );
@@ -123,6 +125,7 @@ describe("MailboxPage", () => {
               }
             : null,
           isLoading: false,
+          isFetching: false,
           error: null,
         }) as unknown as ReturnType<typeof useMailboxEmailDetailQuery>
     );
@@ -143,12 +146,14 @@ describe("MailboxPage", () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
     } as unknown as ReturnType<typeof useAllAddressesQuery>);
 
     mockedUseMailboxEmailsQuery.mockReturnValue({
       data: { items: [] },
       isLoading: false,
+      isFetching: false,
       error: null,
     } as unknown as ReturnType<typeof useMailboxEmailsQuery>);
 
@@ -198,18 +203,21 @@ describe("MailboxPage", () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: addresses,
       isLoading: false,
+      isFetching: false,
       error: new Error("Unable to load addresses"),
     } as unknown as ReturnType<typeof useAllAddressesQuery>);
 
     mockedUseMailboxEmailsQuery.mockReturnValue({
       data: { items: emailsByAddress.a1 },
       isLoading: false,
+      isFetching: false,
       error: new Error("Unable to load emails"),
     } as unknown as ReturnType<typeof useMailboxEmailsQuery>);
 
     mockedUseMailboxEmailDetailQuery.mockReturnValue({
       data: null,
       isLoading: false,
+      isFetching: false,
       error: new Error("Unable to load preview"),
     } as unknown as ReturnType<typeof useMailboxEmailDetailQuery>);
 
@@ -218,5 +226,72 @@ describe("MailboxPage", () => {
     expect(screen.getByText("Unable to load addresses")).toBeTruthy();
     expect(screen.getByText("Unable to load emails")).toBeTruthy();
     expect(screen.getByText("Unable to load preview")).toBeTruthy();
+  });
+
+  it("waits for a refetching address list before replacing a new route address", async () => {
+    const staleAddresses = addresses;
+    const freshAddresses = [
+      { id: "a3", address: "a3@example.com" },
+      ...addresses,
+    ];
+
+    let addressesQueryState = {
+      data: staleAddresses,
+      isLoading: false,
+      isFetching: true,
+      error: null,
+    };
+
+    mockedUseAllAddressesQuery.mockImplementation(
+      () =>
+        addressesQueryState as unknown as ReturnType<
+          typeof useAllAddressesQuery
+        >
+    );
+
+    mockedUseLocalStorage.mockReturnValue([
+      "a1",
+      setPreferredAddressId,
+    ] as unknown as ReturnType<typeof useLocalStorage>);
+
+    mockedUseMailboxEmailsQuery.mockImplementation(
+      addressId =>
+        ({
+          data: {
+            items:
+              addressId === "a3"
+                ? [{ id: "e3", subject: "third", from: "from3@example.com" }]
+                : addressId
+                  ? (emailsByAddress[addressId] ?? [])
+                  : [],
+          },
+          isLoading: false,
+          isFetching: false,
+          error: null,
+        }) as unknown as ReturnType<typeof useMailboxEmailsQuery>
+    );
+
+    const { router } = renderMailboxRoute(["/mailbox/a3"]);
+
+    await waitFor(() =>
+      expect(screen.getByText("selected-address:none")).toBeTruthy()
+    );
+    expect(router.state.location.pathname).toBe("/mailbox/a3");
+
+    addressesQueryState = {
+      data: freshAddresses,
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    };
+
+    await act(async () => {
+      await router.navigate("/mailbox/a3?refetch=1");
+    });
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/mailbox/a3/e3")
+    );
+    expect(setPreferredAddressId).toHaveBeenCalledWith("a3");
   });
 });

@@ -34,9 +34,17 @@ export const MailboxPage = () => {
     () => new Set(currentAddresses.map(address => address.id)),
     [currentAddresses]
   );
+  const isRouteAddressRefreshing =
+    routeAddressId !== null &&
+    !currentAddressIds.has(routeAddressId) &&
+    Boolean(addressesQuery.isFetching);
   const resolvedSelectedAddressId = React.useMemo(() => {
     if (routeAddressId && currentAddressIds.has(routeAddressId)) {
       return routeAddressId;
+    }
+
+    if (isRouteAddressRefreshing) {
+      return null;
     }
 
     if (preferredAddressId && currentAddressIds.has(preferredAddressId)) {
@@ -44,14 +52,22 @@ export const MailboxPage = () => {
     }
 
     return currentAddresses[0]?.id ?? null;
-  }, [routeAddressId, preferredAddressId, currentAddresses, currentAddressIds]);
+  }, [
+    routeAddressId,
+    isRouteAddressRefreshing,
+    preferredAddressId,
+    currentAddresses,
+    currentAddressIds,
+  ]);
 
   React.useEffect(() => {
     if (addressesQuery.isLoading) return;
+    if (isRouteAddressRefreshing) return;
     if (preferredAddressId === resolvedSelectedAddressId) return;
     setPreferredAddressId(resolvedSelectedAddressId);
   }, [
     addressesQuery.isLoading,
+    isRouteAddressRefreshing,
     preferredAddressId,
     resolvedSelectedAddressId,
     setPreferredAddressId,
@@ -66,13 +82,21 @@ export const MailboxPage = () => {
     () => new Set(currentEmails.map(email => email.id)),
     [currentEmails]
   );
+  const isRouteEmailRefreshing =
+    routeMailId !== null &&
+    !currentEmailIds.has(routeMailId) &&
+    Boolean(emailsQuery.isFetching);
   const resolvedSelectedEmailId = React.useMemo(() => {
     if (routeMailId && currentEmailIds.has(routeMailId)) {
       return routeMailId;
     }
 
+    if (isRouteEmailRefreshing) {
+      return null;
+    }
+
     return currentEmails[0]?.id ?? null;
-  }, [routeMailId, currentEmailIds, currentEmails]);
+  }, [routeMailId, isRouteEmailRefreshing, currentEmailIds, currentEmails]);
 
   const currentMailboxPath = React.useMemo(
     () => buildMailboxPath(routeAddressId, routeMailId),
@@ -81,6 +105,7 @@ export const MailboxPage = () => {
 
   React.useEffect(() => {
     if (addressesQuery.isLoading) return;
+    if (isRouteAddressRefreshing) return;
 
     if (!resolvedSelectedAddressId) {
       if (currentMailboxPath !== "/mailbox") {
@@ -90,6 +115,7 @@ export const MailboxPage = () => {
     }
 
     if (!routeMailId && emailsQuery.isLoading) return;
+    if (isRouteEmailRefreshing) return;
 
     const nextPath = buildMailboxPath(
       resolvedSelectedAddressId,
@@ -102,6 +128,8 @@ export const MailboxPage = () => {
     addressesQuery.isLoading,
     currentMailboxPath,
     emailsQuery.isLoading,
+    isRouteAddressRefreshing,
+    isRouteEmailRefreshing,
     navigate,
     resolvedSelectedAddressId,
     resolvedSelectedEmailId,
