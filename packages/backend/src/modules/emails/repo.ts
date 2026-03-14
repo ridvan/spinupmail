@@ -2,8 +2,8 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { emailAddresses, emailAttachments, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 
-const EMAIL_SEARCH_MARKER_START = "[[match]]";
-const EMAIL_SEARCH_MARKER_END = "[[/match]]";
+const EMAIL_SEARCH_MARKER_START = "__spinupmail_fts_match_4d7f0c1a_start__";
+const EMAIL_SEARCH_MARKER_END = "__spinupmail_fts_match_4d7f0c1a_end__";
 const EMAIL_SEARCH_MAX_TOKENS = 6;
 const EMAIL_SEARCH_MAX_TOKEN_LENGTH = 48;
 

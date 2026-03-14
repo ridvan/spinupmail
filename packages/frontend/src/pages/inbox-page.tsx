@@ -51,6 +51,10 @@ export const InboxPage = () => {
   const [emailSearchInput, setEmailSearchInput] = React.useState("");
   const deferredEmailSearchInput = React.useDeferredValue(emailSearchInput);
   const [emailSearch, setEmailSearch] = React.useState("");
+  const clearEmailSearch = React.useCallback(() => {
+    setEmailSearchInput("");
+    setEmailSearch("");
+  }, []);
   const handleEmailSearchChange = React.useCallback((value: string) => {
     setEmailSearchInput(value.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH));
   }, []);
@@ -225,6 +229,7 @@ export const InboxPage = () => {
         previewEmail={previewEmail}
         previewEmailLoading={previewEmailLoading}
         onSelectAddress={addressId => {
+          clearEmailSearch();
           setPreferredAddressId(addressId);
           const nextPath = buildInboxPath(addressId);
           if (nextPath !== currentInboxPath) {

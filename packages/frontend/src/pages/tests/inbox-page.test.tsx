@@ -354,6 +354,33 @@ describe("InboxPage", () => {
     );
   });
 
+  it("clears the active search when selecting a different address", async () => {
+    vi.useFakeTimers();
+
+    const { router } = renderInboxRoute(["/inbox/a1"]);
+
+    fireEvent.change(screen.getByLabelText("search-emails"), {
+      target: { value: "invoice" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "invoice");
+    vi.useRealTimers();
+
+    fireEvent.click(screen.getByRole("button", { name: "select-address-a2" }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/inbox/a2/e2")
+    );
+    expect(
+      (screen.getByLabelText("search-emails") as HTMLInputElement).value
+    ).toBe("");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+  });
+
   it("waits for a refetching address list before replacing a new route address", async () => {
     const staleAddresses = addresses;
     const freshAddresses = [

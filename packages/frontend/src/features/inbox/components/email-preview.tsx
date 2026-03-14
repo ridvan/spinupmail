@@ -261,7 +261,7 @@ export const EmailPreview = ({
             </div>
           ) : null}
           <div
-            className={`relative min-h-0 flex-1 overflow-auto rounded-md border border-border/70 ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
+            className={`relative min-h-0 flex-1 overflow-auto rounded-md border border-border/70 bg-background ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
           >
             <EmailHtmlRenderer
               allowRemoteContent={activeRemoteContentState.allowRemoteContent}
