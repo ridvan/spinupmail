@@ -160,7 +160,7 @@ export const OrganizationSwitcher = () => {
   const handleCreateDialogTrigger = () => {
     if (isCreateDisabled) return;
 
-    setIsDropdownOpen(false);
+    handleOpenChange(false);
     setCreateErrorMessage(null);
     setIsCreateDialogOpen(true);
   };
