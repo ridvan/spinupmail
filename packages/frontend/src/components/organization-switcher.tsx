@@ -6,6 +6,8 @@ import {
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +17,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import {
   ChevronsUpDownIcon,
   type ChevronsUpDownIconHandle,
 } from "@/components/ui/chevrons-up-down";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -32,6 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { OrganizationAvatar } from "@/features/organization/components/organization-avatar";
 import {
@@ -46,6 +61,7 @@ import { cn } from "@/lib/utils";
 const MAX_ORGANIZATIONS = 3;
 
 export const OrganizationSwitcher = () => {
+  const navigate = useNavigate();
   const { isMobile, state } = useSidebar();
   const {
     activeOrganizationId,
@@ -59,7 +75,14 @@ export const OrganizationSwitcher = () => {
   const createMutation = useCreateOrganizationMutation();
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [organizationName, setOrganizationName] = React.useState("");
+  const [createErrorMessage, setCreateErrorMessage] = React.useState<
+    string | null
+  >(null);
   const chevronsRef = React.useRef<ChevronsUpDownIconHandle | null>(null);
+  const cancelCreateIconRef = React.useRef<XIconHandle | null>(null);
+  const confirmCreateIconRef = React.useRef<PlusIconHandle | null>(null);
 
   const organizations: OrganizationItem[] = organizationsQuery.data ?? [];
   const activeOrganization =
@@ -98,6 +121,7 @@ export const OrganizationSwitcher = () => {
     (organizationsQuery.isFetching && organizationsQuery.data === undefined);
   const isAtOrganizationLimit = organizations.length >= MAX_ORGANIZATIONS;
   const isCreateDisabled = isBusy || isAtOrganizationLimit;
+  const trimmedOrganizationName = organizationName.trim();
   const menuSide = isMobile
     ? "bottom"
     : state === "collapsed"
@@ -115,17 +139,57 @@ export const OrganizationSwitcher = () => {
     }
   };
 
-  const handleCreate = async () => {
-    if (organizations.length >= MAX_ORGANIZATIONS) return;
+  const resetCreateDialog = () => {
+    setOrganizationName("");
+    setCreateErrorMessage(null);
+  };
 
-    const name = window.prompt("Organization name");
-    if (!name) return;
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    if (!open && createMutation.isPending) return;
 
-    setErrorMessage(null);
+    setIsCreateDialogOpen(open);
+
+    if (!open) {
+      resetCreateDialog();
+      return;
+    }
+
+    setCreateErrorMessage(null);
+  };
+
+  const handleCreateDialogTrigger = () => {
+    if (isCreateDisabled) return;
+
+    setIsDropdownOpen(false);
+    setCreateErrorMessage(null);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (isCreateDisabled || trimmedOrganizationName.length < 2) return;
+
+    setCreateErrorMessage(null);
+    const createOrganizationToast = toast.promise(
+      createMutation.mutateAsync(trimmedOrganizationName),
+      {
+        loading: "Creating organization...",
+        success: "Organization created.",
+        error: error =>
+          error instanceof Error
+            ? error.message
+            : "Unable to create organization",
+      }
+    );
+
     try {
-      await createMutation.mutateAsync(name);
+      await createOrganizationToast.unwrap();
+      setIsCreateDialogOpen(false);
+      resetCreateDialog();
+      await navigate("/", { replace: true });
     } catch (error) {
-      setErrorMessage((error as Error).message);
+      setCreateErrorMessage((error as Error).message);
     }
   };
 
@@ -180,7 +244,7 @@ export const OrganizationSwitcher = () => {
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <DropdownMenu onOpenChange={handleOpenChange}>
+          <DropdownMenu open={isDropdownOpen} onOpenChange={handleOpenChange}>
             <DropdownMenuTrigger
               render={
                 <SidebarMenuButton
@@ -327,7 +391,7 @@ export const OrganizationSwitcher = () => {
                   <TooltipTrigger render={<div className="w-full" />}>
                     <DropdownMenuItem
                       disabled={isCreateDisabled}
-                      onClick={() => void handleCreate()}
+                      onClick={handleCreateDialogTrigger}
                     >
                       <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} />
                       Create organization
@@ -350,6 +414,80 @@ export const OrganizationSwitcher = () => {
           {errorMessage}
         </p>
       ) : null}
+
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={handleCreateDialogOpenChange}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create organization</DialogTitle>
+            <DialogDescription>
+              Give your workspace a name. You can update branding and invite
+              teammates after it&apos;s created.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreate}>
+            <div className="space-y-2">
+              <Label htmlFor="organization-name">Organization name</Label>
+              <Input
+                id="organization-name"
+                autoFocus
+                value={organizationName}
+                onChange={event => setOrganizationName(event.target.value)}
+                placeholder="Acme QA Team"
+                disabled={createMutation.isPending}
+                maxLength={64}
+              />
+            </div>
+            {createErrorMessage ? (
+              <p role="alert" className="text-sm text-destructive">
+                {createErrorMessage}
+              </p>
+            ) : null}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="cursor-pointer"
+                onClick={() => handleCreateDialogOpenChange(false)}
+                disabled={createMutation.isPending}
+                onMouseEnter={() => {
+                  cancelCreateIconRef.current?.startAnimation();
+                }}
+                onMouseLeave={() => {
+                  cancelCreateIconRef.current?.stopAnimation();
+                }}
+              >
+                <XIcon ref={cancelCreateIconRef} size={16} aria-hidden="true" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="cursor-pointer"
+                disabled={
+                  createMutation.isPending || trimmedOrganizationName.length < 2
+                }
+                onMouseEnter={() => {
+                  confirmCreateIconRef.current?.startAnimation();
+                }}
+                onMouseLeave={() => {
+                  confirmCreateIconRef.current?.stopAnimation();
+                }}
+              >
+                <PlusIcon
+                  ref={confirmCreateIconRef}
+                  size={16}
+                  aria-hidden="true"
+                />
+                {createMutation.isPending
+                  ? "Creating organization..."
+                  : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
