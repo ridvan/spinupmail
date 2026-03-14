@@ -178,4 +178,56 @@ describe("EmailPreview", () => {
     expect(screen.queryByText(/^Delete$/)).toBeNull();
     expect(deleteButton).toBeTruthy();
   });
+
+  it("lets the html renderer fill remaining height while keeping attachments visible", () => {
+    render(
+      <div className="flex h-[640px] flex-col">
+        <EmailPreview
+          email={{
+            id: "email-5",
+            addressId: "address-1",
+            to: "inbox@example.com",
+            from: "sender@example.com",
+            sender: "John Smith <sender@example.com>",
+            senderLabel: "John Smith",
+            subject: "Attachments",
+            headers: [],
+            html: "<p>Hello</p>",
+            text: null,
+            raw: null,
+            rawSize: 10,
+            rawTruncated: false,
+            rawDownloadPath: undefined,
+            attachments: [
+              {
+                id: "attachment-1",
+                filename: "report.pdf",
+                contentType: "application/pdf",
+                size: 1024,
+                disposition: "attachment",
+                contentId: null,
+                inlinePath:
+                  "/api/emails/email-5/attachments/attachment-1?inline=1",
+                downloadPath: "/api/emails/email-5/attachments/attachment-1",
+              },
+            ],
+            receivedAt: "2026-03-09T00:00:00.000Z",
+            receivedAtMs: 1741478400000,
+          }}
+        />
+      </div>
+    );
+
+    expect(screen.getByText("Attachments (1)")).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("email-html-renderer")
+        .parentElement?.className.includes("flex-1")
+    ).toBe(true);
+    expect(
+      screen
+        .getByTestId("email-html-renderer")
+        .parentElement?.className.includes("min-h-0")
+    ).toBe(true);
+  });
 });

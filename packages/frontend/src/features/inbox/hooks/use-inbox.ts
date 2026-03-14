@@ -3,11 +3,14 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { deleteEmail, getEmail, listEmails } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
-export const useInboxEmailsQuery = (addressId: string | null) => {
+export const useInboxEmailsQuery = (
+  addressId: string | null,
+  search: string
+) => {
   const { activeOrganizationId, isOrganizationSwitching } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.emails(activeOrganizationId, addressId),
+    queryKey: queryKeys.emails(activeOrganizationId, addressId, search),
     queryFn: async ({ signal }) => {
       if (!addressId) {
         return { address: "", addressId: "", items: [] };
@@ -17,6 +20,7 @@ export const useInboxEmailsQuery = (addressId: string | null) => {
         addressId,
         limit: 40,
         order: "desc",
+        search: search || undefined,
         signal,
         organizationId: activeOrganizationId,
       });
@@ -59,7 +63,7 @@ export const useDeleteEmailMutation = (addressId: string | null) => {
     onSuccess: async (_result, emailId) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: queryKeys.emails(activeOrganizationId, addressId),
+          queryKey: queryKeys.emailsBase(activeOrganizationId, addressId),
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.organizationStats,

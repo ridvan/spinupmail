@@ -1,0 +1,1 @@
+export const INBOX_EMAIL_SEARCH_MAX_LENGTH = 30;

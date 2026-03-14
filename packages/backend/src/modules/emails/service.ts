@@ -22,6 +22,7 @@ import {
   emailAttachmentQuerySchema,
   emailDetailQuerySchema,
   listEmailsQuerySchema,
+  EMAIL_SEARCH_MAX_LENGTH,
   type EmailAttachmentQuery,
   type EmailDetailQuery,
   type ListEmailsQuery,
@@ -39,12 +40,32 @@ import {
   findEmailDetailByIdAndOrganization,
   findEmailRawSourceByIdAndOrganization,
   listEmailsForAddress,
+  searchEmailsForAddress,
 } from "./repo";
 import { toAttachmentResponse } from "./dto";
 
 const parseListQuery = (payload: unknown): ListEmailsQuery => {
   const parsed = listEmailsQuerySchema.safeParse(payload);
-  if (!parsed.success) return {};
+  if (!parsed.success) {
+    if (!payload || typeof payload !== "object") return {};
+
+    const candidate = payload as Record<string, unknown>;
+    return {
+      address:
+        typeof candidate.address === "string" ? candidate.address : undefined,
+      addressId:
+        typeof candidate.addressId === "string"
+          ? candidate.addressId
+          : undefined,
+      search:
+        typeof candidate.search === "string" ? candidate.search : undefined,
+      limit: typeof candidate.limit === "string" ? candidate.limit : undefined,
+      order: typeof candidate.order === "string" ? candidate.order : undefined,
+      after: typeof candidate.after === "string" ? candidate.after : undefined,
+      before:
+        typeof candidate.before === "string" ? candidate.before : undefined,
+    };
+  }
   return parsed.data;
 };
 
@@ -58,6 +79,12 @@ const parseAttachmentQuery = (payload: unknown): EmailAttachmentQuery => {
   const parsed = emailAttachmentQuerySchema.safeParse(payload);
   if (!parsed.success) return {};
   return parsed.data;
+};
+
+const normalizeEmailSearch = (value: string | undefined) => {
+  const normalized =
+    value?.slice(0, EMAIL_SEARCH_MAX_LENGTH).trim().replace(/\s+/g, " ") ?? "";
+  return normalized.length > 0 ? normalized : undefined;
 };
 
 const getRawDownloadPath = (
@@ -131,15 +158,23 @@ export const listEmails = async ({
 
   const after = parseOptionalTimestamp(query.after ?? null);
   const before = parseOptionalTimestamp(query.before ?? null);
+  const search = normalizeEmailSearch(query.search);
 
-  const rows = await listEmailsForAddress({
-    db,
-    addressId: addressRow.id,
-    after,
-    before,
-    order,
-    limit,
-  });
+  const rows = search
+    ? await searchEmailsForAddress({
+        db,
+        addressId: addressRow.id,
+        search,
+        limit,
+      })
+    : await listEmailsForAddress({
+        db,
+        addressId: addressRow.id,
+        after,
+        before,
+        order,
+        limit,
+      });
 
   const emailIds = rows.map(row => row.id);
   const attachmentCountRows = await findAttachmentCountsForEmails(

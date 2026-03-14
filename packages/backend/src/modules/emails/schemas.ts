@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+export const EMAIL_SEARCH_MAX_LENGTH = 30;
+
 export const listEmailsQuerySchema = z
   .object({
     address: z.string().optional(),
     addressId: z.string().optional(),
+    search: z.string().trim().max(EMAIL_SEARCH_MAX_LENGTH).optional(),
     limit: z.string().optional(),
     order: z.string().optional(),
     after: z.string().optional(),

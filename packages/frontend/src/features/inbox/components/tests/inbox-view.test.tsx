@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import { InboxView } from "@/features/inbox/components/inbox-view";
+import { INBOX_EMAIL_SEARCH_MAX_LENGTH } from "@/features/inbox/constants";
 
 vi.mock("@/features/timezone/hooks/use-timezone", () => ({
   useTimezone: () => ({
@@ -53,6 +54,8 @@ describe("InboxView", () => {
             },
           ]}
           emailsLoading={false}
+          emailSearch=""
+          onEmailSearchChange={vi.fn()}
           selectedEmailId={null}
           onSelectEmail={vi.fn()}
           previewEmail={null}
@@ -63,5 +66,54 @@ describe("InboxView", () => {
 
     expect(screen.getByText("John Smith")).toBeTruthy();
     expect(screen.queryByText("sender@example.com")).toBeNull();
+  });
+
+  it("renders an email search input above the email list", () => {
+    const onEmailSearchChange = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <InboxView
+          addresses={[
+            {
+              id: "address-1",
+              address: "inbox@example.com",
+              localPart: "inbox",
+              domain: "example.com",
+              createdAt: null,
+              createdAtMs: null,
+              expiresAt: null,
+              expiresAtMs: null,
+              lastReceivedAt: null,
+              lastReceivedAtMs: null,
+              maxReceivedEmailCount: null,
+              maxReceivedEmailAction: null,
+            },
+          ]}
+          addressesLoading={false}
+          selectedAddressId="address-1"
+          onSelectAddress={vi.fn()}
+          emails={[]}
+          emailsLoading={false}
+          emailSearch="reset"
+          onEmailSearchChange={onEmailSearchChange}
+          selectedEmailId={null}
+          onSelectEmail={vi.fn()}
+          previewEmail={null}
+          previewEmailLoading={false}
+        />
+      </MemoryRouter>
+    );
+
+    const searchInput = screen.getByRole("searchbox", {
+      name: "Search emails",
+    });
+    expect((searchInput as HTMLInputElement).value).toBe("reset");
+    expect(searchInput.getAttribute("maxlength")).toBe(
+      String(INBOX_EMAIL_SEARCH_MAX_LENGTH)
+    );
+
+    fireEvent.change(searchInput, { target: { value: "invoice" } });
+    expect(onEmailSearchChange).toHaveBeenCalledWith("invoice");
   });
 });

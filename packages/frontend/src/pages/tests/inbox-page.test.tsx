@@ -8,6 +8,7 @@ import {
   useInboxEmailDetailQuery,
   useInboxEmailsQuery,
 } from "@/features/inbox/hooks/use-inbox";
+import { INBOX_EMAIL_SEARCH_MAX_LENGTH } from "@/features/inbox/constants";
 import { renderWithRouter } from "@/test/router-utils";
 
 vi.mock("@/features/addresses/hooks/use-addresses", () => ({
@@ -31,17 +32,26 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
   InboxView: ({
     selectedAddressId,
     selectedEmailId,
+    emailSearch,
+    onEmailSearchChange,
     onSelectAddress,
     onSelectEmail,
   }: {
     selectedAddressId: string | null;
     selectedEmailId: string | null;
+    emailSearch: string;
+    onEmailSearchChange: (value: string) => void;
     onSelectAddress: (addressId: string) => void;
     onSelectEmail: (emailId: string) => void;
   }) => (
     <div>
       <p>selected-address:{selectedAddressId ?? "none"}</p>
       <p>selected-email:{selectedEmailId ?? "none"}</p>
+      <input
+        aria-label="search-emails"
+        onChange={event => onEmailSearchChange(event.target.value)}
+        value={emailSearch}
+      />
       <button onClick={() => onSelectAddress("a2")} type="button">
         select-address-a2
       </button>
@@ -86,6 +96,7 @@ const renderInboxRoute = (initialEntries: string[]) =>
 describe("InboxPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     document.title = "SpinupMail";
 
     mockedUseAuth.mockReturnValue({
@@ -105,7 +116,7 @@ describe("InboxPage", () => {
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
     mockedUseInboxEmailsQuery.mockImplementation(
-      addressId =>
+      (addressId, _search) =>
         ({
           data: {
             items: addressId ? (emailsByAddress[addressId] ?? []) : [],
@@ -296,6 +307,51 @@ describe("InboxPage", () => {
     expect(screen.getByText("Unable to load addresses")).toBeTruthy();
     expect(screen.getByText("Unable to load emails")).toBeTruthy();
     expect(screen.getByText("Unable to load preview")).toBeTruthy();
+  });
+
+  it("debounces search text before updating the email query", async () => {
+    vi.useFakeTimers();
+
+    renderInboxRoute(["/inbox/a1"]);
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+
+    fireEvent.change(screen.getByLabelText("search-emails"), {
+      target: { value: "  reset   password  " },
+    });
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
+      "a1",
+      "reset password"
+    );
+  });
+
+  it("caps search text to 30 characters before updating the email query", async () => {
+    vi.useFakeTimers();
+
+    renderInboxRoute(["/inbox/a1"]);
+
+    const overlongSearch =
+      "123456789012345678901234567890-overflow text that should not survive";
+
+    fireEvent.change(screen.getByLabelText("search-emails"), {
+      target: { value: overlongSearch },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
+      "a1",
+      overlongSearch.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH)
+    );
   });
 
   it("waits for a refetching address list before replacing a new route address", async () => {

@@ -58,6 +58,24 @@ describe("EmailHtmlRenderer", () => {
     expect(host.shadowRoot?.innerHTML ?? "").toContain("font-family:Arial");
   });
 
+  it("adds inset padding around the rendered email content", async () => {
+    render(<EmailHtmlRenderer html="<body><p>Hello</p></body>" />);
+
+    const host = screen.getByTestId("email-html-renderer");
+
+    await waitFor(() => {
+      expect(
+        host.shadowRoot?.querySelector("[data-email-content-root]")
+      ).toBeTruthy();
+    });
+
+    const rendererStyles =
+      host.shadowRoot?.querySelector("style")?.textContent ?? "";
+
+    expect(rendererStyles).toContain("[data-email-content-root]");
+    expect(rendererStyles).toContain("padding: 0.75rem");
+  });
+
   it("blocks remote assets by default and restores them when enabled", async () => {
     const onRemoteContentBlockedChange = vi.fn();
     const { rerender } = render(

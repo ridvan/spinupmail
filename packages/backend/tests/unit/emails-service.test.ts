@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   findAddressByIdAndOrganization: vi.fn(),
   findAddressByValueAndOrganization: vi.fn(),
   listEmailsForAddress: vi.fn(),
+  searchEmailsForAddress: vi.fn(),
   findAttachmentCountsForEmails: vi.fn(),
   findEmailAttachmentsByEmailAndOrganization: vi.fn(),
   findEmailDetailByIdAndOrganization: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/modules/emails/repo", () => ({
   findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
   findAddressByValueAndOrganization: mocks.findAddressByValueAndOrganization,
   listEmailsForAddress: mocks.listEmailsForAddress,
+  searchEmailsForAddress: mocks.searchEmailsForAddress,
   findAttachmentCountsForEmails: mocks.findAttachmentCountsForEmails,
   findEmailAttachmentsByEmailAndOrganization:
     mocks.findEmailAttachmentsByEmailAndOrganization,
@@ -142,6 +144,81 @@ describe("emails service", () => {
       sender: null,
       senderLabel: "noname@example.com",
     });
+  });
+
+  it("uses ranked search when a search query is provided", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.searchEmailsForAddress.mockResolvedValue([
+      {
+        id: "email-2",
+        addressId: "address-1",
+        to: "inbox@example.com",
+        sender: "Jane Smith <jane@example.com>",
+        from: "jane@example.com",
+        subject: "Reset your password",
+        messageId: "message-2",
+        rawSize: 99,
+        rawTruncated: false,
+        receivedAt: new Date("2026-03-10T00:00:00.000Z"),
+        hasHtml: 1,
+        hasText: 1,
+      },
+    ]);
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: {
+        addressId: "address-1",
+        search: "  reset   pass  ",
+        limit: "10",
+      },
+    });
+
+    expect(mocks.searchEmailsForAddress).toHaveBeenCalledWith({
+      db: {},
+      addressId: "address-1",
+      search: "reset pass",
+      limit: 10,
+    });
+    expect(mocks.listEmailsForAddress).not.toHaveBeenCalled();
+    expect(result.status).toBe(200);
+    expect(result.body.items[0]).toMatchObject({
+      id: "email-2",
+      senderLabel: "Jane Smith",
+      subject: "Reset your password",
+    });
+  });
+
+  it("caps search queries to 30 characters before searching", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.searchEmailsForAddress.mockResolvedValue([]);
+
+    const overlongSearch =
+      "123456789012345678901234567890-overflow text that should not survive";
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: {
+        addressId: "address-1",
+        search: overlongSearch,
+      },
+    });
+
+    expect(mocks.searchEmailsForAddress).toHaveBeenCalledWith({
+      db: {},
+      addressId: "address-1",
+      search: overlongSearch.slice(0, 30),
+      limit: 20,
+    });
+    expect(result.status).toBe(200);
   });
 
   it("streams raw email from DB when stored inline", async () => {

@@ -93,10 +93,16 @@ const HOST_STYLES = `
   :host {
     display: block;
     color: inherit;
+    height: 100%;
   }
 
   *, *::before, *::after {
     box-sizing: border-box;
+  }
+
+  [data-email-content-root] {
+    min-height: 100%;
+    padding: 0.75rem;
   }
 
   body {

@@ -15,6 +15,13 @@
       "when": 1773176805299,
       "tag": "0001_minor_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773525710088,
+      "tag": "0002_emails_search_index",
+      "breakpoints": true
     }
   ]
 }

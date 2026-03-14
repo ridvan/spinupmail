@@ -122,6 +122,77 @@ test.describe("spinupmail app behaviors", () => {
     await expect(page.locator("textarea").first()).toHaveValue(bodyText);
   });
 
+  test("filters inbox emails by the search term", async ({
+    authSeed,
+    page,
+  }) => {
+    const session = await signInWithOrganization(authSeed, {
+      email: uniqueEmail("inbox-search"),
+      name: "Inbox Search User",
+      organizationName: "Inbox Search Org",
+    });
+
+    const organizationId = session.organizationId;
+    if (!organizationId) {
+      throw new Error(
+        "Expected seeded inbox search session to include an organization."
+      );
+    }
+
+    const address = await authSeed.createAddress({
+      organizationId,
+      userId: session.userId,
+      localPart: `inbox-search-${Date.now()}`,
+      tag: "inbox-search",
+    });
+
+    const matchingSubject = "Quarterly budget needle report";
+    const nonMatchingSubject = "Weekly operations digest";
+
+    await authSeed.createInboxEmail({
+      organizationId,
+      addressId: address.id,
+      from: "search-match@example.com",
+      sender: "Search Match <search-match@example.com>",
+      subject: matchingSubject,
+      bodyText: "Contains the budget needle keyword for inbox search.",
+      receivedAt: "2026-03-15T10:00:00.000Z",
+    });
+
+    await authSeed.createInboxEmail({
+      organizationId,
+      addressId: address.id,
+      from: "search-other@example.com",
+      sender: "Search Other <search-other@example.com>",
+      subject: nonMatchingSubject,
+      bodyText: "Does not include the keyword.",
+      receivedAt: "2026-03-15T09:59:00.000Z",
+    });
+
+    await page.goto(`/inbox/${address.id}`);
+
+    const searchInput = page.getByRole("searchbox", { name: "Search emails" });
+    const emailRows = page.getByTestId("inbox-email-row");
+
+    await expect(page).toHaveURL(new RegExp(`/inbox/${address.id}`));
+    await expect(emailRows).toHaveCount(2);
+    await expect(page.getByText(matchingSubject).first()).toBeVisible();
+    await expect(page.getByText(nonMatchingSubject).first()).toBeVisible();
+
+    await searchInput.fill("needle");
+
+    await expect(emailRows).toHaveCount(1);
+    await expect(page.getByText(matchingSubject).first()).toBeVisible();
+    await expect(page.getByText(nonMatchingSubject)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/inbox/${address.id}/`));
+
+    await searchInput.fill("");
+
+    await expect(emailRows).toHaveCount(2);
+    await expect(page.getByText(matchingSubject).first()).toBeVisible();
+    await expect(page.getByText(nonMatchingSubject).first()).toBeVisible();
+  });
+
   test("renders seeded HTML email content in the inbox preview", async ({
     authSeed,
     page,

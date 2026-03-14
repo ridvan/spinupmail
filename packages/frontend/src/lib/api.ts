@@ -411,6 +411,7 @@ export const updateEmailAddress = async (
 export const listEmails = async (options: {
   addressId?: string;
   address?: string;
+  search?: string;
   limit?: number;
   order?: "asc" | "desc";
   signal?: AbortSignal;
@@ -419,6 +420,7 @@ export const listEmails = async (options: {
   const query = new URLSearchParams();
   if (options.addressId) query.set("addressId", options.addressId);
   if (options.address) query.set("address", options.address);
+  if (options.search) query.set("search", options.search);
   if (options.limit) query.set("limit", String(options.limit));
   if (options.order) query.set("order", options.order);
   const data = await apiFetch<{
