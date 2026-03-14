@@ -1,4 +1,5 @@
 import {
+  deleteEmail,
   getEmailDetail,
   getEmailAttachment,
   getEmailRaw,
@@ -16,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   findEmailDetailByIdAndOrganization: vi.fn(),
   findEmailRawSourceByIdAndOrganization: vi.fn(),
   findAttachmentByIdsAndOrganization: vi.fn(),
+  deleteEmailSearchEntryByEmailId: vi.fn(),
+  deleteEmailByIdAndAddress: vi.fn(),
+  decrementAddressEmailCount: vi.fn(),
+  findEmailDeleteTargetByIdAndOrganization: vi.fn(),
+  findAttachmentKeysByEmailAndOrganization: vi.fn(),
 }));
 
 vi.mock("@/platform/db/client", () => ({
@@ -23,7 +29,7 @@ vi.mock("@/platform/db/client", () => ({
 }));
 
 vi.mock("@/modules/emails/repo", () => ({
-  decrementAddressEmailCount: vi.fn(),
+  decrementAddressEmailCount: mocks.decrementAddressEmailCount,
   findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
   findAddressByValueAndOrganization: mocks.findAddressByValueAndOrganization,
   listEmailsForAddress: mocks.listEmailsForAddress,
@@ -35,9 +41,12 @@ vi.mock("@/modules/emails/repo", () => ({
   findEmailRawSourceByIdAndOrganization:
     mocks.findEmailRawSourceByIdAndOrganization,
   findAttachmentByIdsAndOrganization: mocks.findAttachmentByIdsAndOrganization,
-  findEmailDeleteTargetByIdAndOrganization: vi.fn(),
-  findAttachmentKeysByEmailAndOrganization: vi.fn(),
-  deleteEmailByIdAndAddress: vi.fn(),
+  findEmailDeleteTargetByIdAndOrganization:
+    mocks.findEmailDeleteTargetByIdAndOrganization,
+  findAttachmentKeysByEmailAndOrganization:
+    mocks.findAttachmentKeysByEmailAndOrganization,
+  deleteEmailByIdAndAddress: mocks.deleteEmailByIdAndAddress,
+  deleteEmailSearchEntryByEmailId: mocks.deleteEmailSearchEntryByEmailId,
 }));
 
 describe("emails service", () => {
@@ -45,6 +54,7 @@ describe("emails service", () => {
     vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
     mocks.findAttachmentCountsForEmails.mockResolvedValue([]);
+    mocks.findAttachmentKeysByEmailAndOrganization.mockResolvedValue([]);
   });
 
   it("requires address or addressId when listing emails", async () => {
@@ -219,6 +229,44 @@ describe("emails service", () => {
       limit: 20,
     });
     expect(result.status).toBe(200);
+  });
+
+  it("deletes the email row and its search entry", async () => {
+    mocks.findEmailDeleteTargetByIdAndOrganization.mockResolvedValue({
+      id: "email-1",
+      addressId: "address-1",
+    });
+    mocks.findAttachmentKeysByEmailAndOrganization.mockResolvedValue([]);
+    mocks.deleteEmailByIdAndAddress.mockResolvedValue(undefined);
+    mocks.deleteEmailSearchEntryByEmailId.mockResolvedValue(undefined);
+    mocks.decrementAddressEmailCount.mockResolvedValue(undefined);
+
+    const result = await deleteEmail({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+    });
+
+    expect(mocks.deleteEmailByIdAndAddress).toHaveBeenCalledWith(
+      {},
+      "email-1",
+      "address-1"
+    );
+    expect(mocks.deleteEmailSearchEntryByEmailId).toHaveBeenCalledWith(
+      {},
+      "email-1"
+    );
+    expect(mocks.decrementAddressEmailCount).toHaveBeenCalledWith(
+      {},
+      "address-1"
+    );
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        id: "email-1",
+        deleted: true,
+      },
+    });
   });
 
   it("streams raw email from DB when stored inline", async () => {

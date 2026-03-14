@@ -1,6 +1,10 @@
 import { and, eq, lt, sql } from "drizzle-orm";
 import { emailAddresses, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
+import {
+  deleteEmailSearchEntriesByAddressId,
+  insertEmailSearchEntry,
+} from "@/modules/emails/repo";
 
 export const findAddressByRecipient = (db: AppDb, recipient: string) =>
   db
@@ -15,7 +19,7 @@ export const findAddressByRecipient = (db: AppDb, recipient: string) =>
     .where(eq(emailAddresses.address, recipient))
     .get();
 
-export const insertInboundEmail = (
+export const insertInboundEmail = async (
   db: AppDb,
   values: {
     id: string;
@@ -33,7 +37,17 @@ export const insertInboundEmail = (
     rawTruncated: boolean;
     receivedAt: Date;
   }
-) => db.insert(emails).values(values).run();
+) => {
+  await db.insert(emails).values(values).run();
+  await insertEmailSearchEntry({
+    db,
+    emailId: values.id,
+    subject: values.subject,
+    sender: values.sender,
+    senderAddress: values.from,
+    bodyText: values.bodyText,
+  });
+};
 
 export const reserveInboxSlot = ({
   db,
@@ -85,8 +99,10 @@ export const resetAddressEmailCount = (db: AppDb, addressId: string) =>
     .where(eq(emailAddresses.id, addressId))
     .run();
 
-export const deleteEmailsForAddress = (db: AppDb, addressId: string) =>
-  db.delete(emails).where(eq(emails.addressId, addressId)).run();
+export const deleteEmailsForAddress = async (db: AppDb, addressId: string) => {
+  await deleteEmailSearchEntriesByAddressId(db, addressId);
+  await db.delete(emails).where(eq(emails.addressId, addressId)).run();
+};
 
 export const updateAddressLastReceivedAt = (
   db: AppDb,

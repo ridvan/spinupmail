@@ -98,6 +98,28 @@ describe("inbound email parser", () => {
     expect(parsed.attachments[0]?.size).toBe(5);
   });
 
+  it("derives text from html when the email has no text part", async () => {
+    const raw = [
+      "From: sender@example.com",
+      "To: recipient@example.com",
+      "Subject: HTML only",
+      "MIME-Version: 1.0",
+      'Content-Type: text/html; charset="utf-8"',
+      "",
+      '<html><head><title>Ignored title</title><style>.hero{color:red}</style></head><body><h1>Example App</h1><p>Reset your password</p><a href="https://example.com/reset-password">Reset Password</a></body></html>',
+      "",
+    ].join("\r\n");
+
+    const parsed = await extractBodiesFromRaw(new TextEncoder().encode(raw));
+
+    expect(parsed.html).toContain("Example App");
+    expect(parsed.text).toContain("Example App");
+    expect(parsed.text).toContain("Reset your password");
+    expect(parsed.text).toContain("Reset Password");
+    expect(parsed.text).not.toContain("Ignored title");
+    expect(parsed.text).not.toContain("color:red");
+  });
+
   it("repairs common utf8 mojibake in decoded html and text", () => {
     const repairedHtml = repairLikelyMisdecodedUtf8(
       "<html><body><p>â€” Example App Team</p><p>Â© 2026 Example App</p></body></html>"

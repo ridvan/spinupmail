@@ -1,4 +1,5 @@
 import PostalMime from "postal-mime";
+import { parseDocument } from "htmlparser2";
 import type {
   PostalAttachmentContent,
   PostalAttachmentEncoding,
@@ -8,6 +9,125 @@ import type {
 import { sanitizeFilename } from "@/shared/utils/string";
 
 export { sanitizeEmailHtml } from "@/shared/utils/email-html";
+
+type HtmlNode = {
+  children?: HtmlNode[];
+  data?: string;
+  name?: string;
+  type: string;
+};
+
+type HtmlDocument = {
+  children: HtmlNode[];
+};
+
+const HTML_TEXT_BREAK_TAGS = new Set([
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "br",
+  "caption",
+  "div",
+  "dl",
+  "dt",
+  "dd",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "hr",
+  "li",
+  "main",
+  "nav",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tr",
+  "ul",
+]);
+const HTML_TEXT_IGNORED_TAGS = new Set([
+  "head",
+  "noscript",
+  "script",
+  "style",
+  "template",
+  "title",
+]);
+
+const extractTextFromHtmlNode = (node: HtmlNode): string => {
+  if (node.type === "text") {
+    return node.data ?? "";
+  }
+
+  if (
+    node.type !== "tag" &&
+    node.type !== "root" &&
+    node.type !== "script" &&
+    node.type !== "style"
+  ) {
+    return "";
+  }
+
+  const tagName = node.name?.toLowerCase();
+  if (tagName && HTML_TEXT_IGNORED_TAGS.has(tagName)) {
+    return "";
+  }
+
+  const childText = (node.children ?? [])
+    .map(child => extractTextFromHtmlNode(child))
+    .join("");
+
+  if (!tagName) {
+    return childText;
+  }
+
+  if (tagName === "br" || tagName === "hr") {
+    return "\n";
+  }
+
+  return HTML_TEXT_BREAK_TAGS.has(tagName) ? `\n${childText}\n` : childText;
+};
+
+const extractTextFromHtml = (html: string | undefined) => {
+  if (!html) return undefined;
+
+  try {
+    const document = parseDocument(html, {
+      decodeEntities: true,
+      lowerCaseAttributeNames: false,
+      lowerCaseTags: true,
+      recognizeSelfClosing: true,
+    }) as unknown as HtmlDocument;
+    const normalized = document.children
+      .map(node => extractTextFromHtmlNode(node))
+      .join("")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t\f\v]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/ *\n */g, "\n")
+      .trim();
+
+    return normalized.length > 0 ? normalized : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export const readRawWithLimit = async (
   stream: ReadableStream<Uint8Array> | CfReadableStream,
@@ -176,7 +296,7 @@ export const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
     const text =
       typeof parsed.text === "string" && parsed.text.trim().length > 0
         ? repairLikelyMisdecodedUtf8(parsed.text)
-        : undefined;
+        : extractTextFromHtml(html);
     const attachments = (parsed.attachments ?? [])
       .map((attachment): ParsedEmailAttachment | null => {
         try {

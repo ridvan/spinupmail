@@ -69,6 +69,65 @@ export const findAddressByValueAndOrganization = (
     )
     .get();
 
+export const insertEmailSearchEntry = async ({
+  db,
+  emailId,
+  subject,
+  sender,
+  senderAddress,
+  bodyText,
+}: {
+  db: AppDb;
+  emailId: string;
+  subject?: string | null;
+  sender?: string | null;
+  senderAddress: string;
+  bodyText?: string | null;
+}) => {
+  await db.$client
+    .prepare(
+      `
+        INSERT INTO emails_search (
+          subject,
+          sender,
+          sender_address,
+          body_text,
+          email_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `
+    )
+    .bind(subject ?? "", sender ?? "", senderAddress, bodyText ?? "", emailId)
+    .run();
+};
+
+export const deleteEmailSearchEntryByEmailId = async (
+  db: AppDb,
+  emailId: string
+) => {
+  await db.$client
+    .prepare(`DELETE FROM emails_search WHERE email_id = ?`)
+    .bind(emailId)
+    .run();
+};
+
+export const deleteEmailSearchEntriesByAddressId = async (
+  db: AppDb,
+  addressId: string
+) => {
+  await db.$client
+    .prepare(
+      `
+        DELETE FROM emails_search
+        WHERE email_id IN (
+          SELECT id FROM emails WHERE address_id = ?
+        )
+      `
+    )
+    .bind(addressId)
+    .run();
+};
+
 export const listEmailsForAddress = ({
   db,
   addressId,
@@ -166,7 +225,7 @@ export const searchEmailsForAddress = async ({
             THEN 1
             ELSE 2
           END AS searchPriority,
-          bm25(emails_search, 10.0, 6.0, 6.0, 2.0, 1.0) AS relevance
+          bm25(emails_search, 10.0, 6.0, 6.0, 2.0) AS relevance
         FROM emails_search
         INNER JOIN emails ON emails.id = emails_search.email_id
         WHERE emails_search MATCH ? AND emails.address_id = ?

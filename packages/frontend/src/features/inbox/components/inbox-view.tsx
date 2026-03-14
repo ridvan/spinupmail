@@ -22,6 +22,8 @@ import { SearchIcon } from "@/components/ui/search";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import type { XIconHandle } from "@/components/ui/x";
+import { XIcon } from "@/components/ui/x";
 import { cn } from "@/lib/utils";
 import type { EmailAddress, EmailDetail, EmailListItem } from "@/lib/api";
 import { EmailPreview } from "@/features/inbox/components/email-preview";
@@ -133,6 +135,7 @@ export const InboxView = ({
 }: InboxViewProps) => {
   const navigate = useNavigate();
   const searchIconRef = React.useRef<SearchIconHandle | null>(null);
+  const clearSearchIconRef = React.useRef<XIconHandle | null>(null);
   const { effectiveTimeZone } = useTimezone();
   const [addressCommandOpen, setAddressCommandOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -247,7 +250,8 @@ export const InboxView = ({
             <Input
               aria-label="Search emails"
               className={cn(
-                "h-9.5 rounded-none border-0 bg-transparent pl-11.5 pr-3 shadow-none focus-visible:bg-accent/40 focus-visible:ring-0",
+                "h-9.5 rounded-none border-0 bg-transparent pl-11.5 shadow-none focus-visible:bg-accent/40 focus-visible:ring-0",
+                emailSearch && "pr-8",
                 emailSearch && "bg-muted/40"
               )}
               disabled={!selectedAddressId}
@@ -269,6 +273,26 @@ export const InboxView = ({
               type="search"
               value={emailSearch}
             />
+            {emailSearch ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
+                aria-label="Clear email search"
+                onClick={() => {
+                  onEmailSearchChange("");
+                }}
+                onMouseEnter={() => {
+                  clearSearchIconRef.current?.startAnimation();
+                }}
+                onMouseLeave={() => {
+                  clearSearchIconRef.current?.stopAnimation();
+                }}
+              >
+                <XIcon ref={clearSearchIconRef} aria-hidden="true" size={14} />
+              </Button>
+            ) : null}
           </div>
         </div>
 
