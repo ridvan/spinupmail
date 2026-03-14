@@ -3,19 +3,41 @@ import { useNavigate, useParams } from "react-router";
 import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { MailboxView } from "@/features/mailbox/components/mailbox-view";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { InboxView } from "@/features/inbox/components/inbox-view";
 import {
-  useMailboxEmailDetailQuery,
-  useMailboxEmailsQuery,
-} from "@/features/mailbox/hooks/use-mailbox";
+  useInboxEmailDetailQuery,
+  useInboxEmailsQuery,
+} from "@/features/inbox/hooks/use-inbox";
 
-const buildMailboxPath = (addressId: string | null, mailId?: string | null) => {
-  if (!addressId) return "/mailbox";
-  if (!mailId) return `/mailbox/${addressId}`;
-  return `/mailbox/${addressId}/${mailId}`;
+const appName = "SpinupMail";
+const inboxTitleMaxLength = 72;
+
+const buildInboxPath = (addressId: string | null, mailId?: string | null) => {
+  if (!addressId) return "/inbox";
+  if (!mailId) return `/inbox/${addressId}`;
+  return `/inbox/${addressId}/${mailId}`;
 };
 
-export const MailboxPage = () => {
+const truncateInboxTitle = (value: string | null | undefined) => {
+  const normalizedValue = value?.replace(/\s+/g, " ").trim() || "No subject";
+  if (normalizedValue.length <= inboxTitleMaxLength) {
+    return normalizedValue;
+  }
+
+  const truncatedValue = normalizedValue
+    .slice(0, inboxTitleMaxLength - 3)
+    .trimEnd();
+  const lastWordBoundary = truncatedValue.lastIndexOf(" ");
+
+  if (lastWordBoundary >= Math.floor((inboxTitleMaxLength - 3) * 0.6)) {
+    return `${truncatedValue.slice(0, lastWordBoundary).trimEnd()}...`;
+  }
+
+  return `${truncatedValue}...`;
+};
+
+export const InboxPage = () => {
   const navigate = useNavigate();
   const params = useParams<{ addressId?: string; mailId?: string }>();
   const routeAddressId = params.addressId ?? null;
@@ -24,7 +46,7 @@ export const MailboxPage = () => {
   const addressesQuery = useAllAddressesQuery();
   const [preferredAddressId, setPreferredAddressId] = useLocalStorage<
     string | null
-  >(`mailbox:address:${activeOrganizationId ?? "none"}`, null);
+  >(`inbox:address:${activeOrganizationId ?? "none"}`, null);
 
   const currentAddresses = React.useMemo(
     () => addressesQuery.data ?? [],
@@ -73,7 +95,7 @@ export const MailboxPage = () => {
     setPreferredAddressId,
   ]);
 
-  const emailsQuery = useMailboxEmailsQuery(resolvedSelectedAddressId);
+  const emailsQuery = useInboxEmailsQuery(resolvedSelectedAddressId);
   const currentEmails = React.useMemo(
     () => emailsQuery.data?.items ?? [],
     [emailsQuery.data?.items]
@@ -98,8 +120,8 @@ export const MailboxPage = () => {
     return currentEmails[0]?.id ?? null;
   }, [routeMailId, isRouteEmailRefreshing, currentEmailIds, currentEmails]);
 
-  const currentMailboxPath = React.useMemo(
-    () => buildMailboxPath(routeAddressId, routeMailId),
+  const currentInboxPath = React.useMemo(
+    () => buildInboxPath(routeAddressId, routeMailId),
     [routeAddressId, routeMailId]
   );
 
@@ -108,8 +130,8 @@ export const MailboxPage = () => {
     if (isRouteAddressRefreshing) return;
 
     if (!resolvedSelectedAddressId) {
-      if (currentMailboxPath !== "/mailbox") {
-        void navigate("/mailbox", { replace: true });
+      if (currentInboxPath !== "/inbox") {
+        void navigate("/inbox", { replace: true });
       }
       return;
     }
@@ -117,16 +139,16 @@ export const MailboxPage = () => {
     if (!routeMailId && emailsQuery.isLoading) return;
     if (isRouteEmailRefreshing) return;
 
-    const nextPath = buildMailboxPath(
+    const nextPath = buildInboxPath(
       resolvedSelectedAddressId,
       resolvedSelectedEmailId
     );
-    if (nextPath !== currentMailboxPath) {
+    if (nextPath !== currentInboxPath) {
       void navigate(nextPath, { replace: true });
     }
   }, [
     addressesQuery.isLoading,
-    currentMailboxPath,
+    currentInboxPath,
     emailsQuery.isLoading,
     isRouteAddressRefreshing,
     isRouteEmailRefreshing,
@@ -136,12 +158,24 @@ export const MailboxPage = () => {
     routeMailId,
   ]);
 
-  const emailDetailQuery = useMailboxEmailDetailQuery(resolvedSelectedEmailId);
+  const emailDetailQuery = useInboxEmailDetailQuery(resolvedSelectedEmailId);
   const previewEmail = resolvedSelectedEmailId
     ? (emailDetailQuery.data ?? null)
     : null;
   const previewEmailLoading =
     Boolean(resolvedSelectedEmailId) && emailDetailQuery.isLoading;
+  const selectedAddress =
+    currentAddresses.find(
+      address => address.id === resolvedSelectedAddressId
+    ) ?? null;
+  const selectedEmailListItem =
+    currentEmails.find(email => email.id === resolvedSelectedEmailId) ?? null;
+  const inboxDocumentTitle = !selectedAddress?.address
+    ? `Inbox | ${appName}`
+    : !routeMailId
+      ? `Inbox - ${selectedAddress.address} | ${appName}`
+      : `${truncateInboxTitle(previewEmail?.subject ?? selectedEmailListItem?.subject)} - ${selectedAddress.address} | ${appName}`;
+  useDocumentTitle(inboxDocumentTitle);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
@@ -161,7 +195,7 @@ export const MailboxPage = () => {
         </p>
       ) : null}
 
-      <MailboxView
+      <InboxView
         addresses={addressesQuery.data ?? []}
         addressesLoading={addressesQuery.isLoading}
         emails={emailsQuery.data?.items ?? []}
@@ -170,15 +204,15 @@ export const MailboxPage = () => {
         previewEmailLoading={previewEmailLoading}
         onSelectAddress={addressId => {
           setPreferredAddressId(addressId);
-          const nextPath = buildMailboxPath(addressId);
-          if (nextPath !== currentMailboxPath) {
+          const nextPath = buildInboxPath(addressId);
+          if (nextPath !== currentInboxPath) {
             void navigate(nextPath);
           }
         }}
         onSelectEmail={emailId => {
           if (!resolvedSelectedAddressId) return;
-          const nextPath = buildMailboxPath(resolvedSelectedAddressId, emailId);
-          if (nextPath !== currentMailboxPath) {
+          const nextPath = buildInboxPath(resolvedSelectedAddressId, emailId);
+          if (nextPath !== currentInboxPath) {
             void navigate(nextPath);
           }
         }}

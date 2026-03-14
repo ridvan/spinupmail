@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { EmailHtmlRenderer } from "@/features/mailbox/components/email-html-renderer";
+import { EmailHtmlRenderer } from "@/features/inbox/components/email-html-renderer";
 
 describe("EmailHtmlRenderer", () => {
   it("renders sanitized email HTML inside a shadow root without using an iframe", async () => {

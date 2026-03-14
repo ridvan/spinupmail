@@ -48,21 +48,19 @@ describe("SignInTwoFactorPage", () => {
       routes: [
         { path: "/sign-in/2fa", element: <SignInTwoFactorPage /> },
         { path: "/sign-in", element: <div>sign-in</div> },
-        { path: "/mailbox", element: <div>mailbox</div> },
+        { path: "/inbox", element: <div>inbox</div> },
       ],
-      initialEntries: ["/sign-in/2fa?next=/mailbox"],
+      initialEntries: ["/sign-in/2fa?next=/inbox"],
     });
 
     const backLink = screen.getByRole("link", { name: "Back to sign in" });
-    expect(backLink.getAttribute("href")).toBe("/sign-in?next=%2Fmailbox");
+    expect(backLink.getAttribute("href")).toBe("/sign-in?next=%2Finbox");
 
     fireEvent.click(
       screen.getByRole("button", { name: "trigger-2fa-success" })
     );
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox")
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/inbox"));
     expect(capturedTwoFactorFormProps).toBeTruthy();
   });
 });

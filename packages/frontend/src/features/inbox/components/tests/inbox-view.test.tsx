@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import { MailboxView } from "@/features/mailbox/components/mailbox-view";
+import { InboxView } from "@/features/inbox/components/inbox-view";
 
 vi.mock("@/features/timezone/hooks/use-timezone", () => ({
   useTimezone: () => ({
@@ -9,11 +9,11 @@ vi.mock("@/features/timezone/hooks/use-timezone", () => ({
   }),
 }));
 
-describe("MailboxView", () => {
+describe("InboxView", () => {
   it("shows the sender label in the email list instead of the raw from address", () => {
     render(
       <MemoryRouter>
-        <MailboxView
+        <InboxView
           addresses={[
             {
               id: "address-1",

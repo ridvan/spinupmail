@@ -2,7 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useDeleteEmailMutation } from "../use-mailbox";
+import { useDeleteEmailMutation } from "../use-inbox";
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),

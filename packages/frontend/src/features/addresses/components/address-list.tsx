@@ -322,7 +322,7 @@ const AddressTableRow = React.memo(
             </Tooltip>
             <Link
               className="block min-w-0 flex-1 truncate font-mono text-xs sm:text-sm hover:underline"
-              to={`/mailbox/${encodeURIComponent(address.id)}`}
+              to={`/inbox/${encodeURIComponent(address.id)}`}
             >
               {address.address}
             </Link>

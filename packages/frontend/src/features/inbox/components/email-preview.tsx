@@ -22,8 +22,8 @@ import {
 import { XIcon, type XIconHandle } from "@/components/ui/x";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
-import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
-import { EmailHtmlRenderer } from "@/features/mailbox/components/email-html-renderer";
+import { useDeleteEmailMutation } from "@/features/inbox/hooks/use-inbox";
+import { EmailHtmlRenderer } from "@/features/inbox/components/email-html-renderer";
 import {
   downloadEmailAttachment,
   type EmailAttachment,

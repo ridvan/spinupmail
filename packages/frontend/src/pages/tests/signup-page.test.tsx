@@ -49,12 +49,12 @@ describe("SignupPage", () => {
         { path: "/signup", element: <SignupPage /> },
         { path: "/sign-in", element: <div>sign-in</div> },
       ],
-      initialEntries: ["/signup?next=/mailbox/addr-1"],
+      initialEntries: ["/signup?next=/inbox/addr-1"],
     });
 
     const signInLink = screen.getByRole("link", { name: "Sign in" });
     expect(signInLink.getAttribute("href")).toBe(
-      "/sign-in?next=%2Fmailbox%2Faddr-1"
+      "/sign-in?next=%2Finbox%2Faddr-1"
     );
 
     fireEvent.click(
@@ -64,7 +64,7 @@ describe("SignupPage", () => {
     await waitFor(() =>
       expect(
         router.state.location.pathname + router.state.location.search
-      ).toBe("/sign-in?next=%2Fmailbox%2Faddr-1&verification=required")
+      ).toBe("/sign-in?next=%2Finbox%2Faddr-1&verification=required")
     );
 
     expect(capturedSignUpFormProps).toBeTruthy();

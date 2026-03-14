@@ -375,13 +375,13 @@ const RecentAddressLinkCell = ({
         <div className="relative inline-flex max-w-full items-center">
           <Link
             className="block max-w-full truncate font-mono text-xs sm:text-sm hover:underline"
-            to={`/mailbox/${encodeURIComponent(addressId)}`}
+            to={`/inbox/${encodeURIComponent(addressId)}`}
           >
             {highlightAddressMatch(address, filterQuery)}
           </Link>
           <Link
             className="mt-px pointer-events-none absolute top-1/2 left-[calc(100%+0.5rem)] inline-flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[11px] text-muted-foreground opacity-0 transition-all duration-150 hover:text-foreground sm:translate-x-1 sm:group-hover/row:pointer-events-auto sm:group-hover/row:translate-x-0 sm:group-hover/row:opacity-100 sm:focus-visible:pointer-events-auto sm:focus-visible:translate-x-0 sm:focus-visible:opacity-100"
-            to={`/mailbox/${encodeURIComponent(addressId)}`}
+            to={`/inbox/${encodeURIComponent(addressId)}`}
             onMouseEnter={() => {
               openInboxIconRef.current?.startAnimation();
             }}

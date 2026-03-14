@@ -29,7 +29,7 @@ Product endpoints accept either of these auth modes:
 
 ## Organization scope rules
 
-Mailbox and inbox-management endpoints are organization-scoped.
+Inbox and email-management endpoints are organization-scoped.
 
 - Session-cookie requests can use the active organization stored on the session
 - Session-cookie requests can also pass `X-Org-Id` explicitly to target another organization the user belongs to
@@ -57,7 +57,7 @@ Use `GET /health` for a lightweight deployment health probe.
 
 <Endpoint method="GET" path="/health">
   Returns an operational status payload with a current timestamp. This route is
-  useful for uptime checks and deployment verification, not mailbox workflows.
+  useful for uptime checks and deployment verification, not inbox workflows.
 </Endpoint>
 
 ```json

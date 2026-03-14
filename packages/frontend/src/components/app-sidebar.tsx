@@ -60,8 +60,8 @@ const navItems: NavItem[] = [
     icon: DashboardSquare01Icon,
   },
   {
-    title: "Mailbox",
-    to: "/mailbox",
+    title: "Inbox",
+    to: "/inbox",
     icon: Mailbox01Icon,
   },
   {

@@ -35,16 +35,16 @@ test.describe("spinupmail protected pages", () => {
     await expect(cardTitle(page, "Recent Address Activity")).toBeVisible();
   });
 
-  test("renders the mailbox page", async ({ authSeed, page }) => {
+  test("renders the inbox page", async ({ authSeed, page }) => {
     await signInWithOrganization(authSeed, {
-      email: uniqueEmail("mailbox"),
-      name: "Mailbox User",
-      organizationName: "Mailbox Org",
+      email: uniqueEmail("inbox"),
+      name: "Inbox User",
+      organizationName: "Inbox Org",
     });
 
-    await page.goto("/mailbox");
+    await page.goto("/inbox");
 
-    await expect(page).toHaveURL("http://127.0.0.1:5173/mailbox");
+    await expect(page).toHaveURL("http://127.0.0.1:5173/inbox");
     await expect(page.getByText("Select an address").first()).toBeVisible();
     await expect(
       page.getByText("Select an address to view its emails.")

@@ -21,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { EmailAddress, EmailDetail, EmailListItem } from "@/lib/api";
-import { EmailPreview } from "@/features/mailbox/components/email-preview";
+import { EmailPreview } from "@/features/inbox/components/email-preview";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import {
   formatDateTimeInTimeZone,
@@ -30,7 +30,7 @@ import {
 } from "@/features/timezone/lib/date-format";
 import { useNavigate } from "react-router";
 
-type MailboxViewProps = {
+type InboxViewProps = {
   addresses: EmailAddress[];
   addressesLoading: boolean;
   selectedAddressId: string | null;
@@ -111,7 +111,7 @@ const formatRelativeDate = (value: string | null, timeZone: string) => {
   return `${fullDate}, ${formattedTime}`;
 };
 
-export const MailboxView = ({
+export const InboxView = ({
   addresses,
   addressesLoading,
   selectedAddressId,
@@ -122,7 +122,7 @@ export const MailboxView = ({
   onSelectEmail,
   previewEmail,
   previewEmailLoading,
-}: MailboxViewProps) => {
+}: InboxViewProps) => {
   const navigate = useNavigate();
   const { effectiveTimeZone } = useTimezone();
   const [addressCommandOpen, setAddressCommandOpen] = React.useState(false);

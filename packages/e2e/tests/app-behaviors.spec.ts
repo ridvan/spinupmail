@@ -33,8 +33,8 @@ test.describe("spinupmail app behaviors", () => {
     await page.goto("/");
     await expect(cardTitle(page, "Received Emails")).toBeVisible();
 
-    await navButton(page, "Mailbox").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/mailbox");
+    await navButton(page, "Inbox").click();
+    await expect(page).toHaveURL("http://127.0.0.1:5173/inbox");
     await expect(page.getByText("No email selected")).toBeVisible();
 
     await navButton(page, "Addresses").click();
@@ -80,32 +80,32 @@ test.describe("spinupmail app behaviors", () => {
     ).toBeVisible();
   });
 
-  test("shows seeded mailbox email content", async ({ authSeed, page }) => {
+  test("shows seeded inbox email content", async ({ authSeed, page }) => {
     const session = await signInWithOrganization(authSeed, {
-      email: uniqueEmail("mailbox-happy"),
-      name: "Mailbox Happy User",
-      organizationName: "Mailbox Happy Org",
+      email: uniqueEmail("inbox-happy"),
+      name: "Inbox Happy User",
+      organizationName: "Inbox Happy Org",
     });
 
     const organizationId = session.organizationId;
     if (!organizationId) {
       throw new Error(
-        "Expected seeded mailbox session to include an organization."
+        "Expected seeded inbox session to include an organization."
       );
     }
 
     const address = await authSeed.createAddress({
       organizationId,
       userId: session.userId,
-      localPart: `mailbox-${Date.now()}`,
-      tag: "mailbox-seeded",
+      localPart: `inbox-${Date.now()}`,
+      tag: "inbox-seeded",
     });
 
-    const subject = "Seeded mailbox subject";
-    const bodyText = "Seeded mailbox body for E2E verification.";
-    const sender = "Mailbox Sender <sender@example.com>";
+    const subject = "Seeded inbox subject";
+    const bodyText = "Seeded inbox body for E2E verification.";
+    const sender = "Inbox Sender <sender@example.com>";
 
-    await authSeed.createMailboxEmail({
+    await authSeed.createInboxEmail({
       organizationId,
       addressId: address.id,
       from: "sender@example.com",
@@ -114,40 +114,40 @@ test.describe("spinupmail app behaviors", () => {
       bodyText,
     });
 
-    await page.goto(`/mailbox/${address.id}`);
+    await page.goto(`/inbox/${address.id}`);
 
-    await expect(page).toHaveURL(new RegExp(`/mailbox/${address.id}`));
+    await expect(page).toHaveURL(new RegExp(`/inbox/${address.id}`));
     await expect(page.getByText(subject).first()).toBeVisible();
     await expect(page.getByText(`Sender: ${sender}`)).toBeVisible();
     await expect(page.locator("textarea").first()).toHaveValue(bodyText);
   });
 
-  test("renders seeded HTML email content in the mailbox preview", async ({
+  test("renders seeded HTML email content in the inbox preview", async ({
     authSeed,
     page,
   }) => {
     const session = await signInWithOrganization(authSeed, {
-      email: uniqueEmail("mailbox-html"),
-      name: "Mailbox HTML User",
-      organizationName: "Mailbox HTML Org",
+      email: uniqueEmail("inbox-html"),
+      name: "Inbox HTML User",
+      organizationName: "Inbox HTML Org",
     });
 
     const organizationId = session.organizationId;
     if (!organizationId) {
       throw new Error(
-        "Expected seeded HTML mailbox session to include an organization."
+        "Expected seeded HTML inbox session to include an organization."
       );
     }
 
     const address = await authSeed.createAddress({
       organizationId,
       userId: session.userId,
-      localPart: `mailbox-html-${Date.now()}`,
-      tag: "mailbox-html",
+      localPart: `inbox-html-${Date.now()}`,
+      tag: "inbox-html",
     });
 
-    const subject = "Seeded HTML mailbox subject";
-    await authSeed.createMailboxEmail({
+    const subject = "Seeded HTML inbox subject";
+    await authSeed.createInboxEmail({
       organizationId,
       addressId: address.id,
       from: "sender@example.com",
@@ -161,7 +161,7 @@ test.describe("spinupmail app behaviors", () => {
       ].join(""),
     });
 
-    await page.goto(`/mailbox/${address.id}`);
+    await page.goto(`/inbox/${address.id}`);
 
     const renderer = page.getByTestId("email-html-renderer");
 

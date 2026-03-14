@@ -99,7 +99,7 @@ export const OrganizationOnboardingPage = () => {
           <CardHeader>
             <CardTitle className="text-xl">Create an organization</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Create a new organization to start generating shared mailbox
+              Create a new organization to start generating shared inbox
               addresses.
             </p>
           </CardHeader>

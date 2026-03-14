@@ -148,7 +148,7 @@ describe("createResendVerificationEmailSender", () => {
     await sender(
       {
         user: { email: "signup@example.com" },
-        url: "http://localhost:8787/api/auth/verify-email?token=token-123&callbackURL=http%3A%2F%2Flocalhost%3A5173%2Fmailbox",
+        url: "http://localhost:8787/api/auth/verify-email?token=token-123&callbackURL=http%3A%2F%2Flocalhost%3A5173%2Finbox",
         token: createVerificationToken("email-verification"),
       },
       buildRequest("198.51.100.46")
@@ -157,10 +157,10 @@ describe("createResendVerificationEmailSender", () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining(
-          "http://localhost:5173/verify-email?token=token-123&flow=signup&callbackURL=http%3A%2F%2Flocalhost%3A5173%2Fmailbox"
+          "http://localhost:5173/verify-email?token=token-123&flow=signup&callbackURL=http%3A%2F%2Flocalhost%3A5173%2Finbox"
         ),
         html: expect.stringContaining(
-          'href="http://localhost:5173/verify-email?token=token-123&amp;flow=signup&amp;callbackURL=http%3A%2F%2Flocalhost%3A5173%2Fmailbox"'
+          'href="http://localhost:5173/verify-email?token=token-123&amp;flow=signup&amp;callbackURL=http%3A%2F%2Flocalhost%3A5173%2Finbox"'
         ),
       })
     );

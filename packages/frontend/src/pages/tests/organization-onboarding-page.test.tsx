@@ -54,7 +54,7 @@ const renderPage = (initialEntries: string[]) =>
         element: <OrganizationOnboardingPage />,
       },
       { path: "/", element: <div>home</div> },
-      { path: "/mailbox", element: <div>mailbox</div> },
+      { path: "/inbox", element: <div>inbox</div> },
     ],
     initialEntries,
   });
@@ -136,7 +136,7 @@ describe("OrganizationOnboardingPage", () => {
     } as unknown as ReturnType<typeof useOrganizationInvitationQuery>);
 
     const { router } = renderPage([
-      "/onboarding/organization?invitationId=inv-query&next=/mailbox",
+      "/onboarding/organization?invitationId=inv-query&next=/inbox",
     ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Accept invite" }));
@@ -145,9 +145,7 @@ describe("OrganizationOnboardingPage", () => {
       expect(acceptInvitationMutateAsync).toHaveBeenCalledWith("inv-query")
     );
     expect(refreshSession).toHaveBeenCalledTimes(1);
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox")
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/inbox"));
   });
 
   it("accepts invitation from pending invitation list and filters non-pending entries", async () => {
@@ -170,7 +168,7 @@ describe("OrganizationOnboardingPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useUserInvitationsQuery>);
 
-    const { router } = renderPage(["/onboarding/organization?next=/mailbox"]);
+    const { router } = renderPage(["/onboarding/organization?next=/inbox"]);
 
     expect(screen.getByText("Pending Org")).toBeTruthy();
     expect(screen.queryByText("Accepted Org")).toBeNull();
@@ -180,9 +178,7 @@ describe("OrganizationOnboardingPage", () => {
     await waitFor(() =>
       expect(acceptInvitationMutateAsync).toHaveBeenCalledWith("inv-pending")
     );
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox")
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/inbox"));
   });
 
   it("shows existing organizations section when no active org exists and orgs are available", () => {

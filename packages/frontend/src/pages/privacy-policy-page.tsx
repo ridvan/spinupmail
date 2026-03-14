@@ -49,7 +49,7 @@ export const PrivacyPolicyPage = () => {
                   metadata, and 2FA state.
                 </li>
                 <li>
-                  Mailbox data, such as inbound message content, headers,
+                  Inbox data, such as inbound message content, headers,
                   metadata, and attachments.
                 </li>
                 <li>

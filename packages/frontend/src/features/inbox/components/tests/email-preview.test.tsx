@@ -1,15 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EmailPreview } from "@/features/mailbox/components/email-preview";
+import { EmailPreview } from "@/features/inbox/components/email-preview";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { useDeleteEmailMutation } from "@/features/mailbox/hooks/use-mailbox";
+import { useDeleteEmailMutation } from "@/features/inbox/hooks/use-inbox";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock("@/features/mailbox/hooks/use-mailbox", () => ({
+vi.mock("@/features/inbox/hooks/use-inbox", () => ({
   useDeleteEmailMutation: vi.fn(),
 }));
 

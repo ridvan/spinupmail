@@ -49,13 +49,13 @@ describe("VerifyEmailPage", () => {
 
   it("verifies a signup email and redirects to the callback path", async () => {
     const callbackURL = encodeURIComponent(
-      `${window.location.origin}/mailbox?view=inbox`
+      `${window.location.origin}/inbox?view=inbox`
     );
 
     const { router } = renderWithRouter({
       routes: [
         { path: "/verify-email", element: <VerifyEmailPage /> },
-        { path: "/mailbox", element: <div>mailbox</div> },
+        { path: "/inbox", element: <div>inbox</div> },
       ],
       initialEntries: [
         `/verify-email?token=abc123&flow=signup&callbackURL=${callbackURL}`,
@@ -92,7 +92,7 @@ describe("VerifyEmailPage", () => {
     await waitFor(() =>
       expect(
         router.state.location.pathname + router.state.location.search
-      ).toBe("/mailbox?view=inbox")
+      ).toBe("/inbox?view=inbox")
     );
   });
 

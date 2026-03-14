@@ -87,7 +87,7 @@ const emailAddressFields: Array<ApiFieldSpec> = [
   {
     name: "localPart",
     type: "string",
-    description: "Normalized mailbox local part stored for the address.",
+    description: "Normalized inbox local part stored for the address.",
   },
   {
     name: "domain",
@@ -198,7 +198,7 @@ const emailListItemFields: Array<ApiFieldSpec> = [
   },
   isoTimestampField(
     "receivedAt",
-    "When the email was accepted into the mailbox."
+    "When the email was accepted into the inbox."
   ),
   msTimestampField("receivedAtMs", "Millisecond representation of receivedAt."),
 ];
@@ -856,7 +856,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: true,
         description: "Inbox local part before normalization.",
         constraints:
-          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved mailbox keywords are rejected.",
+          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
       },
       {
         name: "tag",
@@ -962,7 +962,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       {
         status: 400,
         error: "localPart is reserved and cannot be used",
-        when: "localPart matches a reserved mailbox keyword.",
+        when: "localPart matches a reserved inbox keyword.",
       },
       {
         status: 409,
@@ -1050,7 +1050,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: false,
         description: "New local part for the address.",
         constraints:
-          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved mailbox keywords are rejected.",
+          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
       },
       {
         name: "tag",
@@ -1129,7 +1129,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       {
         status: 400,
         error: "localPart is reserved and cannot be used",
-        when: "localPart matches a reserved mailbox keyword.",
+        when: "localPart matches a reserved inbox keyword.",
       },
       {
         status: 404,

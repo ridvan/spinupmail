@@ -63,7 +63,7 @@ test.describe("recent address activity", () => {
         tag: "recent-activity-e2e",
       });
 
-      await authSeed.createMailboxEmail({
+      await authSeed.createInboxEmail({
         organizationId,
         addressId: address.id,
         subject: `Recent activity email ${index + 1}`,

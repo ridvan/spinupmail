@@ -11,7 +11,7 @@ const stripWrappingQuotes = (value: string) => {
   return startsWithQuote && endsWithQuote ? value.slice(1, -1) : value;
 };
 
-const cleanMailboxValue = (value: string) =>
+const cleanAddressValue = (value: string) =>
   stripWrappingQuotes(value.trim().replace(/^mailto:/i, ""));
 
 export type ParsedSenderIdentity = {
@@ -257,7 +257,7 @@ export const parseSenderIdentity = (
   if (!raw) return null;
 
   const angleAddressMatch = raw.match(/<\s*([^<>]+)\s*>/);
-  const addressCandidate = cleanMailboxValue(
+  const addressCandidate = cleanAddressValue(
     angleAddressMatch?.[1] ?? raw.split(",")[0]?.trim() ?? ""
   );
   const address =
@@ -266,7 +266,7 @@ export const parseSenderIdentity = (
       : null;
 
   const nameCandidate = angleAddressMatch
-    ? cleanMailboxValue(raw.slice(0, angleAddressMatch.index).trim())
+    ? cleanAddressValue(raw.slice(0, angleAddressMatch.index).trim())
     : "";
   const normalizedName =
     nameCandidate.length > 0 && nameCandidate !== address

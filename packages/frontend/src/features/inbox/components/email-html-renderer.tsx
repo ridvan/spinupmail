@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   getEmailRendererHostStyles,
   prepareEmailHtmlForRender,
-} from "@/features/mailbox/utils/email-html";
+} from "@/features/inbox/utils/email-html";
 
 type EmailHtmlRendererProps = {
   html: string;

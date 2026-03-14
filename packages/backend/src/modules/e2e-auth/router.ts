@@ -298,10 +298,10 @@ export const createE2EAuthTestRouter = () => {
       ? new Date(payload.receivedAt)
       : new Date();
     const from = payload.from?.trim() || "sender@example.com";
-    const sender = payload.sender?.trim() || `Mailbox Sender <${from}>`;
-    const subject = payload.subject?.trim() || "Seeded mailbox message";
+    const sender = payload.sender?.trim() || `Inbox Sender <${from}>`;
+    const subject = payload.subject?.trim() || "Seeded inbox message";
     const bodyText =
-      payload.bodyText ?? "This is a seeded mailbox email for E2E tests.";
+      payload.bodyText ?? "This is a seeded inbox email for E2E tests.";
     const raw = [
       `From: ${sender}`,
       `To: ${address.address}`,

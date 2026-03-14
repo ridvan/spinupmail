@@ -3,7 +3,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { deleteEmail, getEmail, listEmails } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
-export const useMailboxEmailsQuery = (addressId: string | null) => {
+export const useInboxEmailsQuery = (addressId: string | null) => {
   const { activeOrganizationId, isOrganizationSwitching } = useAuth();
 
   return useQuery({
@@ -28,7 +28,7 @@ export const useMailboxEmailsQuery = (addressId: string | null) => {
   });
 };
 
-export const useMailboxEmailDetailQuery = (emailId: string | null) => {
+export const useInboxEmailDetailQuery = (emailId: string | null) => {
   const { activeOrganizationId, isOrganizationSwitching } = useAuth();
 
   return useQuery({

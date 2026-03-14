@@ -72,7 +72,7 @@ type AddressSeedResponse = {
   tag?: string;
 };
 
-type MailboxEmailSeedOptions = {
+type InboxEmailSeedOptions = {
   organizationId: string;
   addressId: string;
   from?: string;
@@ -83,7 +83,7 @@ type MailboxEmailSeedOptions = {
   receivedAt?: string;
 };
 
-type MailboxEmailSeedResponse = {
+type InboxEmailSeedResponse = {
   id: string;
   addressId: string;
   subject: string;
@@ -109,9 +109,9 @@ export type AuthSeedHelper = {
     options?: SessionSeedOptions
   ) => Promise<SessionSeedResponse>;
   createAddress: (options: AddressSeedOptions) => Promise<AddressSeedResponse>;
-  createMailboxEmail: (
-    options: MailboxEmailSeedOptions
-  ) => Promise<MailboxEmailSeedResponse>;
+  createInboxEmail: (
+    options: InboxEmailSeedOptions
+  ) => Promise<InboxEmailSeedResponse>;
 };
 
 export type SignInWithOrganizationOptions = {
@@ -281,8 +281,8 @@ export const test = base.extend<{
           options
         );
       },
-      createMailboxEmail: async options => {
-        return postJson<MailboxEmailSeedResponse>(
+      createInboxEmail: async options => {
+        return postJson<InboxEmailSeedResponse>(
           request,
           "/api/test/auth/email",
           options

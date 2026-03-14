@@ -49,7 +49,7 @@ describe("route loaders", () => {
 
     await expect(
       redirectIfAuthenticatedLoader(
-        loaderArgs("https://app/sign-in?next=/mailbox")
+        loaderArgs("https://app/sign-in?next=/inbox")
       )
     ).rejects.toMatchObject({
       status: 302,

@@ -70,19 +70,19 @@ describe("SignInPage", () => {
         { path: "/signup", element: <div>signup</div> },
         { path: "/sign-in/2fa", element: <div>2fa</div> },
       ],
-      initialEntries: ["/sign-in?next=/mailbox/my-address"],
+      initialEntries: ["/sign-in?next=/inbox/my-address"],
     });
 
     const signUpLink = screen.getByRole("link", { name: "Sign up" });
     expect(signUpLink.getAttribute("href")).toBe(
-      "/signup?next=%2Fmailbox%2Fmy-address"
+      "/signup?next=%2Finbox%2Fmy-address"
     );
 
     fireEvent.click(screen.getByRole("button", { name: "trigger-2fa" }));
     await waitFor(() =>
       expect(
         router.state.location.pathname + router.state.location.search
-      ).toBe("/sign-in/2fa?next=%2Fmailbox%2Fmy-address")
+      ).toBe("/sign-in/2fa?next=%2Finbox%2Fmy-address")
     );
   });
 

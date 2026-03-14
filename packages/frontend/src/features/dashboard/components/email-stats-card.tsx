@@ -45,8 +45,8 @@ const formatDormantCreatedAt = (createdAt: string | null, timeZone: string) => {
   })}`;
 };
 
-const buildMailboxAddressPath = (addressId: string) =>
-  addressId ? `/mailbox/${encodeURIComponent(addressId)}` : "/mailbox";
+const buildInboxAddressPath = (addressId: string) =>
+  addressId ? `/inbox/${encodeURIComponent(addressId)}` : "/inbox";
 
 const StatBlock = ({
   icon: Icon,
@@ -191,7 +191,7 @@ export const EmailStatsCard = () => {
                                 className="cursor-pointer text-[10px] font-normal"
                                 render={
                                   <Link
-                                    to={buildMailboxAddressPath(
+                                    to={buildInboxAddressPath(
                                       busiestInboxes[0].addressId
                                     )}
                                   />
@@ -244,7 +244,7 @@ export const EmailStatsCard = () => {
                                               className="cursor-pointer text-[10px] font-normal"
                                               render={
                                                 <Link
-                                                  to={buildMailboxAddressPath(
+                                                  to={buildInboxAddressPath(
                                                     addressId
                                                   )}
                                                 />
@@ -354,7 +354,7 @@ export const EmailStatsCard = () => {
                                 className="cursor-pointer text-[10px] font-normal"
                                 render={
                                   <Link
-                                    to={buildMailboxAddressPath(
+                                    to={buildInboxAddressPath(
                                       dormantInboxes[0].addressId
                                     )}
                                   />
@@ -411,7 +411,7 @@ export const EmailStatsCard = () => {
                                                 className="cursor-pointer text-[10px] font-normal"
                                                 render={
                                                   <Link
-                                                    to={buildMailboxAddressPath(
+                                                    to={buildInboxAddressPath(
                                                       addressId
                                                     )}
                                                   />

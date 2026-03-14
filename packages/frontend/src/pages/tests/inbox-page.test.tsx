@@ -1,13 +1,13 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MailboxPage } from "@/pages/mailbox-page";
+import { InboxPage } from "@/pages/inbox-page";
 import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import {
-  useMailboxEmailDetailQuery,
-  useMailboxEmailsQuery,
-} from "@/features/mailbox/hooks/use-mailbox";
+  useInboxEmailDetailQuery,
+  useInboxEmailsQuery,
+} from "@/features/inbox/hooks/use-inbox";
 import { renderWithRouter } from "@/test/router-utils";
 
 vi.mock("@/features/addresses/hooks/use-addresses", () => ({
@@ -22,13 +22,13 @@ vi.mock("@/hooks/use-local-storage", () => ({
   useLocalStorage: vi.fn(),
 }));
 
-vi.mock("@/features/mailbox/hooks/use-mailbox", () => ({
-  useMailboxEmailsQuery: vi.fn(),
-  useMailboxEmailDetailQuery: vi.fn(),
+vi.mock("@/features/inbox/hooks/use-inbox", () => ({
+  useInboxEmailsQuery: vi.fn(),
+  useInboxEmailDetailQuery: vi.fn(),
 }));
 
-vi.mock("@/features/mailbox/components/mailbox-view", () => ({
-  MailboxView: ({
+vi.mock("@/features/inbox/components/inbox-view", () => ({
+  InboxView: ({
     selectedAddressId,
     selectedEmailId,
     onSelectAddress,
@@ -55,8 +55,8 @@ vi.mock("@/features/mailbox/components/mailbox-view", () => ({
 const mockedUseAllAddressesQuery = vi.mocked(useAllAddressesQuery);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseLocalStorage = vi.mocked(useLocalStorage);
-const mockedUseMailboxEmailsQuery = vi.mocked(useMailboxEmailsQuery);
-const mockedUseMailboxEmailDetailQuery = vi.mocked(useMailboxEmailDetailQuery);
+const mockedUseInboxEmailsQuery = vi.mocked(useInboxEmailsQuery);
+const mockedUseInboxEmailDetailQuery = vi.mocked(useInboxEmailDetailQuery);
 
 const setPreferredAddressId = vi.fn();
 
@@ -73,19 +73,20 @@ const emailsByAddress = {
   a2: [{ id: "e2", subject: "second", from: "from2@example.com" }],
 } as Record<string, Array<{ id: string; subject: string; from: string }>>;
 
-const renderMailboxRoute = (initialEntries: string[]) =>
+const renderInboxRoute = (initialEntries: string[]) =>
   renderWithRouter({
     routes: [
-      { path: "/mailbox", element: <MailboxPage /> },
-      { path: "/mailbox/:addressId", element: <MailboxPage /> },
-      { path: "/mailbox/:addressId/:mailId", element: <MailboxPage /> },
+      { path: "/inbox", element: <InboxPage /> },
+      { path: "/inbox/:addressId", element: <InboxPage /> },
+      { path: "/inbox/:addressId/:mailId", element: <InboxPage /> },
     ],
     initialEntries,
   });
 
-describe("MailboxPage", () => {
+describe("InboxPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    document.title = "SpinupMail";
 
     mockedUseAuth.mockReturnValue({
       activeOrganizationId: "org-1",
@@ -103,7 +104,7 @@ describe("MailboxPage", () => {
       setPreferredAddressId,
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
-    mockedUseMailboxEmailsQuery.mockImplementation(
+    mockedUseInboxEmailsQuery.mockImplementation(
       addressId =>
         ({
           data: {
@@ -112,10 +113,10 @@ describe("MailboxPage", () => {
           isLoading: false,
           isFetching: false,
           error: null,
-        }) as unknown as ReturnType<typeof useMailboxEmailsQuery>
+        }) as unknown as ReturnType<typeof useInboxEmailsQuery>
     );
 
-    mockedUseMailboxEmailDetailQuery.mockImplementation(
+    mockedUseInboxEmailDetailQuery.mockImplementation(
       emailId =>
         ({
           data: emailId
@@ -127,22 +128,22 @@ describe("MailboxPage", () => {
           isLoading: false,
           isFetching: false,
           error: null,
-        }) as unknown as ReturnType<typeof useMailboxEmailDetailQuery>
+        }) as unknown as ReturnType<typeof useInboxEmailDetailQuery>
     );
   });
 
   it("normalizes invalid route params to first valid address and email", async () => {
-    const { router } = renderMailboxRoute([
-      "/mailbox/unknown-address/unknown-email",
+    const { router } = renderInboxRoute([
+      "/inbox/unknown-address/unknown-email",
     ]);
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox/a1/e1")
+      expect(router.state.location.pathname).toBe("/inbox/a1/e1")
     );
     expect(setPreferredAddressId).toHaveBeenCalledWith("a1");
   });
 
-  it("normalizes to base mailbox route when no addresses exist", async () => {
+  it("normalizes to base inbox route when no addresses exist", async () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: [],
       isLoading: false,
@@ -150,18 +151,16 @@ describe("MailboxPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useAllAddressesQuery>);
 
-    mockedUseMailboxEmailsQuery.mockReturnValue({
+    mockedUseInboxEmailsQuery.mockReturnValue({
       data: { items: [] },
       isLoading: false,
       isFetching: false,
       error: null,
-    } as unknown as ReturnType<typeof useMailboxEmailsQuery>);
+    } as unknown as ReturnType<typeof useInboxEmailsQuery>);
 
-    const { router } = renderMailboxRoute(["/mailbox/a1"]);
+    const { router } = renderInboxRoute(["/inbox/a1"]);
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox")
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/inbox"));
   });
 
   it("falls back to preferred address when route address is missing", async () => {
@@ -170,32 +169,103 @@ describe("MailboxPage", () => {
       setPreferredAddressId,
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
-    const { router } = renderMailboxRoute(["/mailbox"]);
+    const { router } = renderInboxRoute(["/inbox"]);
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox/a2/e2")
+      expect(router.state.location.pathname).toBe("/inbox/a2/e2")
     );
     expect(setPreferredAddressId).not.toHaveBeenCalled();
   });
 
+  it("sets inbox title when viewing an address without a selected mail", async () => {
+    mockedUseInboxEmailsQuery.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<typeof useInboxEmailsQuery>);
+
+    renderInboxRoute(["/inbox/a1"]);
+
+    await waitFor(() =>
+      expect(document.title).toBe("Inbox - a1@example.com | SpinupMail")
+    );
+  });
+
+  it("sets single mail title with a truncated subject and address", async () => {
+    const longSubject =
+      "This is a very long inbox subject that should be truncated fairly before the page title suffix is appended for the browser tab";
+
+    mockedUseInboxEmailsQuery.mockReturnValue({
+      data: {
+        items: [{ id: "e1", subject: longSubject, from: "from1@example.com" }],
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<typeof useInboxEmailsQuery>);
+
+    mockedUseInboxEmailDetailQuery.mockReturnValue({
+      data: {
+        id: "e1",
+        addressId: "a1",
+        to: "a1@example.com",
+        from: "from1@example.com",
+        senderLabel: "from1@example.com",
+        subject: longSubject,
+        headers: {},
+        attachments: [],
+        rawTruncated: false,
+        receivedAt: null,
+        receivedAtMs: null,
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    } as unknown as ReturnType<typeof useInboxEmailDetailQuery>);
+
+    renderInboxRoute(["/inbox/a1/e1"]);
+
+    await waitFor(() =>
+      expect(document.title).toBe(
+        "This is a very long inbox subject that should be truncated fairly... - a1@example.com | SpinupMail"
+      )
+    );
+  });
+
+  it("uses the email list subject while mail detail is still unavailable", async () => {
+    mockedUseInboxEmailDetailQuery.mockReturnValue({
+      data: null,
+      isLoading: true,
+      isFetching: true,
+      error: null,
+    } as unknown as ReturnType<typeof useInboxEmailDetailQuery>);
+
+    renderInboxRoute(["/inbox/a1/e1"]);
+
+    await waitFor(() =>
+      expect(document.title).toBe("first - a1@example.com | SpinupMail")
+    );
+  });
+
   it("updates preferred address and navigates when selecting address", async () => {
-    const { router } = renderMailboxRoute(["/mailbox/a1/e1"]);
+    const { router } = renderInboxRoute(["/inbox/a1/e1"]);
 
     fireEvent.click(screen.getByRole("button", { name: "select-address-a2" }));
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox/a2/e2")
+      expect(router.state.location.pathname).toBe("/inbox/a2/e2")
     );
     expect(setPreferredAddressId).toHaveBeenCalledWith("a2");
   });
 
   it("navigates to email detail when selecting an email", async () => {
-    const { router } = renderMailboxRoute(["/mailbox/a1"]);
+    const { router } = renderInboxRoute(["/inbox/a1"]);
 
     fireEvent.click(screen.getByRole("button", { name: "select-email-e2" }));
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox/a1/e2")
+      expect(router.state.location.pathname).toBe("/inbox/a1/e2")
     );
   });
 
@@ -207,21 +277,21 @@ describe("MailboxPage", () => {
       error: new Error("Unable to load addresses"),
     } as unknown as ReturnType<typeof useAllAddressesQuery>);
 
-    mockedUseMailboxEmailsQuery.mockReturnValue({
+    mockedUseInboxEmailsQuery.mockReturnValue({
       data: { items: emailsByAddress.a1 },
       isLoading: false,
       isFetching: false,
       error: new Error("Unable to load emails"),
-    } as unknown as ReturnType<typeof useMailboxEmailsQuery>);
+    } as unknown as ReturnType<typeof useInboxEmailsQuery>);
 
-    mockedUseMailboxEmailDetailQuery.mockReturnValue({
+    mockedUseInboxEmailDetailQuery.mockReturnValue({
       data: null,
       isLoading: false,
       isFetching: false,
       error: new Error("Unable to load preview"),
-    } as unknown as ReturnType<typeof useMailboxEmailDetailQuery>);
+    } as unknown as ReturnType<typeof useInboxEmailDetailQuery>);
 
-    renderMailboxRoute(["/mailbox/a1/e1"]);
+    renderInboxRoute(["/inbox/a1/e1"]);
 
     expect(screen.getByText("Unable to load addresses")).toBeTruthy();
     expect(screen.getByText("Unable to load emails")).toBeTruthy();
@@ -254,7 +324,7 @@ describe("MailboxPage", () => {
       setPreferredAddressId,
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
-    mockedUseMailboxEmailsQuery.mockImplementation(
+    mockedUseInboxEmailsQuery.mockImplementation(
       addressId =>
         ({
           data: {
@@ -268,15 +338,15 @@ describe("MailboxPage", () => {
           isLoading: false,
           isFetching: false,
           error: null,
-        }) as unknown as ReturnType<typeof useMailboxEmailsQuery>
+        }) as unknown as ReturnType<typeof useInboxEmailsQuery>
     );
 
-    const { router } = renderMailboxRoute(["/mailbox/a3"]);
+    const { router } = renderInboxRoute(["/inbox/a3"]);
 
     await waitFor(() =>
       expect(screen.getByText("selected-address:none")).toBeTruthy()
     );
-    expect(router.state.location.pathname).toBe("/mailbox/a3");
+    expect(router.state.location.pathname).toBe("/inbox/a3");
 
     addressesQueryState = {
       data: freshAddresses,
@@ -286,11 +356,11 @@ describe("MailboxPage", () => {
     };
 
     await act(async () => {
-      await router.navigate("/mailbox/a3?refetch=1");
+      await router.navigate("/inbox/a3?refetch=1");
     });
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/mailbox/a3/e3")
+      expect(router.state.location.pathname).toBe("/inbox/a3/e3")
     );
     expect(setPreferredAddressId).toHaveBeenCalledWith("a3");
   });

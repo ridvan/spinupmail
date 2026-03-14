@@ -21,7 +21,7 @@ import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { TimezoneProvider } from "@/features/timezone/hooks/use-timezone";
 import { AddressManagementPage } from "@/pages/address-management-page";
 import { HomePage } from "@/pages/home-page";
-import { MailboxPage } from "@/pages/mailbox-page";
+import { InboxPage } from "@/pages/inbox-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { OrganizationOnboardingPage } from "@/pages/organization-onboarding-page";
 import { OrganizationSettingsPage } from "@/pages/organization-settings-page";
@@ -50,7 +50,7 @@ const hydrationFallbackElement = (
   <div className="flex min-h-screen items-center justify-center">
     <div className="flex items-center gap-2 rounded-md border border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
       <Spinner className="size-4" />
-      <span>Loading mailbox...</span>
+      <span>Loading inbox...</span>
     </div>
   </div>
 );
@@ -150,18 +150,18 @@ const routes: RouteObject[] = [
         handle: { title: "Overview" },
       },
       {
-        path: "mailbox",
-        element: <MailboxPage />,
-        handle: { title: "Mailbox" },
+        path: "inbox",
+        element: <InboxPage />,
+        handle: { title: "Inbox" },
       },
       {
-        path: "mailbox/:addressId",
-        element: <MailboxPage />,
+        path: "inbox/:addressId",
+        element: <InboxPage />,
         handle: { title: "Address List" },
       },
       {
-        path: "mailbox/:addressId/:mailId",
-        element: <MailboxPage />,
+        path: "inbox/:addressId/:mailId",
+        element: <InboxPage />,
         handle: { title: "View Email" },
       },
       {

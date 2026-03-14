@@ -149,17 +149,17 @@ describe("ProtectedLayoutPage", () => {
           element: <ProtectedLayoutPage />,
           children: [
             {
-              path: "mailbox",
-              element: <div>Mailbox content</div>,
-              handle: { title: "Mailbox" },
+              path: "inbox",
+              element: <div>Inbox content</div>,
+              handle: { title: "Inbox" },
             },
           ],
         },
       ],
-      initialEntries: ["/mailbox"],
+      initialEntries: ["/inbox"],
     });
 
-    expect(screen.getByText("Mailbox")).toBeTruthy();
+    expect(screen.getByText("Inbox")).toBeTruthy();
   });
 
   it("surfaces sign-out errors", async () => {
