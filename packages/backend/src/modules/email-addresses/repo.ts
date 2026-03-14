@@ -78,37 +78,100 @@ export const countAddressesByOrganization = (
     .get();
 
 export type RecentAddressActivityCursor = {
-  recentActivityMs: number;
+  sortValueMs: number;
   id: string;
 };
+
+export type RecentAddressActivitySortBy = "recentActivity" | "createdAt";
+
+const escapeLikePattern = (value: string) =>
+  value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+
+const buildRecentAddressActivityBaseWhereClause = ({
+  organizationId,
+  search,
+}: {
+  organizationId: string;
+  search?: string;
+}) => {
+  const normalizedSearch = search?.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return eq(emailAddresses.organizationId, organizationId);
+  }
+
+  return and(
+    eq(emailAddresses.organizationId, organizationId),
+    sql`lower(${emailAddresses.address}) like ${`%${escapeLikePattern(normalizedSearch)}%`} escape '\\'`
+  );
+};
+
+export const countRecentAddressActivity = ({
+  db,
+  organizationId,
+  search,
+}: {
+  db: AppDb;
+  organizationId: string;
+  search?: string;
+}) =>
+  db
+    .select({ count: sql<number>`count(*)` })
+    .from(emailAddresses)
+    .where(
+      buildRecentAddressActivityBaseWhereClause({
+        organizationId,
+        search,
+      })
+    )
+    .get();
 
 export const listRecentAddressActivityPage = ({
   db,
   organizationId,
   limit,
   cursor,
+  sortBy,
+  sortDirection,
+  search,
 }: {
   db: AppDb;
   organizationId: string;
   limit: number;
   cursor?: RecentAddressActivityCursor;
+  sortBy: RecentAddressActivitySortBy;
+  sortDirection: AddressListSortDirection;
+  search?: string;
 }) => {
   const recentActivityExpr = sql<number>`coalesce(${emailAddresses.lastReceivedAt}, ${emailAddresses.createdAt})`;
+  const sortExpr =
+    sortBy === "createdAt" ? emailAddresses.createdAt : recentActivityExpr;
+  const isAscending = sortDirection === "asc";
+  const primaryOrder = isAscending ? asc(sortExpr) : desc(sortExpr);
+  const secondaryOrder = isAscending
+    ? asc(emailAddresses.id)
+    : desc(emailAddresses.id);
+  const cursorComparisonOperator = isAscending ? sql`>` : sql`<`;
+  const baseWhereClause = buildRecentAddressActivityBaseWhereClause({
+    organizationId,
+    search,
+  });
   const whereClause = cursor
     ? and(
-        eq(emailAddresses.organizationId, organizationId),
-        sql`(${recentActivityExpr} < ${cursor.recentActivityMs} OR (${recentActivityExpr} = ${cursor.recentActivityMs} AND ${emailAddresses.id} < ${cursor.id}))`
+        baseWhereClause,
+        sql`(${sortExpr} ${cursorComparisonOperator} ${cursor.sortValueMs} OR (${sortExpr} = ${cursor.sortValueMs} AND ${emailAddresses.id} ${cursorComparisonOperator} ${cursor.id}))`
       )
-    : eq(emailAddresses.organizationId, organizationId);
+    : baseWhereClause;
 
   return db
     .select({
       ...addressListSelect,
       recentActivityMs: recentActivityExpr,
+      sortValueMs: sortExpr,
     })
     .from(emailAddresses)
     .where(whereClause)
-    .orderBy(desc(recentActivityExpr), desc(emailAddresses.id))
+    .orderBy(primaryOrder, secondaryOrder)
     .limit(limit + 1);
 };
 

@@ -224,7 +224,10 @@ function createAuth(
           }),
         ],
         rateLimit: {
-          enabled: true,
+          // Playwright e2e flows seed auth state directly and can fan out
+          // `get-session` calls across workers, which makes production
+          // throttling introduce test-only sign-in redirects.
+          enabled: !enableE2ETestUtils,
           window: 60,
           customRules: {
             // It's here to prevent abuse,

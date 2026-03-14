@@ -98,6 +98,7 @@ export type EmailAddress = {
 
 export type EmailAddressSortBy = "createdAt" | "address" | "lastReceivedAt";
 export type SortDirection = "asc" | "desc";
+export type RecentAddressActivitySortBy = "recentActivity" | "createdAt";
 
 export type EmailAddressListResponse = {
   items: EmailAddress[];
@@ -241,17 +242,24 @@ export const listAllEmailAddresses = async (options?: {
 export const listRecentAddressActivity = async (options?: {
   limit?: number;
   cursor?: string;
+  search?: string;
+  sortBy?: RecentAddressActivitySortBy;
+  sortDirection?: SortDirection;
   signal?: AbortSignal;
   organizationId?: string | null;
 }) => {
   const query = new URLSearchParams();
   if (options?.limit) query.set("limit", String(options.limit));
   if (options?.cursor) query.set("cursor", options.cursor);
+  if (options?.search) query.set("search", options.search);
+  if (options?.sortBy) query.set("sortBy", options.sortBy);
+  if (options?.sortDirection) query.set("sortDirection", options.sortDirection);
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
 
   return apiFetch<{
     items: EmailAddress[];
     nextCursor: string | null;
+    totalItems: number;
   }>(
     `/api/email-addresses/recent-activity${suffix}`,
     {

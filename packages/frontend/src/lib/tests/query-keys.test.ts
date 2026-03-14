@@ -20,13 +20,25 @@ describe("queryKeys", () => {
       "address",
       "asc",
     ]);
-    expect(queryKeys.recentAddressActivity("org-1", "cursor-1", 20)).toEqual([
+    expect(
+      queryKeys.recentAddressActivity(
+        "org-1",
+        "cursor-1",
+        20,
+        "sales",
+        "recentActivity",
+        "desc"
+      )
+    ).toEqual([
       "app",
       "organizations",
       "org-1",
       "recent-address-activity",
       20,
       "cursor-1",
+      "sales",
+      "recentActivity",
+      "desc",
     ]);
     expect(queryKeys.emailDetail("org-1", "email-1")).toEqual([
       "app",

@@ -36,6 +36,7 @@ import {
 } from "./schemas";
 import {
   countAddressesByOrganization,
+  countRecentAddressActivity,
   deleteAddressByIdAndOrganization,
   findAddressByIdAndOrganization,
   findAddressByValue,
@@ -44,6 +45,7 @@ import {
   type AddressListSortDirection,
   listAddressesByOrganization,
   listRecentAddressActivityPage,
+  type RecentAddressActivitySortBy,
   updateAddressByIdAndOrganization,
 } from "./repo";
 import { toEmailAddressListItem } from "./dto";
@@ -58,6 +60,9 @@ const ADDRESS_LIST_SORT_DIRECTION_DEFAULT: AddressListSortDirection = "desc";
 const RECENT_ACTIVITY_PAGE_LIMIT_DEFAULT = 10;
 const RECENT_ACTIVITY_PAGE_LIMIT_MAX = 50;
 const RECENT_ACTIVITY_CURSOR_SEPARATOR = ":";
+const RECENT_ACTIVITY_SORT_BY_DEFAULT: RecentAddressActivitySortBy =
+  "recentActivity";
+const RECENT_ACTIVITY_SORT_DIRECTION_DEFAULT: AddressListSortDirection = "desc";
 
 const parseCreateBody = (payload: unknown): CreateEmailAddressBody => {
   const parsed = createEmailAddressBodySchema.safeParse(payload);
@@ -91,23 +96,23 @@ const normalizeMaxReceivedEmailAction = (value: unknown) =>
   value === "rejectNew" ? "rejectNew" : "cleanAll";
 
 const encodeRecentAddressActivityCursor = (value: {
-  recentActivityMs: number;
+  sortValueMs: number;
   id: string;
-}) => `${value.recentActivityMs}${RECENT_ACTIVITY_CURSOR_SEPARATOR}${value.id}`;
+}) => `${value.sortValueMs}${RECENT_ACTIVITY_CURSOR_SEPARATOR}${value.id}`;
 
 const decodeRecentAddressActivityCursor = (value: string) => {
   const separatorIndex = value.indexOf(RECENT_ACTIVITY_CURSOR_SEPARATOR);
   if (separatorIndex <= 0 || separatorIndex >= value.length - 1) return null;
 
-  const recentActivityMsRaw = value.slice(0, separatorIndex);
+  const sortValueMsRaw = value.slice(0, separatorIndex);
   const id = value.slice(separatorIndex + 1);
-  const recentActivityMs = Number(recentActivityMsRaw);
+  const sortValueMs = Number(sortValueMsRaw);
 
-  if (!Number.isFinite(recentActivityMs) || recentActivityMs < 0 || !id) {
+  if (!Number.isFinite(sortValueMs) || sortValueMs < 0 || !id) {
     return null;
   }
 
-  return { recentActivityMs, id };
+  return { sortValueMs, id };
 };
 
 export const listEmailAddresses = async ({
@@ -181,6 +186,11 @@ export const listRecentAddressActivity = async ({
     RECENT_ACTIVITY_PAGE_LIMIT_MAX,
     RECENT_ACTIVITY_PAGE_LIMIT_DEFAULT
   );
+  const search = query.search?.trim() || undefined;
+  const sortBy = (query.sortBy ??
+    RECENT_ACTIVITY_SORT_BY_DEFAULT) as RecentAddressActivitySortBy;
+  const sortDirection = (query.sortDirection ??
+    RECENT_ACTIVITY_SORT_DIRECTION_DEFAULT) as AddressListSortDirection;
   const cursor = query.cursor
     ? decodeRecentAddressActivityCursor(query.cursor)
     : null;
@@ -193,11 +203,19 @@ export const listRecentAddressActivity = async ({
   }
 
   const db = getDb(env);
+  const totalRow = await countRecentAddressActivity({
+    db,
+    organizationId,
+    search,
+  });
   const rows = await listRecentAddressActivityPage({
     db,
     organizationId,
     limit,
     cursor: cursor ?? undefined,
+    sortBy,
+    sortDirection,
+    search,
   });
 
   const hasNext = rows.length > limit;
@@ -206,7 +224,7 @@ export const listRecentAddressActivity = async ({
   const nextCursor =
     hasNext && lastPageRow
       ? encodeRecentAddressActivityCursor({
-          recentActivityMs: Number(lastPageRow.recentActivityMs),
+          sortValueMs: Number(lastPageRow.sortValueMs),
           id: lastPageRow.id,
         })
       : null;
@@ -216,6 +234,7 @@ export const listRecentAddressActivity = async ({
     body: {
       items: pageRows.map(toEmailAddressListItem),
       nextCursor,
+      totalItems: Number(totalRow?.count ?? 0),
     },
   };
 };

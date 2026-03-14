@@ -108,6 +108,9 @@ export const listRecentAddressActivityQuerySchema = z
   .object({
     limit: z.string().optional(),
     cursor: z.string().optional(),
+    search: z.string().optional(),
+    sortBy: z.enum(["recentActivity", "createdAt"]).optional(),
+    sortDirection: z.enum(["asc", "desc"]).optional(),
   })
   .passthrough();
 

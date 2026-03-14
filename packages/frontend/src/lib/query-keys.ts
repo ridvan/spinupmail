@@ -13,7 +13,10 @@ export const queryKeys = {
   recentAddressActivity: (
     organizationId: string | null,
     cursor: string | null,
-    limit: number
+    limit: number,
+    search: string,
+    sortBy: "recentActivity" | "createdAt",
+    sortDirection: "asc" | "desc"
   ) =>
     [
       "app",
@@ -22,6 +25,9 @@ export const queryKeys = {
       "recent-address-activity",
       limit,
       cursor,
+      search,
+      sortBy,
+      sortDirection,
     ] as const,
   addressesBase: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses"] as const,

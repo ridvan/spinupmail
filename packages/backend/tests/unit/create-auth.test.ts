@@ -126,10 +126,14 @@ describe("createAuth", () => {
       plugins?: Array<{
         id?: string;
       }>;
+      rateLimit?: {
+        enabled?: boolean;
+      };
     };
 
     expect(auth.plugins?.map(plugin => plugin.id)).toContain("test-utils");
     expect(auth.plugins?.map(plugin => plugin.id)).toContain("captcha");
+    expect(auth.rateLimit?.enabled).toBe(false);
   });
 
   it("configures Google hosted domain restrictions when enabled", async () => {
