@@ -260,7 +260,7 @@ const TimestampCell = ({
     <div
       className={cn(
         "flex min-w-0 items-center gap-2 text-[0.78rem] sm:text-xs",
-        muted ? "text-muted-foreground" : "text-muted-foreground"
+        muted ? "text-muted-foreground" : "text-foreground"
       )}
     >
       <HugeiconsIcon
