@@ -10,6 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import BoringAvatar from "boring-avatars";
+import { AppLogo } from "@/components/app-logo";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { useTheme } from "@/components/theme-provider";
 import {
@@ -136,19 +137,10 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
               size="lg"
               className="gap-1 hover:bg-transparent! hover:text-inherit! active:bg-transparent! active:text-inherit! data-open:hover:bg-transparent! data-open:hover:text-inherit!"
             >
-              <img
-                src="/logo-black.png"
-                alt="SpinupMail"
-                className="size-8 shrink-0 rounded-lg object-contain dark:hidden"
+              <AppLogo
+                className="group-data-[collapsible=icon]:gap-0"
+                textClassName="text-sm group-data-[collapsible=icon]:hidden"
               />
-              <img
-                src="/logo-transparent.png"
-                alt="SpinupMail"
-                className="size-8 shrink-0 rounded-lg object-contain hidden dark:block"
-              />
-              <div className="flex flex-col text-left group-data-[collapsible=icon]:hidden">
-                <span className="text-sm font-semibold">SpinupMail</span>
-              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -9,8 +9,8 @@ import {
   useInboxEmailDetailQuery,
   useInboxEmailsQuery,
 } from "@/features/inbox/hooks/use-inbox";
+import { APP_NAME } from "@/lib/app";
 
-const appName = "SpinupMail";
 const inboxTitleMaxLength = 72;
 
 const buildInboxPath = (addressId: string | null, mailId?: string | null) => {
@@ -171,10 +171,10 @@ export const InboxPage = () => {
   const selectedEmailListItem =
     currentEmails.find(email => email.id === resolvedSelectedEmailId) ?? null;
   const inboxDocumentTitle = !selectedAddress?.address
-    ? `Inbox | ${appName}`
+    ? `Inbox | ${APP_NAME}`
     : !routeMailId
-      ? `Inbox - ${selectedAddress.address} | ${appName}`
-      : `${truncateInboxTitle(previewEmail?.subject ?? selectedEmailListItem?.subject)} - ${selectedAddress.address} | ${appName}`;
+      ? `Inbox - ${selectedAddress.address} | ${APP_NAME}`
+      : `${truncateInboxTitle(previewEmail?.subject ?? selectedEmailListItem?.subject)} - ${selectedAddress.address} | ${APP_NAME}`;
   useDocumentTitle(inboxDocumentTitle);
 
   return (

@@ -35,6 +35,7 @@ import { SignInTwoFactorPage } from "@/pages/sign-in-two-factor-page";
 import { SignupPage } from "@/pages/signup-page";
 import { TermsOfServicePage } from "@/pages/terms-of-service-page";
 import { VerifyEmailPage } from "@/pages/verify-email-page";
+import { APP_NAME } from "@/lib/app";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -55,8 +56,6 @@ const hydrationFallbackElement = (
   </div>
 );
 
-const appName = "SpinupMail";
-
 type RouteHandle = {
   title?: string;
 };
@@ -65,11 +64,11 @@ const resolveDocumentTitle = (matches: DataRouteMatch[]) => {
   for (const match of [...matches].reverse()) {
     const handle = match.route.handle as RouteHandle | undefined;
     if (handle?.title) {
-      return `${handle.title} | ${appName}`;
+      return `${handle.title} | ${APP_NAME}`;
     }
   }
 
-  return appName;
+  return APP_NAME;
 };
 
 const syncDocumentTitle = (matches: DataRouteMatch[]) => {

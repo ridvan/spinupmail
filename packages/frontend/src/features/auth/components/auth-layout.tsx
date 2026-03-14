@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { AppLogo } from "@/components/app-logo";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { FieldDescription } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
@@ -27,19 +28,10 @@ export function AuthLayout({
     >
       <Card className="border-border/70 bg-card">
         <CardHeader className="text-center">
-          <div className="mx-auto flex items-center gap-0 rounded-xl bg-muted/10 pr-2 pl-1">
-            <img
-              src="/logo-black.png"
-              alt="SpinupMail"
-              className="size-8 shrink-0 rounded-lg object-contain dark:hidden"
-            />
-            <img
-              src="/logo-transparent.png"
-              alt="SpinupMail"
-              className="hidden size-8 shrink-0 rounded-lg object-contain dark:block"
-            />
-            <span className="text-base font-semibold">SpinupMail</span>
-          </div>
+          <AppLogo
+            className="mx-auto rounded-xl bg-muted/10 pl-1 pr-2"
+            textClassName="text-base"
+          />
           {title ? <h1 className="text-xl font-semibold">{title}</h1> : null}
           {subtitle ? (
             <FieldDescription className="text-center text-sm text-muted-foreground">
