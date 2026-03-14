@@ -2,10 +2,25 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { emailAddresses, emailAttachments, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 
-const EMAIL_SEARCH_MARKER_START = "__spinupmail_fts_match_4d7f0c1a_start__";
-const EMAIL_SEARCH_MARKER_END = "__spinupmail_fts_match_4d7f0c1a_end__";
+const EMAIL_SEARCH_MARKER_START = "__smfts_s__";
+const EMAIL_SEARCH_MARKER_END = "__smfts_e__";
 const EMAIL_SEARCH_MAX_TOKENS = 6;
 const EMAIL_SEARCH_MAX_TOKEN_LENGTH = 48;
+const SAFE_EMAIL_SEARCH_MARKER_PATTERN = /^[A-Za-z0-9_]+$/;
+
+const assertSafeEmailSearchMarker = (value: string, name: string) => {
+  if (!SAFE_EMAIL_SEARCH_MARKER_PATTERN.test(value)) {
+    throw new Error(
+      `${name} must contain only ASCII letters, numbers, and underscores`
+    );
+  }
+};
+
+assertSafeEmailSearchMarker(
+  EMAIL_SEARCH_MARKER_START,
+  "EMAIL_SEARCH_MARKER_START"
+);
+assertSafeEmailSearchMarker(EMAIL_SEARCH_MARKER_END, "EMAIL_SEARCH_MARKER_END");
 
 const tokenizeEmailSearch = (value: string) =>
   value
@@ -101,6 +116,36 @@ export const insertEmailSearchEntry = async ({
     .run();
 };
 
+export const buildInsertEmailSearchEntryStatement = ({
+  db,
+  emailId,
+  subject,
+  sender,
+  senderAddress,
+  bodyText,
+}: {
+  db: AppDb;
+  emailId: string;
+  subject?: string | null;
+  sender?: string | null;
+  senderAddress: string;
+  bodyText?: string | null;
+}) =>
+  db.$client
+    .prepare(
+      `
+        INSERT INTO emails_search (
+          subject,
+          sender,
+          sender_address,
+          body_text,
+          email_id
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `
+    )
+    .bind(subject ?? "", sender ?? "", senderAddress, bodyText ?? "", emailId);
+
 export const deleteEmailSearchEntryByEmailId = async (
   db: AppDb,
   emailId: string
@@ -126,6 +171,29 @@ export const deleteEmailSearchEntriesByAddressId = async (
     )
     .bind(addressId)
     .run();
+};
+
+export const deleteEmailSearchEntriesByEmailIds = async (
+  db: AppDb,
+  emailIds: string[]
+) => {
+  if (emailIds.length === 0) return;
+
+  const placeholders = emailIds.map(() => "?").join(", ");
+  await db.$client
+    .prepare(`DELETE FROM emails_search WHERE email_id IN (${placeholders})`)
+    .bind(...emailIds)
+    .run();
+};
+
+export const buildDeleteEmailSearchEntriesByEmailIdsStatement = (
+  db: AppDb,
+  emailIds: string[]
+) => {
+  const placeholders = emailIds.map(() => "?").join(", ");
+  return db.$client
+    .prepare(`DELETE FROM emails_search WHERE email_id IN (${placeholders})`)
+    .bind(...emailIds);
 };
 
 export const listEmailsForAddress = ({

@@ -45,6 +45,7 @@ type InboxViewProps = {
   emailsLoading: boolean;
   emailSearch: string;
   onEmailSearchChange: (value: string) => void;
+  onEmailSearchFocusChange?: ((focused: boolean) => void) | undefined;
   selectedEmailId: string | null;
   onSelectEmail: (emailId: string) => void;
   previewEmail: EmailDetail | null;
@@ -128,6 +129,7 @@ export const InboxView = ({
   emailsLoading,
   emailSearch,
   onEmailSearchChange,
+  onEmailSearchFocusChange,
   selectedEmailId,
   onSelectEmail,
   previewEmail,
@@ -257,12 +259,14 @@ export const InboxView = ({
               disabled={!selectedAddressId}
               onBlur={() => {
                 searchIconRef.current?.stopAnimation();
+                onEmailSearchFocusChange?.(false);
               }}
               onChange={event => {
                 onEmailSearchChange(event.target.value);
               }}
               onFocus={() => {
                 searchIconRef.current?.startAnimation();
+                onEmailSearchFocusChange?.(true);
               }}
               maxLength={INBOX_EMAIL_SEARCH_MAX_LENGTH}
               placeholder={

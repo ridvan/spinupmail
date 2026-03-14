@@ -231,6 +231,33 @@ describe("emails service", () => {
     expect(result.status).toBe(200);
   });
 
+  it("rejects search requests that also pass after, before, or order", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: {
+        addressId: "address-1",
+        search: "reset",
+        after: "2026-03-10T00:00:00.000Z",
+        order: "asc",
+      },
+    });
+
+    expect(mocks.searchEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.listEmailsForAddress).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 400,
+      body: {
+        error: "search does not support after, before, or order=asc parameters",
+      },
+    });
+  });
+
   it("deletes the email row and its search entry", async () => {
     mocks.findEmailDeleteTargetByIdAndOrganization.mockResolvedValue({
       id: "email-1",

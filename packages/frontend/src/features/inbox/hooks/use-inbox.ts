@@ -19,7 +19,7 @@ export const useInboxEmailsQuery = (
       return listEmails({
         addressId,
         limit: 40,
-        order: "desc",
+        order: search ? undefined : "desc",
         search: search || undefined,
         signal,
         organizationId: activeOrganizationId,

@@ -34,6 +34,7 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
     selectedEmailId,
     emailSearch,
     onEmailSearchChange,
+    onEmailSearchFocusChange,
     onSelectAddress,
     onSelectEmail,
   }: {
@@ -41,6 +42,7 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
     selectedEmailId: string | null;
     emailSearch: string;
     onEmailSearchChange: (value: string) => void;
+    onEmailSearchFocusChange?: (focused: boolean) => void;
     onSelectAddress: (addressId: string) => void;
     onSelectEmail: (emailId: string) => void;
   }) => (
@@ -49,7 +51,9 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
       <p>selected-email:{selectedEmailId ?? "none"}</p>
       <input
         aria-label="search-emails"
+        onBlur={() => onEmailSearchFocusChange?.(false)}
         onChange={event => onEmailSearchChange(event.target.value)}
+        onFocus={() => onEmailSearchFocusChange?.(true)}
         value={emailSearch}
       />
       <button onClick={() => onSelectAddress("a2")} type="button">
@@ -116,10 +120,15 @@ describe("InboxPage", () => {
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
     mockedUseInboxEmailsQuery.mockImplementation(
-      (addressId, _search) =>
+      (addressId, search) =>
         ({
           data: {
-            items: addressId ? (emailsByAddress[addressId] ?? []) : [],
+            items:
+              addressId && search === "nomatch"
+                ? []
+                : addressId
+                  ? (emailsByAddress[addressId] ?? [])
+                  : [],
           },
           isLoading: false,
           isFetching: false,
@@ -379,6 +388,31 @@ describe("InboxPage", () => {
       (screen.getByLabelText("search-emails") as HTMLInputElement).value
     ).toBe("");
     expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+  });
+
+  it("does not replace the route while the email search input is focused", async () => {
+    vi.useFakeTimers();
+    const { router } = renderInboxRoute(["/inbox/a1/e1"]);
+    const searchInput = screen.getByLabelText("search-emails");
+
+    fireEvent.focus(searchInput);
+    fireEvent.change(searchInput, {
+      target: { value: "nomatch" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "nomatch");
+    expect(router.state.location.pathname).toBe("/inbox/a1/e1");
+
+    fireEvent.blur(searchInput);
+    vi.useRealTimers();
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/inbox/a1")
+    );
   });
 
   it("waits for a refetching address list before replacing a new route address", async () => {

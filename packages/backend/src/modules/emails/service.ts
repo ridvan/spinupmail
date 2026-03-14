@@ -160,6 +160,19 @@ export const listEmails = async ({
   const after = parseOptionalTimestamp(query.after ?? null);
   const before = parseOptionalTimestamp(query.before ?? null);
   const search = normalizeEmailSearch(query.search);
+  const hasUnsupportedSearchOrder = query.order === "asc";
+
+  if (
+    search &&
+    (after !== undefined || before !== undefined || hasUnsupportedSearchOrder)
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: "search does not support after, before, or order=asc parameters",
+      },
+    };
+  }
 
   const rows = search
     ? await searchEmailsForAddress({

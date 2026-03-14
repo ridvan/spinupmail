@@ -2,8 +2,8 @@ import { and, eq, lt, sql } from "drizzle-orm";
 import { emailAddresses, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 import {
-  deleteEmailSearchEntriesByAddressId,
-  insertEmailSearchEntry,
+  buildDeleteEmailSearchEntriesByEmailIdsStatement,
+  buildInsertEmailSearchEntryStatement,
 } from "@/modules/emails/repo";
 
 export const findAddressByRecipient = (db: AppDb, recipient: string) =>
@@ -38,15 +38,56 @@ export const insertInboundEmail = async (
     receivedAt: Date;
   }
 ) => {
-  await db.insert(emails).values(values).run();
-  await insertEmailSearchEntry({
-    db,
-    emailId: values.id,
-    subject: values.subject,
-    sender: values.sender,
-    senderAddress: values.from,
-    bodyText: values.bodyText,
-  });
+  const insertEmailStatement = db.$client
+    .prepare(
+      `
+        INSERT INTO emails (
+          id,
+          address_id,
+          message_id,
+          sender,
+          "from",
+          "to",
+          subject,
+          headers,
+          body_html,
+          body_text,
+          raw,
+          raw_size,
+          raw_truncated,
+          received_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .bind(
+      values.id,
+      values.addressId,
+      values.messageId ?? null,
+      values.sender ?? null,
+      values.from,
+      values.to,
+      values.subject ?? null,
+      values.headers ?? null,
+      values.bodyHtml ?? null,
+      values.bodyText ?? null,
+      values.raw ?? null,
+      values.rawSize ?? null,
+      values.rawTruncated ? 1 : 0,
+      values.receivedAt.getTime()
+    );
+
+  await db.$client.batch([
+    insertEmailStatement,
+    buildInsertEmailSearchEntryStatement({
+      db,
+      emailId: values.id,
+      subject: values.subject,
+      sender: values.sender,
+      senderAddress: values.from,
+      bodyText: values.bodyText,
+    }),
+  ]);
 };
 
 export const reserveInboxSlot = ({
@@ -100,8 +141,25 @@ export const resetAddressEmailCount = (db: AppDb, addressId: string) =>
     .run();
 
 export const deleteEmailsForAddress = async (db: AppDb, addressId: string) => {
-  await deleteEmailSearchEntriesByAddressId(db, addressId);
-  await db.delete(emails).where(eq(emails.addressId, addressId)).run();
+  const emailRows = await db
+    .select({ id: emails.id })
+    .from(emails)
+    .where(eq(emails.addressId, addressId));
+  const emailIds = emailRows.map(row => row.id);
+
+  const statements = [
+    db.$client
+      .prepare(`DELETE FROM emails WHERE address_id = ?`)
+      .bind(addressId),
+  ];
+
+  if (emailIds.length > 0) {
+    statements.push(
+      buildDeleteEmailSearchEntriesByEmailIdsStatement(db, emailIds)
+    );
+  }
+
+  await db.$client.batch(statements);
 };
 
 export const updateAddressLastReceivedAt = (

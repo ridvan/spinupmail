@@ -51,6 +51,7 @@ export const InboxPage = () => {
   const [emailSearchInput, setEmailSearchInput] = React.useState("");
   const deferredEmailSearchInput = React.useDeferredValue(emailSearchInput);
   const [emailSearch, setEmailSearch] = React.useState("");
+  const [isEmailSearchFocused, setIsEmailSearchFocused] = React.useState(false);
   const clearEmailSearch = React.useCallback(() => {
     setEmailSearchInput("");
     setEmailSearch("");
@@ -159,6 +160,10 @@ export const InboxPage = () => {
       return currentInboxPath === "/inbox" ? null : "/inbox";
     }
 
+    if (isEmailSearchFocused) {
+      return null;
+    }
+
     if (!routeMailId && emailsQuery.isLoading) return;
     if (isRouteEmailRefreshing) return;
 
@@ -171,6 +176,7 @@ export const InboxPage = () => {
     addressesQuery.isLoading,
     currentInboxPath,
     emailsQuery.isLoading,
+    isEmailSearchFocused,
     isRouteAddressRefreshing,
     isRouteEmailRefreshing,
     resolvedSelectedAddressId,
@@ -224,6 +230,7 @@ export const InboxPage = () => {
         addressesLoading={addressesQuery.isLoading}
         emailSearch={emailSearchInput}
         onEmailSearchChange={handleEmailSearchChange}
+        onEmailSearchFocusChange={setIsEmailSearchFocused}
         emails={emailsQuery.data?.items ?? []}
         emailsLoading={emailsQuery.isLoading}
         previewEmail={previewEmail}
