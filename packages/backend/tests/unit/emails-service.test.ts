@@ -17,9 +17,9 @@ const mocks = vi.hoisted(() => ({
   findEmailDetailByIdAndOrganization: vi.fn(),
   findEmailRawSourceByIdAndOrganization: vi.fn(),
   findAttachmentByIdsAndOrganization: vi.fn(),
-  deleteEmailSearchEntryByEmailId: vi.fn(),
-  deleteEmailByIdAndAddress: vi.fn(),
-  decrementAddressEmailCount: vi.fn(),
+  buildDeleteEmailByIdAndAddressStatement: vi.fn(),
+  buildDeleteEmailSearchEntryByEmailIdStatement: vi.fn(),
+  buildDecrementAddressEmailCountStatement: vi.fn(),
   findEmailDeleteTargetByIdAndOrganization: vi.fn(),
   findAttachmentKeysByEmailAndOrganization: vi.fn(),
 }));
@@ -29,7 +29,12 @@ vi.mock("@/platform/db/client", () => ({
 }));
 
 vi.mock("@/modules/emails/repo", () => ({
-  decrementAddressEmailCount: mocks.decrementAddressEmailCount,
+  buildDecrementAddressEmailCountStatement:
+    mocks.buildDecrementAddressEmailCountStatement,
+  buildDeleteEmailByIdAndAddressStatement:
+    mocks.buildDeleteEmailByIdAndAddressStatement,
+  buildDeleteEmailSearchEntryByEmailIdStatement:
+    mocks.buildDeleteEmailSearchEntryByEmailIdStatement,
   findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
   findAddressByValueAndOrganization: mocks.findAddressByValueAndOrganization,
   listEmailsForAddress: mocks.listEmailsForAddress,
@@ -45,8 +50,6 @@ vi.mock("@/modules/emails/repo", () => ({
     mocks.findEmailDeleteTargetByIdAndOrganization,
   findAttachmentKeysByEmailAndOrganization:
     mocks.findAttachmentKeysByEmailAndOrganization,
-  deleteEmailByIdAndAddress: mocks.deleteEmailByIdAndAddress,
-  deleteEmailSearchEntryByEmailId: mocks.deleteEmailSearchEntryByEmailId,
 }));
 
 describe("emails service", () => {
@@ -258,15 +261,32 @@ describe("emails service", () => {
     });
   });
 
-  it("deletes the email row and its search entry", async () => {
+  it("deletes the email row, FTS entry, and count in one batch", async () => {
+    const deleteEmailStatement = { query: "delete email" };
+    const deleteSearchStatement = { query: "delete search" };
+    const decrementCountStatement = { query: "decrement count" };
+    const batch = vi.fn().mockResolvedValue([]);
+    const db = {
+      $client: {
+        batch,
+      },
+    };
+
+    mocks.getDb.mockReturnValue(db);
     mocks.findEmailDeleteTargetByIdAndOrganization.mockResolvedValue({
       id: "email-1",
       addressId: "address-1",
     });
     mocks.findAttachmentKeysByEmailAndOrganization.mockResolvedValue([]);
-    mocks.deleteEmailByIdAndAddress.mockResolvedValue(undefined);
-    mocks.deleteEmailSearchEntryByEmailId.mockResolvedValue(undefined);
-    mocks.decrementAddressEmailCount.mockResolvedValue(undefined);
+    mocks.buildDeleteEmailByIdAndAddressStatement.mockReturnValue(
+      deleteEmailStatement
+    );
+    mocks.buildDeleteEmailSearchEntryByEmailIdStatement.mockReturnValue(
+      deleteSearchStatement
+    );
+    mocks.buildDecrementAddressEmailCountStatement.mockReturnValue(
+      decrementCountStatement
+    );
 
     const result = await deleteEmail({
       env: {} as CloudflareBindings,
@@ -274,19 +294,24 @@ describe("emails service", () => {
       emailId: "email-1",
     });
 
-    expect(mocks.deleteEmailByIdAndAddress).toHaveBeenCalledWith(
-      {},
+    expect(mocks.buildDeleteEmailByIdAndAddressStatement).toHaveBeenCalledWith(
+      db,
       "email-1",
       "address-1"
     );
-    expect(mocks.deleteEmailSearchEntryByEmailId).toHaveBeenCalledWith(
-      {},
-      "email-1"
-    );
-    expect(mocks.decrementAddressEmailCount).toHaveBeenCalledWith(
-      {},
+    expect(
+      mocks.buildDeleteEmailSearchEntryByEmailIdStatement
+    ).toHaveBeenCalledWith(db, "email-1");
+    expect(mocks.buildDecrementAddressEmailCountStatement).toHaveBeenCalledWith(
+      db,
       "address-1"
     );
+    expect(batch).toHaveBeenCalledWith([
+      deleteEmailStatement,
+      deleteSearchStatement,
+      decrementCountStatement,
+    ]);
+    expect(batch).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       status: 200,
       body: {

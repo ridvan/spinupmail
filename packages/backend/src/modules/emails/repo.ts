@@ -186,15 +186,50 @@ export const deleteEmailSearchEntriesByEmailIds = async (
     .run();
 };
 
+export const buildDeleteEmailByIdAndAddressStatement = (
+  db: AppDb,
+  emailId: string,
+  addressId: string
+) =>
+  db.$client
+    .prepare(`DELETE FROM emails WHERE id = ? AND address_id = ?`)
+    .bind(emailId, addressId);
+
+export const buildDeleteEmailSearchEntryByEmailIdStatement = (
+  db: AppDb,
+  emailId: string
+) =>
+  db.$client
+    .prepare(`DELETE FROM emails_search WHERE email_id = ?`)
+    .bind(emailId);
+
 export const buildDeleteEmailSearchEntriesByEmailIdsStatement = (
   db: AppDb,
   emailIds: string[]
 ) => {
+  if (emailIds.length === 0) {
+    throw new Error("emailIds must not be empty");
+  }
+
   const placeholders = emailIds.map(() => "?").join(", ");
   return db.$client
     .prepare(`DELETE FROM emails_search WHERE email_id IN (${placeholders})`)
     .bind(...emailIds);
 };
+
+export const buildDecrementAddressEmailCountStatement = (
+  db: AppDb,
+  addressId: string
+) =>
+  db.$client
+    .prepare(
+      `
+        UPDATE email_addresses
+        SET email_count = max(email_count - 1, 0)
+        WHERE id = ?
+      `
+    )
+    .bind(addressId);
 
 export const listEmailsForAddress = ({
   db,

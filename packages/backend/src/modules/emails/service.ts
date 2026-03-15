@@ -28,9 +28,9 @@ import {
   type ListEmailsQuery,
 } from "./schemas";
 import {
-  deleteEmailSearchEntryByEmailId,
-  decrementAddressEmailCount,
-  deleteEmailByIdAndAddress,
+  buildDecrementAddressEmailCountStatement,
+  buildDeleteEmailByIdAndAddressStatement,
+  buildDeleteEmailSearchEntryByEmailIdStatement,
   findAddressByIdAndOrganization,
   findAddressByValueAndOrganization,
   findAttachmentByIdsAndOrganization,
@@ -290,9 +290,15 @@ export const deleteEmail = async ({
     }
   }
 
-  await deleteEmailByIdAndAddress(db, emailRow.id, emailRow.addressId);
-  await deleteEmailSearchEntryByEmailId(db, emailRow.id);
-  await decrementAddressEmailCount(db, emailRow.addressId);
+  await db.$client.batch([
+    buildDeleteEmailByIdAndAddressStatement(
+      db,
+      emailRow.id,
+      emailRow.addressId
+    ),
+    buildDeleteEmailSearchEntryByEmailIdStatement(db, emailRow.id),
+    buildDecrementAddressEmailCountStatement(db, emailRow.addressId),
+  ]);
 
   return {
     status: 200 as const,
