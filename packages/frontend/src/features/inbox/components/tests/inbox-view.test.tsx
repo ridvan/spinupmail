@@ -71,6 +71,7 @@ describe("InboxView", () => {
 
   it("renders an email search input above the email list", () => {
     const onEmailSearchChange = vi.fn();
+    const onClearEmailSearch = vi.fn();
 
     render(
       <MemoryRouter>
@@ -98,6 +99,7 @@ describe("InboxView", () => {
           emailsLoading={false}
           emailSearch="reset"
           onEmailSearchChange={onEmailSearchChange}
+          onClearEmailSearch={onClearEmailSearch}
           onEmailSearchFocusChange={vi.fn()}
           selectedEmailId={null}
           onSelectEmail={vi.fn()}
@@ -117,5 +119,8 @@ describe("InboxView", () => {
 
     fireEvent.change(searchInput, { target: { value: "invoice" } });
     expect(onEmailSearchChange).toHaveBeenCalledWith("invoice");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear email search" }));
+    expect(onClearEmailSearch).toHaveBeenCalledTimes(1);
   });
 });

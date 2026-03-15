@@ -45,6 +45,7 @@ type InboxViewProps = {
   emailsLoading: boolean;
   emailSearch: string;
   onEmailSearchChange: (value: string) => void;
+  onClearEmailSearch?: (() => void) | undefined;
   onEmailSearchFocusChange?: ((focused: boolean) => void) | undefined;
   selectedEmailId: string | null;
   onSelectEmail: (emailId: string) => void;
@@ -129,6 +130,7 @@ export const InboxView = ({
   emailsLoading,
   emailSearch,
   onEmailSearchChange,
+  onClearEmailSearch,
   onEmailSearchFocusChange,
   selectedEmailId,
   onSelectEmail,
@@ -285,7 +287,7 @@ export const InboxView = ({
                 className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
                 aria-label="Clear email search"
                 onClick={() => {
-                  onEmailSearchChange("");
+                  onClearEmailSearch?.();
                 }}
                 onMouseEnter={() => {
                   clearSearchIconRef.current?.startAnimation();

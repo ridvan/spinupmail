@@ -52,9 +52,14 @@ export const InboxPage = () => {
   const deferredEmailSearchInput = React.useDeferredValue(emailSearchInput);
   const [emailSearch, setEmailSearch] = React.useState("");
   const [isEmailSearchFocused, setIsEmailSearchFocused] = React.useState(false);
+  const emailSearchDebounceTimerRef = React.useRef<number | null>(null);
   const clearEmailSearch = React.useCallback(() => {
     setEmailSearchInput("");
     setEmailSearch("");
+    if (emailSearchDebounceTimerRef.current !== null) {
+      window.clearTimeout(emailSearchDebounceTimerRef.current);
+      emailSearchDebounceTimerRef.current = null;
+    }
   }, []);
   const handleEmailSearchChange = React.useCallback((value: string) => {
     setEmailSearchInput(value.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH));
@@ -65,11 +70,17 @@ export const InboxPage = () => {
       .slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH)
       .trim()
       .replace(/\s+/g, " ");
-    const timeoutId = window.setTimeout(() => {
+    emailSearchDebounceTimerRef.current = window.setTimeout(() => {
+      emailSearchDebounceTimerRef.current = null;
       setEmailSearch(current => (current === nextValue ? current : nextValue));
     }, 250);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      if (emailSearchDebounceTimerRef.current !== null) {
+        window.clearTimeout(emailSearchDebounceTimerRef.current);
+        emailSearchDebounceTimerRef.current = null;
+      }
+    };
   }, [deferredEmailSearchInput]);
 
   const currentAddresses = React.useMemo(
@@ -230,6 +241,7 @@ export const InboxPage = () => {
         addressesLoading={addressesQuery.isLoading}
         emailSearch={emailSearchInput}
         onEmailSearchChange={handleEmailSearchChange}
+        onClearEmailSearch={clearEmailSearch}
         onEmailSearchFocusChange={setIsEmailSearchFocused}
         emails={emailsQuery.data?.items ?? []}
         emailsLoading={emailsQuery.isLoading}

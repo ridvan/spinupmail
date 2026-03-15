@@ -3,6 +3,7 @@ import {
   buildDeleteEmailSearchEntriesByEmailIdsStatement,
   buildDeleteEmailSearchEntryByEmailIdStatement,
   buildDecrementAddressEmailCountStatement,
+  maybeBuildDeleteEmailSearchEntriesByEmailIdsStatement,
 } from "@/modules/emails/repo";
 
 const createPreparedStatement = (query: string) => {
@@ -19,7 +20,7 @@ const createPreparedStatement = (query: string) => {
 };
 
 describe("emails repo", () => {
-  it("rejects empty email id lists when building FTS delete statements", () => {
+  it("rejects empty email id lists in the strict builder", () => {
     const db = {
       $client: {
         prepare: vi.fn((query: string) => createPreparedStatement(query)),
@@ -31,6 +32,20 @@ describe("emails repo", () => {
     expect(() =>
       buildDeleteEmailSearchEntriesByEmailIdsStatement(db, [])
     ).toThrowError("emailIds must not be empty");
+  });
+
+  it("returns null for empty email id lists in the conditional builder", () => {
+    const db = {
+      $client: {
+        prepare: vi.fn((query: string) => createPreparedStatement(query)),
+      },
+    } as unknown as Parameters<
+      typeof maybeBuildDeleteEmailSearchEntriesByEmailIdsStatement
+    >[0];
+
+    expect(
+      maybeBuildDeleteEmailSearchEntriesByEmailIdsStatement(db, [])
+    ).toBeNull();
   });
 
   it("builds a single-email FTS delete statement", () => {

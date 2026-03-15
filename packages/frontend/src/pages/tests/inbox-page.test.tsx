@@ -34,6 +34,7 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
     selectedEmailId,
     emailSearch,
     onEmailSearchChange,
+    onClearEmailSearch,
     onEmailSearchFocusChange,
     onSelectAddress,
     onSelectEmail,
@@ -42,6 +43,7 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
     selectedEmailId: string | null;
     emailSearch: string;
     onEmailSearchChange: (value: string) => void;
+    onClearEmailSearch?: () => void;
     onEmailSearchFocusChange?: (focused: boolean) => void;
     onSelectAddress: (addressId: string) => void;
     onSelectEmail: (emailId: string) => void;
@@ -58,6 +60,9 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
       />
       <button onClick={() => onSelectAddress("a2")} type="button">
         select-address-a2
+      </button>
+      <button onClick={() => onClearEmailSearch?.()} type="button">
+        clear-search
       </button>
       <button onClick={() => onSelectEmail("e2")} type="button">
         select-email-e2
@@ -388,6 +393,69 @@ describe("InboxPage", () => {
       (screen.getByLabelText("search-emails") as HTMLInputElement).value
     ).toBe("");
     expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+  });
+
+  it("cancels a pending debounced search when selecting a different address", async () => {
+    vi.useFakeTimers();
+
+    const { router } = renderInboxRoute(["/inbox/a1"]);
+
+    fireEvent.change(screen.getByLabelText("search-emails"), {
+      target: { value: "invoice" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "select-address-a2" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+
+    vi.useRealTimers();
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/inbox/a2/e2")
+    );
+
+    expect(
+      mockedUseInboxEmailsQuery.mock.calls.some(
+        ([addressId, search]) => addressId === "a2" && search === "invoice"
+      )
+    ).toBe(false);
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+  });
+
+  it("cancels a pending debounced search when clearing the search", async () => {
+    vi.useFakeTimers();
+
+    renderInboxRoute(["/inbox/a1"]);
+
+    fireEvent.change(screen.getByLabelText("search-emails"), {
+      target: { value: "invoice" },
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "clear-search" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(
+      mockedUseInboxEmailsQuery.mock.calls.some(
+        ([addressId, search]) => addressId === "a1" && search === "invoice"
+      )
+    ).toBe(false);
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+    expect(
+      (screen.getByLabelText("search-emails") as HTMLInputElement).value
+    ).toBe("");
   });
 
   it("does not replace the route while the email search input is focused", async () => {

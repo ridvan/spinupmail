@@ -207,6 +207,17 @@ export const buildDeleteEmailSearchEntriesByEmailIdsStatement = (
     .bind(...emailIds);
 };
 
+export const maybeBuildDeleteEmailSearchEntriesByEmailIdsStatement = (
+  db: AppDb,
+  emailIds: string[]
+) => {
+  if (emailIds.length === 0) {
+    return null;
+  }
+
+  return buildDeleteEmailSearchEntriesByEmailIdsStatement(db, emailIds);
+};
+
 export const buildDeleteEmailSearchEntriesByAddressIdStatement = (
   db: AppDb,
   addressId: string
