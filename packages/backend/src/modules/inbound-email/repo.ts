@@ -1,8 +1,8 @@
 import { and, eq, lt, sql } from "drizzle-orm";
-import { emailAddresses, emails } from "@/db";
+import { emailAddresses } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 import {
-  buildDeleteEmailSearchEntriesByEmailIdsStatement,
+  buildDeleteEmailSearchEntriesByAddressIdStatement,
   buildInsertEmailSearchEntryStatement,
 } from "@/modules/emails/repo";
 
@@ -141,25 +141,12 @@ export const resetAddressEmailCount = (db: AppDb, addressId: string) =>
     .run();
 
 export const deleteEmailsForAddress = async (db: AppDb, addressId: string) => {
-  const emailRows = await db
-    .select({ id: emails.id })
-    .from(emails)
-    .where(eq(emails.addressId, addressId));
-  const emailIds = emailRows.map(row => row.id);
-
-  const statements = [
+  await db.$client.batch([
+    buildDeleteEmailSearchEntriesByAddressIdStatement(db, addressId),
     db.$client
       .prepare(`DELETE FROM emails WHERE address_id = ?`)
       .bind(addressId),
-  ];
-
-  if (emailIds.length > 0) {
-    statements.push(
-      buildDeleteEmailSearchEntriesByEmailIdsStatement(db, emailIds)
-    );
-  }
-
-  await db.$client.batch(statements);
+  ]);
 };
 
 export const updateAddressLastReceivedAt = (

@@ -1,4 +1,5 @@
 import {
+  buildDeleteEmailSearchEntriesByAddressIdStatement,
   buildDeleteEmailSearchEntriesByEmailIdsStatement,
   buildDeleteEmailSearchEntryByEmailIdStatement,
   buildDecrementAddressEmailCountStatement,
@@ -50,6 +51,27 @@ describe("emails repo", () => {
       "DELETE FROM emails_search WHERE email_id = ?"
     );
     expect(statement.values).toEqual(["email-1"]);
+  });
+
+  it("builds an address-scoped FTS delete statement", () => {
+    const db = {
+      $client: {
+        prepare: vi.fn((query: string) => createPreparedStatement(query)),
+      },
+    } as unknown as Parameters<
+      typeof buildDeleteEmailSearchEntriesByAddressIdStatement
+    >[0];
+
+    const statement = buildDeleteEmailSearchEntriesByAddressIdStatement(
+      db,
+      "address-1"
+    ) as { query: string; values: unknown[] };
+
+    expect(statement.query).toContain("DELETE FROM emails_search");
+    expect(statement.query).toContain(
+      "SELECT id FROM emails WHERE address_id = ?"
+    );
+    expect(statement.values).toEqual(["address-1"]);
   });
 
   it("builds a decrement statement for the address email count", () => {

@@ -48,34 +48,23 @@ describe("inbound email repo", () => {
     expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
   });
 
-  it("deletes email rows before deleting matching FTS rows in one batch", async () => {
+  it("deletes matching FTS rows before deleting email rows in one batch", async () => {
     const batch = vi.fn().mockResolvedValue([]);
     const prepare = vi.fn((query: string) => createPreparedStatement(query));
-    const where = vi
-      .fn()
-      .mockResolvedValue([{ id: "email-1" }, { id: "email-2" }]);
-    const select = vi.fn(() => ({
-      from: vi.fn(() => ({
-        where,
-      })),
-    }));
     const db = {
       $client: {
         batch,
         prepare,
       },
-      select,
     } as unknown as Parameters<typeof deleteEmailsForAddress>[0];
 
     await deleteEmailsForAddress(db, "address-1");
 
     expect(batch).toHaveBeenCalledTimes(1);
     const statements = batch.mock.calls[0]?.[0] as Array<{ query: string }>;
-    expect(statements[0]?.query).toContain(
-      "DELETE FROM emails WHERE address_id = ?"
-    );
+    expect(statements[0]?.query).toContain("DELETE FROM emails_search");
     expect(statements[1]?.query).toContain(
-      "DELETE FROM emails_search WHERE email_id IN (?, ?)"
+      "DELETE FROM emails WHERE address_id = ?"
     );
   });
 });

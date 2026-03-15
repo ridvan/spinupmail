@@ -160,17 +160,7 @@ export const deleteEmailSearchEntriesByAddressId = async (
   db: AppDb,
   addressId: string
 ) => {
-  await db.$client
-    .prepare(
-      `
-        DELETE FROM emails_search
-        WHERE email_id IN (
-          SELECT id FROM emails WHERE address_id = ?
-        )
-      `
-    )
-    .bind(addressId)
-    .run();
+  await buildDeleteEmailSearchEntriesByAddressIdStatement(db, addressId).run();
 };
 
 export const deleteEmailSearchEntriesByEmailIds = async (
@@ -216,6 +206,21 @@ export const buildDeleteEmailSearchEntriesByEmailIdsStatement = (
     .prepare(`DELETE FROM emails_search WHERE email_id IN (${placeholders})`)
     .bind(...emailIds);
 };
+
+export const buildDeleteEmailSearchEntriesByAddressIdStatement = (
+  db: AppDb,
+  addressId: string
+) =>
+  db.$client
+    .prepare(
+      `
+        DELETE FROM emails_search
+        WHERE email_id IN (
+          SELECT id FROM emails WHERE address_id = ?
+        )
+      `
+    )
+    .bind(addressId);
 
 export const buildDecrementAddressEmailCountStatement = (
   db: AppDb,
