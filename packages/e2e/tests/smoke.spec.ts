@@ -1,4 +1,5 @@
 import { test, expect, runE2E, uniqueEmail } from "./helpers/auth-fixture";
+import { e2eFrontendBaseUrl } from "./helpers/e2e-urls";
 
 test.describe("spinupmail auth", () => {
   test.skip(!runE2E, "Set RUN_E2E=1 to run browser smoke tests.");
@@ -31,7 +32,7 @@ test.describe("spinupmail auth", () => {
     await page.getByLabel("Password").fill(seededUser.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
-    await expect(page).toHaveURL("http://127.0.0.1:5173/settings");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings`);
     await expect(page.getByLabel("Name")).toBeVisible();
   });
 

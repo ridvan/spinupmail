@@ -6,7 +6,7 @@ import {
   uniqueEmail,
   signInWithOrganization,
 } from "./helpers/auth-fixture";
-import { e2eBackendBaseUrl } from "./helpers/e2e-urls";
+import { e2eBackendBaseUrl, e2eFrontendBaseUrl } from "./helpers/e2e-urls";
 
 const navButton = (page: Page, text: string) =>
   page
@@ -34,23 +34,23 @@ test.describe("spinupmail app behaviors", () => {
     await expect(cardTitle(page, "Received Emails")).toBeVisible();
 
     await navButton(page, "Inbox").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/inbox");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/inbox`);
     await expect(page.getByText("No email selected")).toBeVisible();
 
     await navButton(page, "Addresses").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/addresses");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/addresses`);
     await expect(cardTitle(page, "Create Email Address")).toBeVisible();
 
     await navButton(page, "Settings").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/settings");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings`);
     await expect(page.getByLabel("Name")).toBeVisible();
 
     await navButton(page, "Organization").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/organization/settings");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/organization/settings`);
     await expect(cardTitle(page, "Organization Profile")).toBeVisible();
 
     await navButton(page, "Overview").click();
-    await expect(page).toHaveURL("http://127.0.0.1:5173/");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/`);
     await expect(cardTitle(page, "Statistics")).toBeVisible();
   });
 

@@ -1,4 +1,5 @@
 import { expect, test, runE2E, uniqueEmail } from "./helpers/auth-fixture";
+import { e2eFrontendBaseUrl } from "./helpers/e2e-urls";
 
 test.describe("spinupmail turnstile", () => {
   test.skip(!runE2E, "Set RUN_E2E=1 to run browser smoke tests.");
@@ -33,7 +34,7 @@ test.describe("spinupmail turnstile", () => {
     await expect(signInButton).toBeEnabled();
     await signInButton.click();
 
-    await expect(page).toHaveURL("http://127.0.0.1:5173/settings");
+    await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings`);
     await expect(page.getByLabel("Name")).toHaveValue("Turnstile Login User");
   });
 });

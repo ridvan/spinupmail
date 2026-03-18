@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
-import { e2eAuthBaseUrl, e2eBackendBaseUrl } from "./tests/helpers/e2e-urls";
+import {
+  e2eAuthBaseUrl,
+  e2eBackendBaseUrl,
+  e2eFrontendBaseUrl,
+} from "./tests/helpers/e2e-urls";
 
 const runE2E = process.env.RUN_E2E !== "0";
 const e2eTestSecret = process.env.E2E_TEST_SECRET ?? randomUUID();
@@ -16,10 +20,11 @@ const backendCommand =
   `--ip 127.0.0.1 --port ${new URL(e2eBackendBaseUrl).port} --var E2E_TEST_SECRET:${e2eTestSecret} ` +
   `--var TURNSTILE_SECRET_KEY:${turnstileSecretKey} ` +
   `--var BETTER_AUTH_SECRET:${betterAuthSecret} ` +
-  `--var BETTER_AUTH_BASE_URL:${e2eAuthBaseUrl}`;
+  `--var BETTER_AUTH_BASE_URL:${e2eAuthBaseUrl} ` +
+  `--var CORS_ORIGIN:${e2eFrontendBaseUrl}`;
 const frontendCommand = process.env.CI
-  ? "pnpm -C ../frontend build && pnpm -C ../frontend exec vite preview --host 127.0.0.1 --port 5173 --strictPort"
-  : "pnpm -C ../frontend dev --host 127.0.0.1 --port 5173";
+  ? `pnpm -C ../frontend build && pnpm -C ../frontend exec vite preview --host 127.0.0.1 --port ${new URL(e2eFrontendBaseUrl).port} --strictPort`
+  : `pnpm -C ../frontend dev --host 127.0.0.1 --port ${new URL(e2eFrontendBaseUrl).port} --strictPort`;
 
 export default defineConfig({
   testDir: "./tests",
@@ -33,7 +38,7 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: e2eFrontendBaseUrl,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -49,10 +54,11 @@ export default defineConfig({
         },
         {
           command: frontendCommand,
-          url: "http://127.0.0.1:5173/sign-in",
+          url: `${e2eFrontendBaseUrl}/sign-in`,
           timeout: 120_000,
           reuseExistingServer: !process.env.CI,
           env: {
+            BACKEND_PROXY_TARGET: e2eBackendBaseUrl,
             VITE_API_BASE_URL: e2eBackendBaseUrl,
             VITE_AUTH_BASE_URL: e2eAuthBaseUrl,
             VITE_TURNSTILE_SITE_KEY: turnstileSiteKey,
