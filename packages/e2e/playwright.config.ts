@@ -56,7 +56,7 @@ export default defineConfig({
           command: frontendCommand,
           url: `${e2eFrontendBaseUrl}/sign-in`,
           timeout: 120_000,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: false,
           env: {
             BACKEND_PROXY_TARGET: e2eBackendBaseUrl,
             VITE_API_BASE_URL: e2eBackendBaseUrl,
