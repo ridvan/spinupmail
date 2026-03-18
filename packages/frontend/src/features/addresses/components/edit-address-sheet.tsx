@@ -50,6 +50,9 @@ import { cn } from "@/lib/utils";
 type EditAddressSheetProps = {
   address: EmailAddress | null;
   domains: string[];
+  errorMessage?: string | null;
+  isLoading?: boolean;
+  isNotFound?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -518,6 +521,9 @@ const EditAddressSheetForm = ({
 export const EditAddressSheet = ({
   address,
   domains,
+  errorMessage = null,
+  isLoading = false,
+  isNotFound = false,
   open,
   onOpenChange,
 }: EditAddressSheetProps) => {
@@ -541,12 +547,44 @@ export const EditAddressSheet = ({
             domains={domains}
             onOpenChange={onOpenChange}
           />
-        ) : (
+        ) : errorMessage ? (
+          <div className="flex flex-1 flex-col items-start justify-center gap-4 p-4 pt-0">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {isNotFound ? "Address not found" : "Unable to load address"}
+              </p>
+              <p className="text-sm text-muted-foreground">{errorMessage}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Back to addresses
+            </Button>
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-1 items-center justify-center p-4 pt-0 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Spinner className="size-4" />
               <span>Loading address...</span>
             </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col items-start justify-center gap-4 p-4 pt-0">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">No address selected</p>
+              <p className="text-sm text-muted-foreground">
+                Choose an address from the list to edit its settings.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Back to addresses
+            </Button>
           </div>
         )}
       </SheetContent>

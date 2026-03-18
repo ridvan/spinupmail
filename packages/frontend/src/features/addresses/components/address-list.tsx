@@ -8,7 +8,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { parseAsString, useQueryState } from "nuqs";
 import { NuqsAdapter } from "nuqs/adapters/react-router/v7";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -390,6 +396,35 @@ const toErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const getErrorStatusCode = (error: unknown) => {
+  if (typeof error !== "object" || !error) return null;
+
+  const directStatus =
+    (error as { status?: unknown }).status ??
+    (error as { statusCode?: unknown }).statusCode;
+  if (typeof directStatus === "number" && Number.isFinite(directStatus)) {
+    return directStatus;
+  }
+
+  const nestedStatus = (error as { response?: { status?: unknown } }).response
+    ?.status;
+  if (typeof nestedStatus === "number" && Number.isFinite(nestedStatus)) {
+    return nestedStatus;
+  }
+
+  return null;
+};
+
+const isNotFoundError = (error: unknown) => {
+  if (getErrorStatusCode(error) === 404) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error ? error.message.trim().toLowerCase() : "";
+  return message.includes("not found");
+};
+
 const AllowedSendersBadges = ({ domains }: { domains?: string[] }) => {
   const allowedDomains = domains?.filter(Boolean) ?? [];
 
@@ -645,6 +680,22 @@ const AddressListContent = ({ domains }: AddressListProps) => {
     initialData: editingAddressFromPage ?? undefined,
   });
   const editingAddress = editingAddressQuery.data ?? editingAddressFromPage;
+  const editSheetErrorMessage =
+    editingAddressId && editingAddressQuery.isError && !editingAddress
+      ? isNotFoundError(editingAddressQuery.error)
+        ? "This address no longer exists."
+        : toErrorMessage(
+            editingAddressQuery.error,
+            "Unable to load address details."
+          )
+      : null;
+  const isEditSheetLoading = Boolean(
+    editingAddressId && !editingAddress && editingAddressQuery.isPending
+  );
+  const isEditSheetOpen = Boolean(
+    editingAddressId &&
+    (editingAddress || isEditSheetLoading || editSheetErrorMessage)
+  );
 
   const navigateToAddressList = React.useCallback(() => {
     void navigate(
@@ -701,21 +752,54 @@ const AddressListContent = ({ domains }: AddressListProps) => {
     setPendingDeleteAddress(address);
   }, []);
   const isTableLoading = addressesQuery.isLoading;
-  const currentPage = addressesQuery.data?.page ?? page;
   const totalItems = addressesQuery.data?.totalItems ?? 0;
   const addressLimit =
     addressesQuery.data?.addressLimit ?? ADDRESS_LIMIT_FALLBACK;
-  const totalPages = addressesQuery.data?.totalPages ?? 1;
+  const totalPages = Math.max(1, addressesQuery.data?.totalPages ?? 1);
+  const currentPage = Math.min(addressesQuery.data?.page ?? page, totalPages);
+  const isPageOutOfRange = addressesQuery.isSuccess && page > totalPages;
   const paginationPages = Array.from(
-    { length: Math.max(1, totalPages) },
+    { length: totalPages },
     (_, index) => index + 1
   );
   const isTotalLoading = !addressesQuery.data && addressesQuery.isLoading;
   const isFetching = addressesQuery.isFetching;
-  const isPaginationDisabled = isTableLoading || isFetching;
+  const isPaginationDisabled = isTableLoading || isFetching || isPageOutOfRange;
   const isPageTransitioning = isFetching && !isTableLoading;
+  const showFilteredEmptyState =
+    addressesQuery.isSuccess &&
+    !isPageOutOfRange &&
+    totalItems === 0 &&
+    Boolean(addressSearchValue);
   const showEmptyState =
-    !isTableLoading && addresses.length === 0 && !addressSearchValue;
+    addressesQuery.isSuccess &&
+    !isPageOutOfRange &&
+    totalItems === 0 &&
+    !addressSearchValue;
+  const clampedPageSearch = React.useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+
+    if (totalPages > 1) {
+      searchParams.set("page", String(totalPages));
+    } else {
+      searchParams.delete("page");
+    }
+
+    const nextSearch = searchParams.toString();
+    return nextSearch ? `?${nextSearch}` : "";
+  }, [location.search, totalPages]);
+
+  if (isPageOutOfRange) {
+    return (
+      <Navigate
+        replace
+        to={{
+          pathname: location.pathname,
+          search: clampedPageSearch,
+        }}
+      />
+    );
+  }
 
   return (
     <Card className="border-border/70 bg-card/60">
@@ -729,6 +813,7 @@ const AddressListContent = ({ domains }: AddressListProps) => {
             size={14}
           />
           <Input
+            aria-label="Search addresses"
             value={searchInputValue}
             onBlur={() => {
               searchIconRef.current?.stopAnimation();
@@ -878,6 +963,24 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                         </TableRow>
                       )
                     )
+                  ) : addressesQuery.isError ? (
+                    <TableRow>
+                      <TableCell
+                        className="h-20 text-center text-destructive"
+                        colSpan={5}
+                      >
+                        {addressesQuery.error.message}
+                      </TableCell>
+                    </TableRow>
+                  ) : isPageOutOfRange ? (
+                    <TableRow>
+                      <TableCell
+                        className="h-20 text-center text-muted-foreground"
+                        colSpan={5}
+                      >
+                        Returning to page {totalPages}...
+                      </TableCell>
+                    </TableRow>
                   ) : addresses.length > 0 ? (
                     addresses.map(address => (
                       <AddressTableRow
@@ -889,7 +992,7 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                         onDelete={handleDeleteAddress}
                       />
                     ))
-                  ) : (
+                  ) : showFilteredEmptyState ? (
                     <TableRow>
                       <TableCell
                         className="h-20 text-center text-muted-foreground"
@@ -921,6 +1024,15 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                         </div>
                       </TableCell>
                     </TableRow>
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        className="h-20 text-center text-muted-foreground"
+                        colSpan={5}
+                      >
+                        No addresses available on this page.
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -942,9 +1054,11 @@ const AddressListContent = ({ domains }: AddressListProps) => {
               ? addressesQuery.error.message
               : isTableLoading
                 ? "Loading addresses..."
-                : isPageTransitioning
-                  ? `Updating page ${currentPage}...`
-                  : `Showing ${addresses.length} of ${totalItems}`}
+                : isPageOutOfRange
+                  ? `Redirecting to page ${totalPages}...`
+                  : isPageTransitioning
+                    ? `Updating page ${currentPage}...`
+                    : `Showing ${addresses.length} of ${totalItems}`}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
@@ -963,7 +1077,7 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                 previousPageIconRef.current?.stopAnimation();
               }}
               onClick={() => {
-                void setPageParam(String(Math.max(1, page - 1)));
+                void setPageParam(String(Math.max(1, currentPage - 1)));
               }}
             >
               <ChevronLeftIcon
@@ -1009,7 +1123,9 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                 nextPageIconRef.current?.stopAnimation();
               }}
               onClick={() => {
-                void setPageParam(String(Math.min(totalPages, page + 1)));
+                void setPageParam(
+                  String(Math.min(totalPages, currentPage + 1))
+                );
               }}
             >
               <ChevronRightIcon
@@ -1076,7 +1192,10 @@ const AddressListContent = ({ domains }: AddressListProps) => {
       <EditAddressSheet
         address={editingAddress}
         domains={domains}
-        open={Boolean(editingAddressId)}
+        errorMessage={editSheetErrorMessage}
+        isLoading={isEditSheetLoading}
+        isNotFound={isNotFoundError(editingAddressQuery.error)}
+        open={isEditSheetOpen}
         onOpenChange={handleEditSheetOpenChange}
       />
     </Card>

@@ -118,10 +118,16 @@ export const useCreateAddressMutation = () => {
       createEmailAddress(payload, {
         organizationId: activeOrganizationId,
       }),
-    onSuccess: async () => {
+    onSuccess: async createdAddress => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: queryKeys.addressesBase(activeOrganizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.addressDetail(
+            activeOrganizationId,
+            createdAddress.id
+          ),
         }),
         queryClient.invalidateQueries({
           queryKey: [
@@ -148,10 +154,16 @@ export const useDeleteAddressMutation = () => {
       deleteEmailAddress(addressId, {
         organizationId: activeOrganizationId,
       }),
-    onSuccess: async () => {
+    onSuccess: async (deletedAddress, addressId) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: queryKeys.addressesBase(activeOrganizationId),
+        }),
+        queryClient.removeQueries({
+          queryKey: queryKeys.addressDetail(
+            activeOrganizationId,
+            deletedAddress.id ?? addressId
+          ),
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.organizationStats,
@@ -206,10 +218,16 @@ export const useUpdateAddressMutation = () => {
       updateEmailAddress(addressId, payload, {
         organizationId: activeOrganizationId,
       }),
-    onSuccess: async () => {
+    onSuccess: async (updatedAddress, { addressId }) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: queryKeys.addressesBase(activeOrganizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.addressDetail(
+            activeOrganizationId,
+            updatedAddress.id ?? addressId
+          ),
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.organizationStats,
