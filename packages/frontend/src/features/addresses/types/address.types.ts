@@ -1,7 +1,6 @@
 export type CreateAddressFormValues = {
   prefix: string;
   localPart: string;
-  tag: string;
   ttlMinutes: string;
   domain: string;
 };

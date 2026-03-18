@@ -62,8 +62,10 @@ test.describe("spinupmail protected pages", () => {
     await page.goto("/addresses");
 
     await expect(page).toHaveURL("http://127.0.0.1:5173/addresses");
-    await expect(cardTitle(page, "Create Address")).toBeVisible();
-    await expect(page.getByLabel("Address prefix")).toBeVisible();
+    await expect(cardTitle(page, "Create Email Address")).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: "Address prefix" })
+    ).toBeVisible();
     await expect(cardTitle(page, "Addresses")).toBeVisible();
     await expect(page.getByText("No addresses created yet.")).toBeVisible();
   });

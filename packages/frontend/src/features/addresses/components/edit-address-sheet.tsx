@@ -27,12 +27,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
 import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
   ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
-  ADDRESS_TAG_MAX_LENGTH,
   ADDRESS_TTL_MAX_MINUTES,
   ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ALLOWED_FROM_DOMAINS_MAX_ITEMS,
@@ -45,6 +45,7 @@ import {
 import { useUpdateAddressMutation } from "@/features/addresses/hooks/use-addresses";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import type { EmailAddress } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type EditAddressSheetProps = {
   address: EmailAddress | null;
@@ -77,12 +78,6 @@ const editAddressSchema = (availableDomains: string[]) =>
         value => availableDomains.includes(normalizeDomainToken(value)),
         "Select one of the available domains"
       ),
-    tag: z
-      .string()
-      .trim()
-      .max(ADDRESS_TAG_MAX_LENGTH, {
-        message: `Tag must be ${ADDRESS_TAG_MAX_LENGTH} characters or fewer`,
-      }),
     ttlMinutes: z.union([
       z
         .number()
@@ -132,12 +127,15 @@ const deriveTtlMinutes = (expiresAt: string | null) => {
   return Math.ceil(remainingMs / 60_000);
 };
 
-export const EditAddressSheet = ({
+const EditAddressSheetForm = ({
   address,
   domains,
-  open,
   onOpenChange,
-}: EditAddressSheetProps) => {
+}: {
+  address: EmailAddress;
+  domains: string[];
+  onOpenChange: (open: boolean) => void;
+}) => {
   const updateMutation = useUpdateAddressMutation();
   const availableDomains = React.useMemo(
     () => uniqueDomains(domains),
@@ -145,15 +143,14 @@ export const EditAddressSheet = ({
   );
   const initialValues = React.useMemo(
     () => ({
-      localPart: address?.localPart ?? "",
-      domain: address?.domain ?? domains[0] ?? "",
-      tag: address?.tag ?? "",
-      ttlMinutes: deriveTtlMinutes(address?.expiresAt ?? null) as
+      localPart: address.localPart,
+      domain: address.domain || domains[0] || "",
+      ttlMinutes: deriveTtlMinutes(address.expiresAt ?? null) as
         | number
         | undefined,
-      allowedFromDomains: address?.allowedFromDomains ?? ([] as string[]),
-      maxReceivedEmailCount: address?.maxReceivedEmailCount ?? undefined,
-      maxReceivedEmailAction: address?.maxReceivedEmailAction ?? "cleanAll",
+      allowedFromDomains: address.allowedFromDomains ?? ([] as string[]),
+      maxReceivedEmailCount: address.maxReceivedEmailCount ?? undefined,
+      maxReceivedEmailAction: address.maxReceivedEmailAction ?? "cleanAll",
     }),
     [address, domains]
   );
@@ -164,15 +161,12 @@ export const EditAddressSheet = ({
       onSubmit: editAddressSchema(availableDomains),
     },
     onSubmit: async ({ value }) => {
-      if (!address) return;
-
       const updateAddressToast = toast.promise(
         updateMutation.mutateAsync({
           addressId: address.id,
           payload: {
             localPart: value.localPart.trim(),
             domain: value.domain.trim(),
-            tag: value.tag.trim() || null,
             ttlMinutes: value.ttlMinutes ?? null,
             allowedFromDomains: uniqueDomains(value.allowedFromDomains),
             maxReceivedEmailCount: value.maxReceivedEmailCount ?? null,
@@ -200,13 +194,335 @@ export const EditAddressSheet = ({
   });
 
   return (
-    <Sheet
-      open={open}
-      onOpenChange={nextOpen => {
-        if (updateMutation.isPending) return;
-        onOpenChange(nextOpen);
+    <form
+      className="flex flex-1 flex-col gap-4 p-4 pt-0"
+      noValidate
+      onSubmit={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        void form.handleSubmit();
       }}
     >
+      <FieldGroup>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-start">
+          <form.Field
+            name="localPart"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor="edit-address-local-part">
+                    Address prefix
+                  </FieldLabel>
+                  <Input
+                    id="edit-address-local-part"
+                    name={field.name}
+                    value={field.state.value}
+                    maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
+                    onBlur={field.handleBlur}
+                    onChange={event => field.handleChange(event.target.value)}
+                    placeholder="support"
+                    aria-invalid={isInvalid}
+                  />
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
+
+          <div aria-hidden="true" className="hidden md:flex md:flex-col">
+            <div className="h-3.5" />
+            <span className="mt-3.5 inline-flex h-8 items-center justify-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+              @
+            </span>
+          </div>
+
+          <form.Field
+            name="domain"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+              const selectedValue = field.state.value || domains[0] || "";
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor="edit-address-domain">Domain</FieldLabel>
+                  {domains.length <= 1 ? (
+                    <Input
+                      id="edit-address-domain"
+                      disabled
+                      value={field.state.value || domains[0] || ""}
+                      aria-invalid={isInvalid}
+                    />
+                  ) : (
+                    <Select
+                      value={selectedValue}
+                      onValueChange={value => field.handleChange(value ?? "")}
+                    >
+                      <SelectTrigger
+                        id="edit-address-domain"
+                        name={field.name}
+                        onBlur={field.handleBlur}
+                        className="h-10 w-full"
+                        aria-invalid={isInvalid}
+                      >
+                        <SelectValue placeholder="Select domain" />
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        {domains.map(domain => (
+                          <SelectItem key={domain} value={domain}>
+                            {domain}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)]">
+          <form.Field
+            name="ttlMinutes"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor="edit-address-ttl">
+                    TTL (minutes)
+                  </FieldLabel>
+                  <Input
+                    id="edit-address-ttl"
+                    name={field.name}
+                    type="number"
+                    min={1}
+                    max={ADDRESS_TTL_MAX_MINUTES}
+                    step={1}
+                    value={field.state.value ?? ""}
+                    onBlur={field.handleBlur}
+                    onChange={event => {
+                      const nextValue = event.target.value;
+                      field.handleChange(
+                        nextValue === "" ? undefined : Number(nextValue)
+                      );
+                    }}
+                    placeholder="0"
+                    aria-invalid={isInvalid}
+                  />
+                  <FieldDescription>
+                    Leave empty for no expiration
+                  </FieldDescription>
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
+
+          <form.Field
+            name="allowedFromDomains"
+            children={field => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid;
+
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor="edit-address-allowed-from-domains">
+                    Allowed sender domains
+                  </FieldLabel>
+                  <DomainTagsInput
+                    id="edit-address-allowed-from-domains"
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    onBlur={field.handleBlur}
+                    isInvalid={isInvalid}
+                  />
+                  <FieldDescription>
+                    Up to {ALLOWED_FROM_DOMAINS_MAX_ITEMS} hostnames, each up to{" "}
+                    {ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters.
+                  </FieldDescription>
+                  {isInvalid ? (
+                    <FieldError
+                      errors={toFieldErrors(field.state.meta.errors)}
+                    />
+                  ) : null}
+                </Field>
+              );
+            }}
+          />
+        </div>
+
+        <form.Subscribe
+          selector={state => state.values.maxReceivedEmailCount !== undefined}
+        >
+          {isLimitEnabled => (
+            <div
+              className={cn(
+                "rounded-lg border p-3",
+                isLimitEnabled
+                  ? "border-border bg-muted/35"
+                  : "border-border/70 bg-muted/20"
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Inbox limit</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Empty = unlimited.
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                    isLimitEnabled
+                      ? "border-foreground/20 bg-background/70 text-foreground"
+                      : "border-border/80 text-muted-foreground"
+                  )}
+                >
+                  {isLimitEnabled ? "Enabled" : "Unlimited"}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start">
+                <form.Field
+                  name="maxReceivedEmailCount"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel htmlFor="edit-address-max-received-email-count">
+                          Max emails
+                        </FieldLabel>
+                        <Input
+                          id="edit-address-max-received-email-count"
+                          name={field.name}
+                          type="number"
+                          min={1}
+                          max={ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}
+                          step={1}
+                          value={field.state.value ?? ""}
+                          onBlur={field.handleBlur}
+                          onChange={event => {
+                            const nextValue = event.target.value;
+                            field.handleChange(
+                              nextValue === "" ? undefined : Number(nextValue)
+                            );
+                          }}
+                          placeholder="Unlimited"
+                          className="h-9"
+                          aria-invalid={isInvalid}
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+
+                <form.Field
+                  name="maxReceivedEmailAction"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel>On limit</FieldLabel>
+                        <RadioGroup
+                          value={field.state.value}
+                          className="grid gap-2 sm:grid-cols-2"
+                          onValueChange={value =>
+                            field.handleChange(
+                              (value ?? "cleanAll") as "cleanAll" | "rejectNew"
+                            )
+                          }
+                          onBlur={() => field.handleBlur()}
+                          aria-invalid={isInvalid}
+                        >
+                          <label
+                            htmlFor="edit-address-max-received-action-clean-all"
+                            className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
+                          >
+                            <RadioGroupItem
+                              id="edit-address-max-received-action-clean-all"
+                              value="cleanAll"
+                            />
+                            <span className="font-medium">Delete all</span>
+                          </label>
+                          <label
+                            htmlFor="edit-address-max-received-action-reject-new"
+                            className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
+                          >
+                            <RadioGroupItem
+                              id="edit-address-max-received-action-reject-new"
+                              value="rejectNew"
+                            />
+                            <span className="font-medium">Reject new</span>
+                          </label>
+                        </RadioGroup>
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </form.Subscribe>
+      </FieldGroup>
+
+      <SheetFooter className="p-0">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={updateMutation.isPending}
+          onClick={() => onOpenChange(false)}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? "Saving..." : "Save changes"}
+        </Button>
+      </SheetFooter>
+    </form>
+  );
+};
+
+export const EditAddressSheet = ({
+  address,
+  domains,
+  open,
+  onOpenChange,
+}: EditAddressSheetProps) => {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         className="data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
@@ -218,312 +534,21 @@ export const EditAddressSheet = ({
           </SheetDescription>
         </SheetHeader>
 
-        <form
-          className="flex flex-1 flex-col gap-4 p-4 pt-0"
-          noValidate
-          onSubmit={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            void form.handleSubmit();
-          }}
-        >
-          <FieldGroup>
-            <form.Field
-              name="localPart"
-              children={field => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor="edit-address-local-part">
-                      Address prefix
-                    </FieldLabel>
-                    <Input
-                      id="edit-address-local-part"
-                      name={field.name}
-                      value={field.state.value}
-                      maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
-                      onBlur={field.handleBlur}
-                      onChange={event => field.handleChange(event.target.value)}
-                      placeholder="support"
-                      aria-invalid={isInvalid}
-                    />
-                    {isInvalid ? (
-                      <FieldError
-                        errors={toFieldErrors(field.state.meta.errors)}
-                      />
-                    ) : null}
-                  </Field>
-                );
-              }}
-            />
-
-            <form.Field
-              name="domain"
-              children={field => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-                const selectedValue = field.state.value || domains[0] || "";
-
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor="edit-address-domain">
-                      Domain
-                    </FieldLabel>
-                    {domains.length <= 1 ? (
-                      <Input
-                        id="edit-address-domain"
-                        disabled
-                        value={field.state.value || domains[0] || ""}
-                        aria-invalid={isInvalid}
-                      />
-                    ) : (
-                      <Select
-                        value={selectedValue}
-                        onValueChange={value => field.handleChange(value ?? "")}
-                      >
-                        <SelectTrigger
-                          id="edit-address-domain"
-                          name={field.name}
-                          onBlur={field.handleBlur}
-                          className="h-10 w-full"
-                          aria-invalid={isInvalid}
-                        >
-                          <SelectValue placeholder="Select domain" />
-                        </SelectTrigger>
-                        <SelectContent align="start">
-                          {domains.map(domain => (
-                            <SelectItem key={domain} value={domain}>
-                              {domain}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {isInvalid ? (
-                      <FieldError
-                        errors={toFieldErrors(field.state.meta.errors)}
-                      />
-                    ) : null}
-                  </Field>
-                );
-              }}
-            />
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field
-                name="ttlMinutes"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor="edit-address-ttl">
-                        TTL (minutes)
-                      </FieldLabel>
-                      <Input
-                        id="edit-address-ttl"
-                        name={field.name}
-                        type="number"
-                        min={1}
-                        max={ADDRESS_TTL_MAX_MINUTES}
-                        step={1}
-                        value={field.state.value ?? ""}
-                        onBlur={field.handleBlur}
-                        onChange={event => {
-                          const nextValue = event.target.value;
-                          field.handleChange(
-                            nextValue === "" ? undefined : Number(nextValue)
-                          );
-                        }}
-                        placeholder="Leave empty for no exp"
-                        aria-invalid={isInvalid}
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
-              <form.Field
-                name="tag"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor="edit-address-tag">Tag</FieldLabel>
-                      <Input
-                        id="edit-address-tag"
-                        name={field.name}
-                        value={field.state.value}
-                        maxLength={ADDRESS_TAG_MAX_LENGTH}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
-                        }
-                        placeholder="Tag"
-                        aria-invalid={isInvalid}
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
+        {address ? (
+          <EditAddressSheetForm
+            key={address.id}
+            address={address}
+            domains={domains}
+            onOpenChange={onOpenChange}
+          />
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-4 pt-0 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Spinner className="size-4" />
+              <span>Loading address...</span>
             </div>
-
-            <form.Field
-              name="allowedFromDomains"
-              children={field => {
-                const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
-
-                return (
-                  <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor="edit-address-allowed-from-domains">
-                      Allowed sender domains
-                    </FieldLabel>
-                    <DomainTagsInput
-                      id="edit-address-allowed-from-domains"
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      onBlur={field.handleBlur}
-                      isInvalid={isInvalid}
-                    />
-                    <FieldDescription>
-                      Up to {ALLOWED_FROM_DOMAINS_MAX_ITEMS} hostnames, each up
-                      to {ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters.
-                    </FieldDescription>
-                    {isInvalid ? (
-                      <FieldError
-                        errors={toFieldErrors(field.state.meta.errors)}
-                      />
-                    ) : null}
-                  </Field>
-                );
-              }}
-            />
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field
-                name="maxReceivedEmailCount"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor="edit-address-max-received-email-count">
-                        Max received emails
-                      </FieldLabel>
-                      <Input
-                        id="edit-address-max-received-email-count"
-                        name={field.name}
-                        type="number"
-                        min={1}
-                        max={ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}
-                        step={1}
-                        value={field.state.value ?? ""}
-                        onBlur={field.handleBlur}
-                        onChange={event => {
-                          const nextValue = event.target.value;
-                          field.handleChange(
-                            nextValue === "" ? undefined : Number(nextValue)
-                          );
-                        }}
-                        placeholder="Leave empty for unlimited"
-                        aria-invalid={isInvalid}
-                      />
-                      <FieldDescription>
-                        Auto-action runs when this inbox reaches the count.
-                      </FieldDescription>
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
-              <form.Field
-                name="maxReceivedEmailAction"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel>When max is reached</FieldLabel>
-                      <RadioGroup
-                        value={field.state.value}
-                        onValueChange={value =>
-                          field.handleChange(
-                            (value ?? "cleanAll") as "cleanAll" | "rejectNew"
-                          )
-                        }
-                        onBlur={() => field.handleBlur()}
-                        aria-invalid={isInvalid}
-                      >
-                        <label
-                          htmlFor="edit-address-max-received-action-clean-all"
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <RadioGroupItem
-                            id="edit-address-max-received-action-clean-all"
-                            value="cleanAll"
-                          />
-                          <span className="text-sm">Clean all</span>
-                        </label>
-                        <label
-                          htmlFor="edit-address-max-received-action-reject-new"
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <RadioGroupItem
-                            id="edit-address-max-received-action-reject-new"
-                            value="rejectNew"
-                          />
-                          <span className="text-sm">Reject new emails</span>
-                        </label>
-                      </RadioGroup>
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-            </div>
-          </FieldGroup>
-
-          <SheetFooter className="p-0">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={updateMutation.isPending}
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save changes"}
-            </Button>
-          </SheetFooter>
-        </form>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

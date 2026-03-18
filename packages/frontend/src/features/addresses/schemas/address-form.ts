@@ -2,7 +2,6 @@ export const addressPartRegex = /^[a-z0-9._+-]+$/i;
 export const domainRegex =
   /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 export const ADDRESS_LOCAL_PART_MAX_LENGTH = 30;
-export const ADDRESS_TAG_MAX_LENGTH = 20;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
 export const ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
 export const ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;

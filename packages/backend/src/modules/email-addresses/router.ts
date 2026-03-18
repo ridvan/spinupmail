@@ -4,6 +4,7 @@ import type { AppHonoEnv } from "@/app/types";
 import {
   createEmailAddress,
   deleteEmailAddress,
+  getEmailAddress,
   listEmailAddresses,
   listRecentAddressActivity,
   updateEmailAddress,
@@ -76,6 +77,21 @@ export const createEmailAddressesRouter = () => {
       });
     }
   );
+
+  router.get("/email-addresses/:id", async c => {
+    const organizationId = c.get("organizationId");
+    const addressId = c.req.param("id");
+
+    const result = await getEmailAddress({
+      env: c.env,
+      organizationId,
+      addressId,
+    });
+
+    return c.json(result.body, result.status, {
+      "Cache-Control": "private, max-age=15",
+    });
+  });
 
   router.delete("/email-addresses/:id", async c => {
     const organizationId = c.get("organizationId");

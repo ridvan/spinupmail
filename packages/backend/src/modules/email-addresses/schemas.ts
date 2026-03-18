@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const ADDRESS_LOCAL_PART_MAX_LENGTH = 30;
-export const ADDRESS_TAG_MAX_LENGTH = 20;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
 export const ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
 export const ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
@@ -33,7 +32,6 @@ export const createEmailAddressBodySchema = z
       .min(1)
       .max(ADDRESS_LOCAL_PART_MAX_LENGTH)
       .regex(ADDRESS_LOCAL_PART_REGEX),
-    tag: z.string().trim().max(ADDRESS_TAG_MAX_LENGTH).optional(),
     ttlMinutes: z
       .number()
       .int()
@@ -64,6 +62,7 @@ export const listEmailAddressesQuerySchema = z
   .object({
     page: z.string().optional(),
     pageSize: z.string().optional(),
+    search: z.string().optional(),
     sortBy: z.enum(["createdAt", "address", "lastReceivedAt"]).optional(),
     sortDirection: z.enum(["asc", "desc"]).optional(),
   })
@@ -78,7 +77,6 @@ export const updateEmailAddressBodySchema = z
       .max(ADDRESS_LOCAL_PART_MAX_LENGTH)
       .regex(ADDRESS_LOCAL_PART_REGEX)
       .optional(),
-    tag: z.string().trim().max(ADDRESS_TAG_MAX_LENGTH).nullish(),
     ttlMinutes: z
       .number()
       .int()

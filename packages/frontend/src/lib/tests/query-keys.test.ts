@@ -10,13 +10,14 @@ describe("queryKeys", () => {
       "org-1",
       "addresses",
     ]);
-    expect(queryKeys.addresses("org-1", 2, 25, "address", "asc")).toEqual([
+    expect(queryKeys.addresses("org-1", 2, 25, "", "address", "asc")).toEqual([
       "app",
       "organizations",
       "org-1",
       "addresses",
       2,
       25,
+      "",
       "address",
       "asc",
     ]);
@@ -60,7 +61,7 @@ describe("queryKeys", () => {
       queryKeys.emails("org-1", "address-1", "invoice")
     );
     expect(
-      queryKeys.addresses("org-1", 1, 20, "createdAt", "desc")
-    ).not.toEqual(queryKeys.addresses("org-1", 2, 20, "createdAt", "desc"));
+      queryKeys.addresses("org-1", 1, 20, "", "createdAt", "desc")
+    ).not.toEqual(queryKeys.addresses("org-1", 2, 20, "", "createdAt", "desc"));
   });
 });

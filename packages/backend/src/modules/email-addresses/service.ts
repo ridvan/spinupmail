@@ -137,13 +137,18 @@ export const listEmailAddresses = async ({
     ADDRESS_LIST_PAGE_SIZE_MAX,
     ADDRESS_LIST_PAGE_SIZE_DEFAULT
   );
+  const search = query.search?.trim() || undefined;
   const sortBy = (query.sortBy ??
     ADDRESS_LIST_SORT_BY_DEFAULT) as AddressListSortBy;
   const sortDirection = (query.sortDirection ??
     ADDRESS_LIST_SORT_DIRECTION_DEFAULT) as AddressListSortDirection;
 
   const db = getDb(env);
-  const countRow = await countAddressesByOrganization(db, organizationId);
+  const countRow = await countAddressesByOrganization({
+    db,
+    organizationId,
+    search,
+  });
   const totalItems = Number(countRow?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = page;
@@ -154,6 +159,7 @@ export const listEmailAddresses = async ({
     organizationId,
     page: currentPage,
     pageSize,
+    search,
     sortBy,
     sortDirection,
   });
@@ -236,6 +242,35 @@ export const listRecentAddressActivity = async ({
       nextCursor,
       totalItems: Number(totalRow?.count ?? 0),
     },
+  };
+};
+
+export const getEmailAddress = async ({
+  env,
+  organizationId,
+  addressId,
+}: {
+  env: CloudflareBindings;
+  organizationId: string;
+  addressId: string;
+}) => {
+  const db = getDb(env);
+  const addressRow = await findAddressByIdAndOrganization(
+    db,
+    addressId,
+    organizationId
+  );
+
+  if (!addressRow) {
+    return {
+      status: 404 as const,
+      body: { error: "address not found" },
+    };
+  }
+
+  return {
+    status: 200 as const,
+    body: toEmailAddressListItem(addressRow),
   };
 };
 
@@ -445,7 +480,6 @@ export const createEmailAddress = async ({
         address,
         localPart,
         domain,
-        tag: typeof body.tag === "string" ? body.tag : undefined,
         meta: meta ?? undefined,
         expiresAt,
       },
@@ -480,7 +514,6 @@ export const createEmailAddress = async ({
       address,
       localPart,
       domain,
-      tag: typeof body.tag === "string" ? body.tag : undefined,
       meta: responseMeta,
       allowedFromDomains,
       maxReceivedEmailCount: responseMaxReceivedEmailCount,
@@ -722,13 +755,6 @@ export const updateEmailAddress = async ({
         ? null
         : new Date(Date.now() + body.ttlMinutes * 60 * 1000);
 
-  const tag =
-    body.tag === undefined
-      ? existing.tag
-      : typeof body.tag === "string" && body.tag.trim().length > 0
-        ? body.tag.trim()
-        : null;
-
   let metaForStorage = existing.meta;
   const shouldUpdateMeta =
     body.meta !== undefined ||
@@ -781,7 +807,6 @@ export const updateEmailAddress = async ({
         address,
         localPart,
         domain: domainFromBody,
-        tag,
         meta: metaForStorage,
         expiresAt,
       },
@@ -807,7 +832,6 @@ export const updateEmailAddress = async ({
       address,
       localPart,
       domain: domainFromBody,
-      tag,
       meta: metaForStorage,
       expiresAt,
     }),

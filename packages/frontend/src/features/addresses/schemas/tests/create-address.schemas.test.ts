@@ -9,7 +9,6 @@ describe("create address schema", () => {
     const errors = validateCreateAddress({
       prefix: "bad value",
       localPart: "ok",
-      tag: "",
       ttlMinutes: "0",
       domain: "",
     });
@@ -23,7 +22,6 @@ describe("create address schema", () => {
     const payload = toCreateAddressPayload({
       prefix: " app ",
       localPart: " inbox ",
-      tag: " qa ",
       ttlMinutes: " 30 ",
       domain: " spinupmail.com ",
     });
@@ -31,7 +29,6 @@ describe("create address schema", () => {
     expect(payload).toEqual({
       prefix: "app",
       localPart: "inbox",
-      tag: "qa",
       ttlMinutes: 30,
       domain: "spinupmail.com",
     });

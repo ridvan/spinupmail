@@ -15,7 +15,6 @@ export const emailAddresses = sqliteTable(
     address: text("address").notNull().unique(),
     localPart: text("local_part").notNull(),
     domain: text("domain").notNull(),
-    tag: text("tag"),
     meta: text("meta"),
     emailCount: integer("email_count").default(0).notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })

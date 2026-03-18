@@ -14,7 +14,6 @@ describe("email address request schemas", () => {
     domain: "example.com",
     acceptedRiskNotice: true,
     ttlMinutes: 60,
-    tag: "ops",
     allowedFromDomains: ["sender.example.com"],
     maxReceivedEmailCount: 500,
     maxReceivedEmailAction: "cleanAll",

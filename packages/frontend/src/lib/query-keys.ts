@@ -31,12 +31,22 @@ export const queryKeys = {
     ] as const,
   addressesBase: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses"] as const,
+  addressDetail: (organizationId: string | null, addressId: string | null) =>
+    [
+      "app",
+      "organizations",
+      organizationId,
+      "addresses",
+      "detail",
+      addressId,
+    ] as const,
   addressesAll: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "addresses", "all"] as const,
   addresses: (
     organizationId: string | null,
     page: number,
     pageSize: number,
+    search: string,
     sortBy: "createdAt" | "address" | "lastReceivedAt",
     sortDirection: "asc" | "desc"
   ) =>
@@ -47,6 +57,7 @@ export const queryKeys = {
       "addresses",
       page,
       pageSize,
+      search,
       sortBy,
       sortDirection,
     ] as const,

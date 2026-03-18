@@ -43,7 +43,6 @@ export const toCreateAddressPayload = (values: CreateAddressFormValues) => {
   return {
     prefix: values.prefix.trim() || undefined,
     localPart: values.localPart.trim() || undefined,
-    tag: values.tag.trim() || undefined,
     ttlMinutes: Number.isFinite(ttl) ? ttl : undefined,
     domain: values.domain.trim() || undefined,
   };

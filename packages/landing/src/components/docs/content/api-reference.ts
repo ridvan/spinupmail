@@ -95,11 +95,6 @@ const emailAddressFields: Array<ApiFieldSpec> = [
     description: "Configured inbound domain assigned to the address.",
   },
   {
-    name: "tag",
-    type: "string | null",
-    description: "Optional tag stored with the address.",
-  },
-  {
     name: "meta",
     type: "unknown",
     description:
@@ -703,7 +698,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "address": "signup-test@spinupmail.dev",
       "localPart": "signup-test",
       "domain": "spinupmail.dev",
-      "tag": null,
       "meta": {
         "allowedFromDomains": ["github.com"],
         "maxReceivedEmailCount": 25,
@@ -812,7 +806,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "address": "signup-test@spinupmail.dev",
       "localPart": "signup-test",
       "domain": "spinupmail.dev",
-      "tag": null,
       "meta": null,
       "allowedFromDomains": [],
       "maxReceivedEmailCount": null,
@@ -857,13 +850,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Inbox local part before normalization.",
         constraints:
           "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
-      },
-      {
-        name: "tag",
-        type: "string",
-        required: false,
-        description: "Optional freeform tag stored on the address.",
-        constraints: "Maximum 20 characters.",
       },
       {
         name: "ttlMinutes",
@@ -994,7 +980,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "address": "signup-test@spinupmail.dev",
   "localPart": "signup-test",
   "domain": "spinupmail.dev",
-  "tag": null,
   "meta": {
     "allowedFromDomains": ["github.com", "example.com"],
     "maxReceivedEmailCount": 25,
@@ -1014,7 +999,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     method: "PATCH",
     path: "/api/email-addresses/:id",
     purpose:
-      "Update an existing inbox, including renaming, retagging, TTL changes, and metadata-backed policy fields.",
+      "Update an existing inbox, including renaming, TTL changes, and metadata-backed policy fields.",
     successStatus: 200,
     auth: {
       summary:
@@ -1041,7 +1026,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     notes: [
       "Set ttlMinutes to null to remove the expiration time.",
       "Set maxReceivedEmailCount to null to clear the inbox-size limit from metadata.",
-      "Set tag to null or an empty string to clear the saved tag.",
     ],
     bodyFields: [
       {
@@ -1051,13 +1035,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "New local part for the address.",
         constraints:
           "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
-      },
-      {
-        name: "tag",
-        type: "string | null",
-        required: false,
-        description: "New tag value. Null or blank removes the tag.",
-        constraints: "Maximum 20 characters when provided.",
       },
       {
         name: "ttlMinutes",
@@ -1157,7 +1134,6 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "address": "signup-test@spinupmail.dev",
   "localPart": "signup-test",
   "domain": "spinupmail.dev",
-  "tag": null,
   "meta": {
     "allowedFromDomains": ["github.com"],
     "maxReceivedEmailCount": 50,

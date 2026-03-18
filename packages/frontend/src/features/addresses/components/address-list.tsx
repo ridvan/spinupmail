@@ -1,7 +1,14 @@
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { Link } from "react-router";
+import {
+  Calendar03Icon,
+  Clock03Icon,
+  Copy01Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
+import { parseAsString, useQueryState } from "nuqs";
+import { NuqsAdapter } from "nuqs/adapters/react-router/v7";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -15,22 +22,25 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeftIcon,
-  type ArrowLeftIconHandle,
-} from "@/components/ui/arrow-left";
+  ChevronLeftIcon,
+  type ChevronLeftIconHandle,
+} from "@/components/ui/chevron-left";
 import {
-  ArrowRightIcon,
-  type ArrowRightIconHandle,
-} from "@/components/ui/arrow-right";
+  ChevronRightIcon,
+  type ChevronRightIconHandle,
+} from "@/components/ui/chevron-right";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyIcon, type CopyIconHandle } from "@/components/ui/copy";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SearchIcon, type SearchIconHandle } from "@/components/ui/search";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   SquarePenIcon,
@@ -42,6 +52,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { XIcon, type XIconHandle } from "@/components/ui/x";
 import {
   Table,
   TableBody,
@@ -52,15 +63,18 @@ import {
 } from "@/components/ui/table";
 import { EditAddressSheet } from "@/features/addresses/components/edit-address-sheet";
 import {
+  useAddressQuery,
   useAddressesQuery,
   useDeleteAddressMutation,
 } from "@/features/addresses/hooks/use-addresses";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import {
   formatDateTimeInTimeZone,
+  getCalendarDayDiff,
   getDayKey,
 } from "@/features/timezone/lib/date-format";
 import type { EmailAddress, EmailAddressSortBy } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type AddressListProps = {
   domains: string[];
@@ -70,25 +84,9 @@ const PAGE_SIZE = 10;
 const ADDRESS_LIMIT_FALLBACK = 100;
 const ALLOWED_SENDER_VISIBLE_COUNT = 2;
 const LOADING_SKELETON_ROW_COUNT = 3;
+const ADDRESS_SEARCH_DEBOUNCE_MS = 250;
 const allowedSenderBadgeClass =
   "h-6 rounded-md border border-border/70 bg-muted/80 px-2 text-xs dark:bg-muted/60";
-const placeholderTextClass =
-  "inline-flex min-w-6 justify-center text-muted-foreground";
-const currentYearDateOptions: Intl.DateTimeFormatOptions = {
-  month: "short",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-};
-const otherYearDateOptions: Intl.DateTimeFormatOptions = {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-};
 
 type AddressRowActionsProps = {
   address: EmailAddress;
@@ -148,24 +146,243 @@ const AddressRowActions = ({
   );
 };
 
-const formatDate = (
-  value: string | null,
-  timeZone: string,
-  nowDayKey: string | null
-) => {
+const formatExactDateTime = (value: string | null, timeZone: string) => {
   if (!value) return "Never";
-  const dateDayKey = getDayKey(value, timeZone);
-  if (!dateDayKey || !nowDayKey) return "Never";
-  const options =
-    dateDayKey.slice(0, 4) === nowDayKey.slice(0, 4)
-      ? currentYearDateOptions
-      : otherYearDateOptions;
   return formatDateTimeInTimeZone({
     value,
     timeZone,
-    options,
+    options: {
+      dateStyle: "medium",
+      timeStyle: "short",
+    },
     fallback: "Never",
   });
+};
+
+const formatRelativeTimestamp = (value: string | null, timeZone: string) => {
+  if (!value) return "Never";
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return "Never";
+
+  const now = new Date();
+  const diffMs = now.getTime() - parsedDate.getTime();
+  const calendarDayDiff = getCalendarDayDiff({
+    value,
+    timeZone,
+    now,
+  });
+
+  if (diffMs < 60_000) {
+    return "Just now";
+  }
+
+  if (diffMs < 60 * 60 * 1000 && calendarDayDiff === 0) {
+    return `${Math.max(1, Math.floor(diffMs / (60 * 1000)))}m ago`;
+  }
+
+  if (diffMs < 24 * 60 * 60 * 1000 && calendarDayDiff === 0) {
+    return `${Math.max(1, Math.floor(diffMs / (60 * 60 * 1000)))}h ago`;
+  }
+
+  if (calendarDayDiff === 1) {
+    return "Yesterday";
+  }
+
+  if ((calendarDayDiff ?? Number.POSITIVE_INFINITY) < 7) {
+    return formatDateTimeInTimeZone({
+      value,
+      timeZone,
+      options: {
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      },
+      fallback: "Recent",
+    });
+  }
+
+  const nowDayKey = getDayKey(now, timeZone);
+  const dateDayKey = getDayKey(value, timeZone);
+  const isCurrentYear = Boolean(
+    nowDayKey && dateDayKey && nowDayKey.slice(0, 4) === dateDayKey.slice(0, 4)
+  );
+
+  return formatDateTimeInTimeZone({
+    value,
+    timeZone,
+    options: isCurrentYear
+      ? {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }
+      : {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        },
+    fallback: "Recent",
+  });
+};
+
+const TimestampCell = ({
+  icon,
+  text,
+  exactText,
+  muted = false,
+}: {
+  icon: typeof Clock03Icon | typeof Calendar03Icon;
+  text: string;
+  exactText?: string;
+  muted?: boolean;
+}) => {
+  const content = (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-2 text-[0.78rem] sm:text-xs",
+        muted ? "text-muted-foreground" : "text-foreground"
+      )}
+    >
+      <HugeiconsIcon
+        icon={icon}
+        strokeWidth={1.9}
+        className="-mt-px size-3.5 shrink-0 opacity-70"
+      />
+      <span className="truncate">{text}</span>
+    </div>
+  );
+
+  if (!exactText) {
+    return content;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<div className="w-fit cursor-default" />}>
+        {content}
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {exactText}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+const UpdatingIndicator = () => (
+  <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+    <span className="size-1.5 animate-pulse rounded-full bg-foreground/60" />
+    Updating
+  </div>
+);
+
+const AddressLinkCell = ({
+  address,
+  addressId,
+}: {
+  address: string;
+  addressId: string;
+}) => {
+  const [didCopyAddress, setDidCopyAddress] = React.useState(false);
+  const copyResetTimeoutRef = React.useRef<number | null>(null);
+  const copyIconRef = React.useRef<CopyIconHandle | null>(null);
+  const openInboxIconRef = React.useRef<ChevronRightIconHandle | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyAddress = React.useCallback(async () => {
+    if (!navigator.clipboard?.writeText) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setDidCopyAddress(true);
+
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+
+      copyResetTimeoutRef.current = window.setTimeout(() => {
+        setDidCopyAddress(false);
+      }, 1600);
+    } catch {
+      // Ignore copy failures silently.
+    }
+  }, [address]);
+
+  return (
+    <div className="flex items-center gap-1">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="cursor-pointer text-muted-foreground hover:text-foreground"
+              aria-label="Copy address"
+              onClick={() => void handleCopyAddress()}
+              onMouseEnter={() => {
+                copyIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                copyIconRef.current?.stopAnimation();
+              }}
+            />
+          }
+        >
+          {didCopyAddress ? (
+            <HugeiconsIcon
+              icon={Tick02Icon}
+              strokeWidth={2}
+              className="size-3.5"
+            />
+          ) : (
+            <CopyIcon ref={copyIconRef} size={14} aria-hidden="true" />
+          )}
+        </TooltipTrigger>
+        <TooltipContent side="top">Copy address</TooltipContent>
+      </Tooltip>
+      <div className="min-w-0 flex-1">
+        <div className="relative inline-flex max-w-full items-center">
+          <Link
+            className="block max-w-full truncate font-mono text-xs sm:text-sm hover:underline"
+            to={`/inbox/${encodeURIComponent(addressId)}`}
+          >
+            {address}
+          </Link>
+          <Link
+            className="mt-px pointer-events-none absolute top-1/2 left-[calc(100%+0.5rem)] inline-flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[11px] text-muted-foreground opacity-0 transition-all duration-150 hover:text-foreground sm:translate-x-1 sm:group-hover/row:pointer-events-auto sm:group-hover/row:translate-x-0 sm:group-hover/row:opacity-100 sm:focus-visible:pointer-events-auto sm:focus-visible:translate-x-0 sm:focus-visible:opacity-100"
+            to={`/inbox/${encodeURIComponent(addressId)}`}
+            onMouseEnter={() => {
+              openInboxIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => {
+              openInboxIconRef.current?.stopAnimation();
+            }}
+          >
+            Open
+            <ChevronRightIcon
+              ref={openInboxIconRef}
+              aria-hidden="true"
+              size={12}
+            />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const toErrorMessage = (error: unknown, fallback: string) => {
@@ -250,7 +467,6 @@ const AllowedSendersBadgeSkeleton = () => (
 type AddressTableRowProps = {
   address: EmailAddress;
   timeZone: string;
-  nowDayKey: string | null;
   isDeletePending: boolean;
   onEdit: (address: EmailAddress) => void;
   onDelete: (address: EmailAddress) => void;
@@ -260,90 +476,32 @@ const AddressTableRow = React.memo(
   ({
     address,
     timeZone,
-    nowDayKey,
     isDeletePending,
     onEdit,
     onDelete,
   }: AddressTableRowProps) => {
-    const [didCopyAddress, setDidCopyAddress] = React.useState(false);
-    const copyResetTimeoutRef = React.useRef<number | null>(null);
-
-    React.useEffect(() => {
-      return () => {
-        if (copyResetTimeoutRef.current !== null) {
-          window.clearTimeout(copyResetTimeoutRef.current);
-        }
-      };
-    }, []);
-
-    const handleCopyAddress = React.useCallback(async () => {
-      if (!navigator.clipboard?.writeText) return;
-
-      try {
-        await navigator.clipboard.writeText(address.address);
-        setDidCopyAddress(true);
-
-        if (copyResetTimeoutRef.current !== null) {
-          window.clearTimeout(copyResetTimeoutRef.current);
-        }
-
-        copyResetTimeoutRef.current = window.setTimeout(() => {
-          setDidCopyAddress(false);
-        }, 1600);
-      } catch {
-        // Ignore copy failures silently.
-      }
-    }, [address.address]);
-
     return (
-      <TableRow>
+      <TableRow className="group/row transition-colors hover:bg-muted/30">
         <TableCell className="max-w-56 font-medium">
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="cursor-pointer text-muted-foreground hover:text-foreground"
-                    aria-label="Copy address"
-                    onClick={() => void handleCopyAddress()}
-                  />
-                }
-              >
-                <HugeiconsIcon
-                  icon={didCopyAddress ? Tick02Icon : Copy01Icon}
-                  strokeWidth={2}
-                  className="size-3.5"
-                />
-              </TooltipTrigger>
-              <TooltipContent side="top">Copy address</TooltipContent>
-            </Tooltip>
-            <Link
-              className="block min-w-0 flex-1 truncate font-mono text-xs sm:text-sm hover:underline"
-              to={`/inbox/${encodeURIComponent(address.id)}`}
-            >
-              {address.address}
-            </Link>
-          </div>
+          <AddressLinkCell address={address.address} addressId={address.id} />
         </TableCell>
         <TableCell>
-          {address.tag ? (
-            <Badge variant="secondary">{address.tag}</Badge>
+          <TimestampCell
+            icon={Calendar03Icon}
+            exactText={formatExactDateTime(address.createdAt, timeZone)}
+            text={formatRelativeTimestamp(address.createdAt, timeZone)}
+          />
+        </TableCell>
+        <TableCell>
+          {address.lastReceivedAt ? (
+            <TimestampCell
+              icon={Clock03Icon}
+              exactText={formatExactDateTime(address.lastReceivedAt, timeZone)}
+              text={formatRelativeTimestamp(address.lastReceivedAt, timeZone)}
+            />
           ) : (
-            <span className={placeholderTextClass}>-</span>
+            <TimestampCell icon={Clock03Icon} text="No activity yet" muted />
           )}
-        </TableCell>
-        <TableCell>
-          {formatDate(address.createdAt, timeZone, nowDayKey)}
-        </TableCell>
-        <TableCell
-          className={
-            address.lastReceivedAt ? undefined : "text-muted-foreground"
-          }
-        >
-          {formatDate(address.lastReceivedAt, timeZone, nowDayKey)}
         </TableCell>
         <TableCell className="max-w-72">
           <AllowedSendersBadges domains={address.allowedFromDomains} />
@@ -359,9 +517,25 @@ const AddressTableRow = React.memo(
   }
 );
 
-export const AddressList = ({ domains }: AddressListProps) => {
+const AddressListContent = ({ domains }: AddressListProps) => {
   const { effectiveTimeZone } = useTimezone();
-  const [page, setPage] = React.useState(1);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = useParams<{ addressId?: string }>();
+  const [pageParam, setPageParam] = useQueryState(
+    "page",
+    parseAsString
+      .withDefault("1")
+      .withOptions({ clearOnDefault: true, history: "replace" })
+  );
+  const [addressSearchValue, setAddressSearchValue] = useQueryState(
+    "addressesFilter",
+    parseAsString
+      .withDefault("")
+      .withOptions({ clearOnDefault: true, history: "replace" })
+  );
+  const [searchInputValue, setSearchInputValue] =
+    React.useState(addressSearchValue);
   const [sortBy, setSortBy] = React.useState<EmailAddressSortBy>("createdAt");
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
     "desc"
@@ -369,22 +543,57 @@ export const AddressList = ({ domains }: AddressListProps) => {
   const deleteMutation = useDeleteAddressMutation();
   const [pendingDeleteAddress, setPendingDeleteAddress] =
     React.useState<EmailAddress | null>(null);
-  const [editingAddress, setEditingAddress] =
-    React.useState<EmailAddress | null>(null);
-  const [isEditSheetOpen, setIsEditSheetOpen] = React.useState(false);
-  const [editSheetSession, setEditSheetSession] = React.useState(0);
-  const previousPageIconRef = React.useRef<ArrowLeftIconHandle>(null);
-  const nextPageIconRef = React.useRef<ArrowRightIconHandle>(null);
+  const searchIconRef = React.useRef<SearchIconHandle | null>(null);
+  const clearFilterIconRef = React.useRef<XIconHandle | null>(null);
+  const previousPageIconRef = React.useRef<ChevronLeftIconHandle>(null);
+  const nextPageIconRef = React.useRef<ChevronRightIconHandle>(null);
+  const page = React.useMemo(() => {
+    const parsed = Number(pageParam);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return 1;
+    }
+    return parsed;
+  }, [pageParam]);
+
+  React.useEffect(() => {
+    setSearchInputValue(addressSearchValue);
+  }, [addressSearchValue]);
+
+  React.useEffect(() => {
+    const normalizedDraft = searchInputValue.trim();
+    const nextSearchValue = normalizedDraft.length >= 2 ? normalizedDraft : "";
+
+    if (nextSearchValue === addressSearchValue) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void Promise.all([
+        setAddressSearchValue(nextSearchValue),
+        setPageParam("1"),
+      ]);
+    }, ADDRESS_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    addressSearchValue,
+    searchInputValue,
+    setAddressSearchValue,
+    setPageParam,
+  ]);
 
   const addressesQuery = useAddressesQuery({
     page,
     pageSize: PAGE_SIZE,
+    search: addressSearchValue,
     sortBy,
     sortDirection,
   });
 
   const handleSort = (column: EmailAddressSortBy) => {
-    setPage(1);
+    void setPageParam("1");
     if (sortBy !== column) {
       setSortBy(column);
       setSortDirection("asc");
@@ -401,6 +610,52 @@ export const AddressList = ({ domains }: AddressListProps) => {
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
+  const editingAddressId = params.addressId ?? null;
+  const preservedSearch = React.useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+
+    if (pageParam && pageParam !== "1") {
+      searchParams.set("page", pageParam);
+    } else {
+      searchParams.delete("page");
+    }
+
+    if (addressSearchValue) {
+      searchParams.set("addressesFilter", addressSearchValue);
+    } else {
+      searchParams.delete("addressesFilter");
+    }
+
+    const nextSearch = searchParams.toString();
+    return nextSearch ? `?${nextSearch}` : "";
+  }, [addressSearchValue, location.search, pageParam]);
+
+  const addresses = React.useMemo(
+    () => addressesQuery.data?.items ?? [],
+    [addressesQuery.data?.items]
+  );
+  const editingAddressFromPage = React.useMemo(
+    () =>
+      editingAddressId
+        ? (addresses.find(address => address.id === editingAddressId) ?? null)
+        : null,
+    [addresses, editingAddressId]
+  );
+  const editingAddressQuery = useAddressQuery(editingAddressId, {
+    initialData: editingAddressFromPage ?? undefined,
+  });
+  const editingAddress = editingAddressQuery.data ?? editingAddressFromPage;
+
+  const navigateToAddressList = React.useCallback(() => {
+    void navigate(
+      {
+        pathname: "/addresses",
+        search: preservedSearch,
+      },
+      { replace: true }
+    );
+  }, [navigate, preservedSearch]);
+
   const handleConfirmDelete = async () => {
     if (!pendingDeleteAddress) return;
 
@@ -415,9 +670,8 @@ export const AddressList = ({ domains }: AddressListProps) => {
 
     try {
       await deleteAddressToast.unwrap();
-      if (editingAddress?.id === pendingDeleteAddress.id) {
-        setIsEditSheetOpen(false);
-        setEditingAddress(null);
+      if (editingAddressId === pendingDeleteAddress.id) {
+        navigateToAddressList();
       }
       setPendingDeleteAddress(null);
     } catch {
@@ -425,47 +679,98 @@ export const AddressList = ({ domains }: AddressListProps) => {
     }
   };
 
-  const handleEditSheetOpenChange = (isOpen: boolean) => {
-    setIsEditSheetOpen(isOpen);
-  };
+  const handleEditAddress = React.useCallback(
+    (address: EmailAddress) => {
+      void navigate({
+        pathname: `/addresses/edit/${encodeURIComponent(address.id)}`,
+        search: preservedSearch,
+      });
+    },
+    [navigate, preservedSearch]
+  );
 
-  const handleEditAddress = React.useCallback((address: EmailAddress) => {
-    setEditSheetSession(previous => previous + 1);
-    setEditingAddress(address);
-    setIsEditSheetOpen(true);
-  }, []);
+  const handleEditSheetOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) return;
+      navigateToAddressList();
+    },
+    [navigateToAddressList]
+  );
 
   const handleDeleteAddress = React.useCallback((address: EmailAddress) => {
     setPendingDeleteAddress(address);
   }, []);
-
-  const addresses = addressesQuery.data?.items ?? [];
   const isTableLoading = addressesQuery.isLoading;
   const currentPage = addressesQuery.data?.page ?? page;
   const totalItems = addressesQuery.data?.totalItems ?? 0;
   const addressLimit =
     addressesQuery.data?.addressLimit ?? ADDRESS_LIMIT_FALLBACK;
   const totalPages = addressesQuery.data?.totalPages ?? 1;
-  const isTotalLoading = !addressesQuery.data && addressesQuery.isLoading;
-  const showEmptyState = !isTableLoading && addresses.length === 0;
-  const nowDayKey = React.useMemo(
-    () => getDayKey(new Date(), effectiveTimeZone),
-    [effectiveTimeZone]
+  const paginationPages = Array.from(
+    { length: Math.max(1, totalPages) },
+    (_, index) => index + 1
   );
+  const isTotalLoading = !addressesQuery.data && addressesQuery.isLoading;
+  const isFetching = addressesQuery.isFetching;
+  const isPaginationDisabled = isTableLoading || isFetching;
+  const isPageTransitioning = isFetching && !isTableLoading;
+  const showEmptyState =
+    !isTableLoading && addresses.length === 0 && !addressSearchValue;
 
   return (
     <Card className="border-border/70 bg-card/60">
       <CardHeader className="flex flex-col gap-2 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-lg">Addresses</CardTitle>
-        <div className="flex items-center gap-2 self-start text-sm text-muted-foreground sm:self-auto">
-          <span>Total</span>
-          {isTotalLoading ? (
-            <Skeleton className="h-5 w-14 rounded-md" />
-          ) : (
-            <Badge variant="secondary" className="font-mono text-xs">
-              {totalItems}/{addressLimit}
-            </Badge>
-          )}
+        <CardTitle className="text-[15px]">Addresses</CardTitle>
+        <div className="relative w-52 sm:ml-auto sm:max-w-xs">
+          <SearchIcon
+            ref={searchIconRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+            size={14}
+          />
+          <Input
+            value={searchInputValue}
+            onBlur={() => {
+              searchIconRef.current?.stopAnimation();
+            }}
+            onChange={event => {
+              setSearchInputValue(event.target.value);
+            }}
+            onFocus={() => {
+              searchIconRef.current?.startAnimation();
+            }}
+            className={cn(
+              "w-full pl-8",
+              searchInputValue && "pr-8",
+              searchInputValue &&
+                "border-primary/50 bg-muted/40 ring-1 ring-primary/25"
+            )}
+            placeholder="Search by address..."
+          />
+          {searchInputValue ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
+              aria-label="Clear address filter"
+              onClick={() => {
+                setSearchInputValue("");
+                void Promise.all([
+                  setAddressSearchValue(""),
+                  setPageParam("1"),
+                ]);
+              }}
+              onMouseEnter={() => {
+                clearFilterIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                clearFilterIconRef.current?.stopAnimation();
+              }}
+            >
+              <XIcon ref={clearFilterIconRef} aria-hidden="true" size={14} />
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -475,53 +780,58 @@ export const AddressList = ({ domains }: AddressListProps) => {
           </p>
         ) : (
           <TooltipProvider delay={120}>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={isTableLoading}
-                      onClick={() => handleSort("address")}
-                      className="-ml-2"
-                    >
-                      Address {sortLabel("address")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Tag</TableHead>
-                  <TableHead>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={isTableLoading}
-                      onClick={() => handleSort("createdAt")}
-                      className="-ml-2"
-                    >
-                      Created {sortLabel("createdAt")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={isTableLoading}
-                      onClick={() => handleSort("lastReceivedAt")}
-                      className="-ml-2"
-                    >
-                      Last Received {sortLabel("lastReceivedAt")}
-                    </Button>
-                  </TableHead>
-                  <TableHead>Allowed Senders</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isTableLoading
-                  ? Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
+            <div
+              className={cn(
+                "overflow-hidden rounded-lg border border-border/70 transition-opacity",
+                isPageTransitioning && "opacity-75"
+              )}
+            >
+              <Table className="min-w-[760px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isTableLoading}
+                        onClick={() => handleSort("address")}
+                        className="-ml-2"
+                      >
+                        Address {sortLabel("address")}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isTableLoading}
+                        onClick={() => handleSort("createdAt")}
+                        className="-ml-2"
+                      >
+                        Created {sortLabel("createdAt")}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isTableLoading}
+                        onClick={() => handleSort("lastReceivedAt")}
+                        className="-ml-2"
+                      >
+                        Last Received {sortLabel("lastReceivedAt")}
+                      </Button>
+                    </TableHead>
+                    <TableHead>Allowed Senders</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isTableLoading ? (
+                    Array.from({ length: LOADING_SKELETON_ROW_COUNT }).map(
                       (_, index) => (
                         <TableRow key={`address-table-skeleton-row-${index}`}>
                           <TableCell className="max-w-38 truncate font-medium">
@@ -535,9 +845,6 @@ export const AddressList = ({ domains }: AddressListProps) => {
                               </span>
                               <Skeleton className="h-4 w-36 rounded-sm" />
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Skeleton className="h-5 w-12 rounded-sm" />
                           </TableCell>
                           <TableCell>
                             <Skeleton className="h-4 w-28 rounded-sm" />
@@ -571,83 +878,159 @@ export const AddressList = ({ domains }: AddressListProps) => {
                         </TableRow>
                       )
                     )
-                  : addresses.map(address => (
+                  ) : addresses.length > 0 ? (
+                    addresses.map(address => (
                       <AddressTableRow
                         key={address.id}
                         address={address}
                         timeZone={effectiveTimeZone}
-                        nowDayKey={nowDayKey}
                         isDeletePending={deleteMutation.isPending}
                         onEdit={handleEditAddress}
                         onDelete={handleDeleteAddress}
                       />
-                    ))}
-              </TableBody>
-            </Table>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        className="h-20 text-center text-muted-foreground"
+                        colSpan={5}
+                      >
+                        <div className="flex flex-col items-center gap-2">
+                          <p>
+                            No addresses match{" "}
+                            <span className="font-medium text-foreground">
+                              "{addressSearchValue}"
+                            </span>
+                            .
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setSearchInputValue("");
+                              void Promise.all([
+                                setAddressSearchValue(""),
+                                setPageParam("1"),
+                              ]);
+                            }}
+                          >
+                            Clear filter
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </TooltipProvider>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
-          <p className="text-sm text-muted-foreground">
-            {addressesQuery.isLoading
-              ? "Loading addresses..."
-              : `Page ${currentPage} of ${totalPages} · ${totalItems} total`}
+        <div className="grid gap-2 pt-1 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+          <p
+            aria-live="polite"
+            className={cn(
+              "text-center text-xs sm:text-left",
+              addressesQuery.error
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}
+          >
+            {addressesQuery.error
+              ? addressesQuery.error.message
+              : isTableLoading
+                ? "Loading addresses..."
+                : isPageTransitioning
+                  ? `Updating page ${currentPage}...`
+                  : `Showing ${addresses.length} of ${totalItems}`}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
+              aria-label="Go to previous page"
               type="button"
               variant="outline"
-              size="sm"
-              disabled={isTableLoading || currentPage <= 1}
               className="cursor-pointer"
+              size="icon-sm"
+              disabled={
+                !currentPage || currentPage <= 1 || isPaginationDisabled
+              }
               onMouseEnter={() => {
                 previousPageIconRef.current?.startAnimation();
               }}
               onMouseLeave={() => {
                 previousPageIconRef.current?.stopAnimation();
               }}
-              onClick={() => setPage(previous => Math.max(1, previous - 1))}
+              onClick={() => {
+                void setPageParam(String(Math.max(1, page - 1)));
+              }}
             >
-              <ArrowLeftIcon
+              <ChevronLeftIcon
                 ref={previousPageIconRef}
-                className="cursor-pointer"
                 size={16}
                 aria-hidden="true"
               />
-              Previous
+              <span className="sr-only">Previous</span>
             </Button>
+            {paginationPages.map(paginationPage => (
+              <Button
+                key={`addresses-page-${paginationPage}`}
+                aria-current={
+                  paginationPage === currentPage ? "page" : undefined
+                }
+                className="min-w-7 cursor-pointer px-2"
+                disabled={
+                  isPaginationDisabled || paginationPage === currentPage
+                }
+                onClick={() => {
+                  void setPageParam(String(paginationPage));
+                }}
+                size="sm"
+                type="button"
+                variant={
+                  paginationPage === currentPage ? "secondary" : "outline"
+                }
+              >
+                {paginationPage}
+              </Button>
+            ))}
             <Button
+              aria-label="Go to next page"
               type="button"
               variant="outline"
-              size="sm"
-              disabled={isTableLoading || currentPage >= totalPages}
               className="cursor-pointer"
+              size="icon-sm"
+              disabled={currentPage >= totalPages || isPaginationDisabled}
               onMouseEnter={() => {
                 nextPageIconRef.current?.startAnimation();
               }}
               onMouseLeave={() => {
                 nextPageIconRef.current?.stopAnimation();
               }}
-              onClick={() =>
-                setPage(previous => Math.min(totalPages, previous + 1))
-              }
+              onClick={() => {
+                void setPageParam(String(Math.min(totalPages, page + 1)));
+              }}
             >
-              Next
-              <ArrowRightIcon
+              <ChevronRightIcon
                 ref={nextPageIconRef}
-                className="cursor-pointer"
                 size={16}
                 aria-hidden="true"
               />
+              <span className="sr-only">Next</span>
             </Button>
+            {isPageTransitioning ? <UpdatingIndicator /> : null}
+          </div>
+          <div className="flex justify-center sm:justify-end">
+            {isTotalLoading ? (
+              <Skeleton className="h-5 w-14 rounded-md" />
+            ) : (
+              <Badge variant="secondary" className="font-mono text-xs">
+                {totalItems}/{addressLimit}
+              </Badge>
+            )}
           </div>
         </div>
-
-        {addressesQuery.error ? (
-          <p className="text-sm text-destructive">
-            {addressesQuery.error.message}
-          </p>
-        ) : null}
       </CardContent>
 
       <AlertDialog
@@ -664,8 +1047,8 @@ export const AddressList = ({ domains }: AddressListProps) => {
               {pendingDeleteAddress ? (
                 <>
                   This will permanently delete{" "}
-                  <b>{pendingDeleteAddress.address}</b>, all received mails, and
-                  all attachments.
+                  <b className="break-all">{pendingDeleteAddress.address}</b>,
+                  all received mails, and all attachments.
                 </>
               ) : (
                 "This action cannot be undone."
@@ -691,12 +1074,17 @@ export const AddressList = ({ domains }: AddressListProps) => {
       </AlertDialog>
 
       <EditAddressSheet
-        key={`${editingAddress?.id ?? "edit-address-sheet"}:${editSheetSession}`}
         address={editingAddress}
         domains={domains}
-        open={isEditSheetOpen}
+        open={Boolean(editingAddressId)}
         onOpenChange={handleEditSheetOpenChange}
       />
     </Card>
   );
 };
+
+export const AddressList = ({ domains }: AddressListProps) => (
+  <NuqsAdapter>
+    <AddressListContent domains={domains} />
+  </NuqsAdapter>
+);

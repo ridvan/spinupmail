@@ -160,6 +160,13 @@ const routes: RouteObject[] = [
         path: "addresses",
         element: <AddressManagementPage />,
         handle: { title: "Address Management" },
+        children: [
+          {
+            path: "edit/:addressId",
+            element: null,
+            handle: { title: "Address Management" },
+          },
+        ],
       },
       {
         path: "settings",

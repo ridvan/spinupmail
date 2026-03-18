@@ -1,4 +1,6 @@
 import { useForm } from "@tanstack/react-form";
+import { ShuffleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { z } from "zod";
 import { Link } from "react-router";
 import { useMemo, useRef } from "react";
@@ -14,6 +16,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { PlusIcon, type PlusIconHandle } from "@/components/ui/plus";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +37,6 @@ import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
   ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
-  ADDRESS_TAG_MAX_LENGTH,
   ADDRESS_TTL_MAX_MINUTES,
   ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ALLOWED_FROM_DOMAINS_MAX_ITEMS,
@@ -46,6 +53,71 @@ import { cn } from "@/lib/utils";
 type CreateAddressFormProps = {
   domains: string[];
   isDomainsLoading?: boolean;
+};
+
+const RANDOM_LOCAL_PART_PRIMARY_WORDS = [
+  "reply",
+  "relay",
+  "route",
+  "inbox",
+  "sender",
+  "signal",
+  "thread",
+  "parcel",
+  "letter",
+  "dispatch",
+  "courier",
+  "post",
+  "mail",
+  "note",
+  "drop",
+  "queue",
+];
+
+const RANDOM_LOCAL_PART_SECONDARY_WORDS = [
+  "desk",
+  "dock",
+  "hub",
+  "lane",
+  "port",
+  "box",
+  "bridge",
+  "flow",
+  "grid",
+  "line",
+  "pulse",
+  "stack",
+  "beam",
+  "gate",
+  "point",
+  "room",
+];
+
+const getRandomItem = <Item,>(items: Item[]) =>
+  items[Math.floor(Math.random() * items.length)];
+
+const generateRandomSuffix = () =>
+  Math.floor(Math.random() * (36 * 36))
+    .toString(36)
+    .padStart(2, "0");
+
+const buildRandomLocalPart = () =>
+  `${getRandomItem(RANDOM_LOCAL_PART_PRIMARY_WORDS)}-${getRandomItem(RANDOM_LOCAL_PART_SECONDARY_WORDS)}-${generateRandomSuffix()}`;
+
+const generateRandomLocalPart = (currentValue = "") => {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const candidate = buildRandomLocalPart();
+    if (
+      candidate !== currentValue &&
+      candidate.length <= ADDRESS_LOCAL_PART_MAX_LENGTH &&
+      addressPartRegex.test(candidate) &&
+      !hasReservedLocalPartKeyword(candidate)
+    ) {
+      return candidate;
+    }
+  }
+
+  return "relay-desk-x1";
 };
 
 const createAddressSchema = (availableDomains: string[]) =>
@@ -82,12 +154,6 @@ const createAddressSchema = (availableDomains: string[]) =>
         value => availableDomains.includes(normalizeDomainToken(value)),
         "Select one of the available domains"
       ),
-    tag: z
-      .string()
-      .trim()
-      .max(ADDRESS_TAG_MAX_LENGTH, {
-        message: `Tag must be ${ADDRESS_TAG_MAX_LENGTH} characters or fewer`,
-      }),
     allowedFromDomains: z
       .array(z.string().trim())
       .max(ALLOWED_FROM_DOMAINS_MAX_ITEMS, {
@@ -142,7 +208,6 @@ export const CreateAddressForm = ({
       localPart: "",
       ttlMinutes: undefined as number | undefined,
       domain: domains[0] ?? "",
-      tag: "",
       allowedFromDomains: [] as string[],
       maxReceivedEmailCount: undefined as number | undefined,
       maxReceivedEmailAction: "cleanAll" as "cleanAll" | "rejectNew",
@@ -159,7 +224,6 @@ export const CreateAddressForm = ({
           localPart: value.localPart.trim(),
           ttlMinutes: value.ttlMinutes,
           domain: selectedDomain,
-          tag: value.tag.trim() || undefined,
           allowedFromDomains:
             allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
           maxReceivedEmailCount: value.maxReceivedEmailCount,
@@ -196,7 +260,6 @@ export const CreateAddressForm = ({
         ...form.state.values,
         localPart: "",
         ttlMinutes: undefined,
-        tag: "",
         allowedFromDomains: [],
         maxReceivedEmailCount: undefined,
         maxReceivedEmailAction: "cleanAll",
@@ -207,11 +270,7 @@ export const CreateAddressForm = ({
   return (
     <Card className="border-border/70 bg-card/60">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <CardTitle className="text-lg">Create Address</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Enter the address prefix, choose TTL and domain, and optionally limit
-          accepted sender domains and inbox size.
-        </p>
+        <CardTitle className="text-[15px]">Create Email Address</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -226,7 +285,7 @@ export const CreateAddressForm = ({
           <FieldGroup>
             <div className="grid gap-4 xl:grid-cols-[minmax(0,50%)_minmax(0,50%)]">
               <div className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,0.85fr)] md:items-start">
                   <form.Field
                     name="localPart"
                     children={field => {
@@ -238,18 +297,43 @@ export const CreateAddressForm = ({
                           <FieldLabel htmlFor="address-local-part">
                             Address prefix
                           </FieldLabel>
-                          <Input
-                            id="address-local-part"
-                            name={field.name}
-                            value={field.state.value}
-                            maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
-                            onBlur={field.handleBlur}
-                            onChange={event =>
-                              field.handleChange(event.target.value)
-                            }
-                            placeholder="support"
-                            aria-invalid={isInvalid}
-                          />
+                          <InputGroup>
+                            <InputGroupInput
+                              id="address-local-part"
+                              name={field.name}
+                              value={field.state.value}
+                              maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
+                              onBlur={field.handleBlur}
+                              onChange={event =>
+                                field.handleChange(event.target.value)
+                              }
+                              placeholder="support"
+                              aria-invalid={isInvalid}
+                            />
+                            <InputGroupAddon align="inline-end">
+                              <InputGroupButton
+                                variant="outline"
+                                size="xs"
+                                className="cursor-pointer border-none bg-transparent! uppercase tracking-[0.08em]"
+                                aria-label="Generate random address prefix"
+                                title="Generate random address prefix"
+                                onClick={() =>
+                                  field.handleChange(
+                                    generateRandomLocalPart(field.state.value)
+                                  )
+                                }
+                              >
+                                <HugeiconsIcon
+                                  icon={ShuffleIcon}
+                                  strokeWidth={1.8}
+                                  className="size-3.5"
+                                />
+                                <span className="text-[10px] font-semibold">
+                                  RANDOM
+                                </span>
+                              </InputGroupButton>
+                            </InputGroupAddon>
+                          </InputGroup>
                           {isInvalid ? (
                             <FieldError
                               errors={toFieldErrors(field.state.meta.errors)}
@@ -259,6 +343,16 @@ export const CreateAddressForm = ({
                       );
                     }}
                   />
+
+                  <div
+                    aria-hidden="true"
+                    className="hidden md:flex md:flex-col"
+                  >
+                    <div className="h-3.5" />
+                    <span className="mt-3.5 inline-flex h-8 items-center justify-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm font-semibold text-muted-foreground">
+                      @
+                    </span>
+                  </div>
 
                   <form.Field
                     name="domain"
@@ -333,7 +427,9 @@ export const CreateAddressForm = ({
                       );
                     }}
                   />
+                </div>
 
+                <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                   <form.Field
                     name="ttlMinutes"
                     children={field => {
@@ -360,7 +456,7 @@ export const CreateAddressForm = ({
                                 value === "" ? undefined : Number(value)
                               );
                             }}
-                            placeholder="Leave empty for no expiration"
+                            placeholder="0"
                             aria-invalid={isInvalid}
                           />
                           {isInvalid ? (
@@ -374,25 +470,23 @@ export const CreateAddressForm = ({
                   />
 
                   <form.Field
-                    name="tag"
+                    name="allowedFromDomains"
                     children={field => {
                       const isInvalid =
                         field.state.meta.isTouched && !field.state.meta.isValid;
 
                       return (
                         <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor="address-tag">Tag</FieldLabel>
-                          <Input
-                            id="address-tag"
-                            name={field.name}
+                          <FieldLabel htmlFor="address-allowed-from-domains">
+                            Allowed sender domains
+                          </FieldLabel>
+                          <DomainTagsInput
+                            id="address-allowed-from-domains"
                             value={field.state.value}
-                            maxLength={ADDRESS_TAG_MAX_LENGTH}
+                            onChange={field.handleChange}
                             onBlur={field.handleBlur}
-                            onChange={event =>
-                              field.handleChange(event.target.value)
-                            }
-                            placeholder="e.g., test-automation"
-                            aria-invalid={isInvalid}
+                            isInvalid={isInvalid}
+                            placeholder="gmail.com (accept only from Gmail)"
                           />
                           {isInvalid ? (
                             <FieldError
@@ -406,39 +500,6 @@ export const CreateAddressForm = ({
                 </div>
 
                 <form.Field
-                  name="allowedFromDomains"
-                  children={field => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
-
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor="address-allowed-from-domains">
-                          Allowed sender domains
-                        </FieldLabel>
-                        <DomainTagsInput
-                          id="address-allowed-from-domains"
-                          value={field.state.value}
-                          onChange={field.handleChange}
-                          onBlur={field.handleBlur}
-                          isInvalid={isInvalid}
-                          placeholder="Optional. e.g., gmail.com (accept only from Gmail)"
-                        />
-                        <FieldDescription>
-                          Only emails from these domains will be accepted. Leave
-                          empty to accept emails from any domain.
-                        </FieldDescription>
-                        {isInvalid ? (
-                          <FieldError
-                            errors={toFieldErrors(field.state.meta.errors)}
-                          />
-                        ) : null}
-                      </Field>
-                    );
-                  }}
-                />
-
-                <form.Field
                   name="acceptedRiskNotice"
                   children={field => {
                     const isInvalid =
@@ -446,37 +507,59 @@ export const CreateAddressForm = ({
 
                     return (
                       <Field data-invalid={isInvalid}>
-                        <label className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <Checkbox
-                            checked={field.state.value}
-                            className="mt-0.5 cursor-pointer"
-                            id="address-legal-acknowledgement"
-                            name={field.name}
-                            onBlur={field.handleBlur}
-                            onCheckedChange={checked =>
-                              field.handleChange(checked)
-                            }
-                            aria-invalid={isInvalid}
-                          />
-                          <span>
-                            I agree to the{" "}
-                            <Link
-                              className="underline underline-offset-4"
-                              target="_blank"
-                              to="/terms"
-                            >
-                              Terms of Service
-                            </Link>{" "}
-                            and{" "}
-                            <Link
-                              className="underline underline-offset-4"
-                              target="_blank"
-                              to="/privacy"
-                            >
-                              Privacy Policy
-                            </Link>
-                          </span>
-                        </label>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                            <Checkbox
+                              checked={field.state.value}
+                              className="cursor-pointer"
+                              id="address-legal-acknowledgement"
+                              name={field.name}
+                              onBlur={field.handleBlur}
+                              onCheckedChange={checked =>
+                                field.handleChange(checked)
+                              }
+                              aria-invalid={isInvalid}
+                            />
+                            <span>
+                              I agree to the{" "}
+                              <Link
+                                className="underline underline-offset-4"
+                                target="_blank"
+                                to="/terms"
+                              >
+                                Terms
+                              </Link>{" "}
+                              and{" "}
+                              <Link
+                                className="underline underline-offset-4"
+                                target="_blank"
+                                to="/privacy"
+                              >
+                                Privacy Policy
+                              </Link>
+                            </span>
+                          </label>
+                          <Button
+                            disabled={createMutation.isPending}
+                            type="submit"
+                            className="w-fit cursor-pointer self-center"
+                            onMouseEnter={() => {
+                              plusIconRef.current?.startAnimation();
+                            }}
+                            onMouseLeave={() => {
+                              plusIconRef.current?.stopAnimation();
+                            }}
+                          >
+                            <PlusIcon
+                              ref={plusIconRef}
+                              size={16}
+                              aria-hidden="true"
+                            />
+                            {createMutation.isPending
+                              ? "Creating..."
+                              : "Create address"}
+                          </Button>
+                        </div>
                         {isInvalid ? (
                           <FieldError
                             errors={toFieldErrors(field.state.meta.errors)}
@@ -486,21 +569,6 @@ export const CreateAddressForm = ({
                     );
                   }}
                 />
-
-                <Button
-                  disabled={createMutation.isPending}
-                  type="submit"
-                  className="w-fit cursor-pointer"
-                  onMouseEnter={() => {
-                    plusIconRef.current?.startAnimation();
-                  }}
-                  onMouseLeave={() => {
-                    plusIconRef.current?.stopAnimation();
-                  }}
-                >
-                  <PlusIcon ref={plusIconRef} size={16} aria-hidden="true" />
-                  {createMutation.isPending ? "Creating..." : "Create address"}
-                </Button>
               </div>
 
               <form.Subscribe
@@ -511,33 +579,32 @@ export const CreateAddressForm = ({
                 {isLimitEnabled => (
                   <div
                     className={cn(
-                      "self-start rounded-xl border p-3 md:p-4",
+                      "self-start rounded-lg border p-3",
                       isLimitEnabled
-                        ? "border-border bg-muted/45"
-                        : "border-border/70 bg-muted/25"
+                        ? "border-border bg-muted/35"
+                        : "border-border/70 bg-muted/20"
                     )}
                   >
-                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-medium">Inbox Limits</p>
-                        <p className="text-xs text-muted-foreground">
-                          Choose the action taken when the inbox limit is
-                          reached.
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">Inbox limit</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Empty = unlimited.
                         </p>
                       </div>
                       <span
                         className={cn(
-                          "rounded-full border px-2 py-1 text-[11px] font-medium",
+                          "rounded-full border px-2 py-0.5 text-[11px] font-medium",
                           isLimitEnabled
                             ? "border-foreground/20 bg-background/70 text-foreground"
                             : "border-border/80 text-muted-foreground"
                         )}
                       >
-                        {isLimitEnabled ? "Limit Enabled" : "Unlimited"}
+                        {isLimitEnabled ? "Enabled" : "Unlimited"}
                       </span>
                     </div>
 
-                    <div className="grid gap-3">
+                    <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] md:items-start">
                       <form.Field
                         name="maxReceivedEmailCount"
                         children={field => {
@@ -548,7 +615,7 @@ export const CreateAddressForm = ({
                           return (
                             <Field data-invalid={isInvalid}>
                               <FieldLabel htmlFor="address-max-received-email-count">
-                                Max received emails count
+                                Max emails
                               </FieldLabel>
                               <Input
                                 id="address-max-received-email-count"
@@ -565,7 +632,8 @@ export const CreateAddressForm = ({
                                     value === "" ? undefined : Number(value)
                                   );
                                 }}
-                                placeholder="Leave empty for unlimited"
+                                placeholder="Unlimited"
+                                className="h-9"
                                 aria-invalid={isInvalid}
                               />
                               {isInvalid ? (
@@ -589,11 +657,11 @@ export const CreateAddressForm = ({
 
                           return (
                             <Field data-invalid={isInvalid}>
-                              <FieldLabel>When max is reached</FieldLabel>
+                              <FieldLabel>On limit</FieldLabel>
                               <RadioGroup
                                 value={field.state.value}
                                 disabled={!isLimitEnabled}
-                                className="gap-2"
+                                className="grid gap-2 sm:grid-cols-2"
                                 onValueChange={value =>
                                   field.handleChange(
                                     (value ?? "cleanAll") as
@@ -607,7 +675,7 @@ export const CreateAddressForm = ({
                                 <label
                                   htmlFor="address-max-received-action-clean-all"
                                   className={cn(
-                                    "flex items-start gap-3 rounded-md border border-border/80 bg-background/70 px-3 py-2 transition-colors",
+                                    "flex min-h-9 items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors",
                                     isLimitEnabled
                                       ? "cursor-pointer hover:bg-background"
                                       : "cursor-not-allowed opacity-60"
@@ -617,20 +685,14 @@ export const CreateAddressForm = ({
                                     id="address-max-received-action-clean-all"
                                     value="cleanAll"
                                   />
-                                  <span className="space-y-0.5">
-                                    <span className="block text-sm font-medium">
-                                      Clean all (recommended)
-                                    </span>
-                                    <span className="block text-xs text-muted-foreground">
-                                      Clear previous emails, then accept new
-                                      ones.
-                                    </span>
+                                  <span className="font-medium">
+                                    Delete all
                                   </span>
                                 </label>
                                 <label
                                   htmlFor="address-max-received-action-reject-new"
                                   className={cn(
-                                    "flex items-start gap-3 rounded-md border border-border/80 bg-background/70 px-3 py-2 transition-colors",
+                                    "flex min-h-9 items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors",
                                     isLimitEnabled
                                       ? "cursor-pointer hover:bg-background"
                                       : "cursor-not-allowed opacity-60"
@@ -640,13 +702,8 @@ export const CreateAddressForm = ({
                                     id="address-max-received-action-reject-new"
                                     value="rejectNew"
                                   />
-                                  <span className="space-y-0.5">
-                                    <span className="block text-sm font-medium">
-                                      Reject new emails
-                                    </span>
-                                    <span className="block text-xs text-muted-foreground">
-                                      Keep existing emails and reject incoming.
-                                    </span>
+                                  <span className="font-medium">
+                                    Reject new
                                   </span>
                                 </label>
                               </RadioGroup>

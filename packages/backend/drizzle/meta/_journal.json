@@ -22,6 +22,13 @@
       "when": 1773525710088,
       "tag": "0002_emails_search_index",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1773580187805,
+      "tag": "0003_needy_venus",
+      "breakpoints": true
     }
   ]
 }

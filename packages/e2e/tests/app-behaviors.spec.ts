@@ -39,7 +39,7 @@ test.describe("spinupmail app behaviors", () => {
 
     await navButton(page, "Addresses").click();
     await expect(page).toHaveURL("http://127.0.0.1:5173/addresses");
-    await expect(cardTitle(page, "Create Address")).toBeVisible();
+    await expect(cardTitle(page, "Create Email Address")).toBeVisible();
 
     await navButton(page, "Settings").click();
     await expect(page).toHaveURL("http://127.0.0.1:5173/settings");
@@ -67,7 +67,7 @@ test.describe("spinupmail app behaviors", () => {
     const localPart = `e2e-address-${Date.now()}`;
 
     await page.goto("/addresses");
-    await page.getByLabel("Address prefix").fill(localPart);
+    await page.getByRole("textbox", { name: "Address prefix" }).fill(localPart);
     await page.getByRole("combobox", { name: "Domain" }).click();
     await page.getByRole("option").first().click();
     await page.getByRole("checkbox").first().click();

@@ -7,7 +7,6 @@ const addressListSelect = {
   address: emailAddresses.address,
   localPart: emailAddresses.localPart,
   domain: emailAddresses.domain,
-  tag: emailAddresses.tag,
   meta: emailAddresses.meta,
   createdAt: emailAddresses.createdAt,
   expiresAt: emailAddresses.expiresAt,
@@ -22,6 +21,7 @@ export const listAddressesByOrganization = ({
   organizationId,
   page,
   pageSize,
+  search,
   sortBy,
   sortDirection,
 }: {
@@ -29,6 +29,7 @@ export const listAddressesByOrganization = ({
   organizationId: string;
   page: number;
   pageSize: number;
+  search?: string;
   sortBy: AddressListSortBy;
   sortDirection: AddressListSortDirection;
 }) => {
@@ -57,24 +58,38 @@ export const listAddressesByOrganization = ({
       : sortBy === "lastReceivedAt"
         ? order.recentActivity
         : order.createdAt;
+  const whereClause = buildRecentAddressActivityBaseWhereClause({
+    organizationId,
+    search,
+  });
 
   return db
     .select(addressListSelect)
     .from(emailAddresses)
-    .where(eq(emailAddresses.organizationId, organizationId))
+    .where(whereClause)
     .orderBy(primaryOrder, order.id)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 };
 
-export const countAddressesByOrganization = (
-  db: AppDb,
-  organizationId: string
-) =>
+export const countAddressesByOrganization = ({
+  db,
+  organizationId,
+  search,
+}: {
+  db: AppDb;
+  organizationId: string;
+  search?: string;
+}) =>
   db
     .select({ count: sql<number>`count(*)` })
     .from(emailAddresses)
-    .where(eq(emailAddresses.organizationId, organizationId))
+    .where(
+      buildRecentAddressActivityBaseWhereClause({
+        organizationId,
+        search,
+      })
+    )
     .get();
 
 export type RecentAddressActivityCursor = {
@@ -207,7 +222,6 @@ export const insertAddress = (
     address: string;
     localPart: string;
     domain: string;
-    tag?: string;
     meta?: string;
     expiresAt?: Date;
   },
@@ -223,7 +237,6 @@ export const insertAddress = (
         address,
         local_part,
         domain,
-        tag,
         meta,
         expires_at,
         auto_created
@@ -235,7 +248,6 @@ export const insertAddress = (
         ${values.address},
         ${values.localPart},
         ${values.domain},
-        ${values.tag ?? null},
         ${values.meta ?? null},
         ${values.expiresAt ? values.expiresAt.getTime() : null},
         ${0}
@@ -261,7 +273,6 @@ export const updateAddressByIdAndOrganization = ({
     address: string;
     localPart: string;
     domain: string;
-    tag: string | null;
     meta: string | null;
     expiresAt: Date | null;
   };

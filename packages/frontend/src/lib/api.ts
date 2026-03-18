@@ -83,7 +83,6 @@ export type EmailAddress = {
   address: string;
   localPart: string;
   domain: string;
-  tag?: string | null;
   meta?: unknown;
   allowedFromDomains?: string[];
   maxReceivedEmailCount: number | null;
@@ -177,6 +176,7 @@ export type OrganizationStatsItem = {
 export const listEmailAddresses = async (options?: {
   page?: number;
   pageSize?: number;
+  search?: string;
   sortBy?: EmailAddressSortBy;
   sortDirection?: SortDirection;
   signal?: AbortSignal;
@@ -185,12 +185,29 @@ export const listEmailAddresses = async (options?: {
   const query = new URLSearchParams();
   if (options?.page) query.set("page", String(options.page));
   if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.search) query.set("search", options.search);
   if (options?.sortBy) query.set("sortBy", options.sortBy);
   if (options?.sortDirection) query.set("sortDirection", options.sortDirection);
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
 
   return apiFetch<EmailAddressListResponse>(
     `/api/email-addresses${suffix}`,
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  );
+};
+
+export const getEmailAddress = async (
+  addressId: string,
+  options?: {
+    signal?: AbortSignal;
+    organizationId?: string | null;
+  }
+) => {
+  return apiFetch<EmailAddress>(
+    `/api/email-addresses/${encodeURIComponent(addressId)}`,
     {
       signal: options?.signal,
     },
@@ -350,7 +367,6 @@ export const createEmailAddress = async (
   payload: {
     localPart?: string;
     prefix?: string;
-    tag?: string;
     ttlMinutes?: number;
     meta?: unknown;
     domain?: string;
@@ -388,7 +404,6 @@ export const updateEmailAddress = async (
   addressId: string,
   payload: {
     localPart?: string;
-    tag?: string | null;
     ttlMinutes?: number | null;
     meta?: unknown;
     domain?: string;

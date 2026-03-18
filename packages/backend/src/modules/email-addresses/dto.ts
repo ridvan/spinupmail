@@ -10,7 +10,6 @@ export const toEmailAddressListItem = (row: {
   address: string;
   localPart: string;
   domain: string;
-  tag: string | null;
   meta: string | null;
   createdAt: Date;
   expiresAt: Date | null;
@@ -29,7 +28,6 @@ export const toEmailAddressListItem = (row: {
     address: row.address,
     localPart: row.localPart,
     domain: row.domain,
-    tag: row.tag,
     meta: parsedMeta,
     allowedFromDomains,
     maxReceivedEmailCount,
