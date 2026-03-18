@@ -251,16 +251,17 @@ const EditAddressSheetForm = ({
             children={field => {
               const isInvalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
-              const selectedValue = field.state.value || domains[0] || "";
+              const selectedValue =
+                field.state.value || availableDomains[0] || "";
 
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor="edit-address-domain">Domain</FieldLabel>
-                  {domains.length <= 1 ? (
+                  {availableDomains.length <= 1 ? (
                     <Input
                       id="edit-address-domain"
                       disabled
-                      value={field.state.value || domains[0] || ""}
+                      value={field.state.value || availableDomains[0] || ""}
                       aria-invalid={isInvalid}
                     />
                   ) : (
@@ -278,7 +279,7 @@ const EditAddressSheetForm = ({
                         <SelectValue placeholder="Select domain" />
                       </SelectTrigger>
                       <SelectContent align="start">
-                        {domains.map(domain => (
+                        {availableDomains.map(domain => (
                           <SelectItem key={domain} value={domain}>
                             {domain}
                           </SelectItem>

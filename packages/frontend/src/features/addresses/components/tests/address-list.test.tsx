@@ -23,6 +23,10 @@ const testState = vi.hoisted(() => ({
   navigate: vi.fn(),
 }));
 
+const mediaQueryState = vi.hoisted(() => ({
+  matches: false,
+}));
+
 vi.mock("react-router", () => ({
   Link: ({
     children,
@@ -200,6 +204,7 @@ const buildAddressQueryResult = ({
 describe("AddressList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mediaQueryState.matches = false;
     testState.params = {};
     testState.query = {
       page: "1",
@@ -210,6 +215,18 @@ describe("AddressList", () => {
       pathname: "/addresses",
       search: "",
     };
+
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: mediaQueryState.matches,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })),
+    });
 
     mockedUseTimezone.mockReturnValue({
       effectiveTimeZone: "UTC",
@@ -229,6 +246,15 @@ describe("AddressList", () => {
     expect(
       screen.getByRole("textbox", { name: "Search addresses" })
     ).toBeTruthy();
+  });
+
+  it("keeps the inline open link out of the keyboard order below the sm breakpoint", () => {
+    render(<AddressList domains={["example.com"]} />);
+
+    const openLink = screen.getByText("Open", { selector: "a" });
+
+    expect(openLink.getAttribute("tabindex")).toBe("-1");
+    expect(openLink.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("redirects an out-of-range page to the last valid page instead of showing a no-match state", async () => {
@@ -282,6 +308,17 @@ describe("AddressList", () => {
   it("surfaces an edit-sheet error instead of leaving the sheet on a loading spinner", () => {
     testState.params = { addressId: "missing-address" };
     testState.location.pathname = "/addresses/edit/missing-address";
+    mockedUseAddressesQuery.mockReturnValue(
+      buildAddressesQueryResult({
+        items: [
+          {
+            ...baseAddress,
+            id: "missing-address",
+            address: "stale@example.com",
+          },
+        ],
+      })
+    );
 
     mockedUseAddressQuery.mockReturnValue(
       buildAddressQueryResult({
@@ -294,6 +331,7 @@ describe("AddressList", () => {
 
     expect(screen.getByText("edit-sheet-open:true")).toBeTruthy();
     expect(screen.getByText("edit-sheet-loading:false")).toBeTruthy();
+    expect(screen.getByText("edit-sheet-address:none")).toBeTruthy();
     expect(
       screen.getByText("edit-sheet-error:This address no longer exists.")
     ).toBeTruthy();

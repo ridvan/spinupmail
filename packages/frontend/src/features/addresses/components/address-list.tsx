@@ -296,6 +296,7 @@ const AddressLinkCell = ({
   addressId: string;
 }) => {
   const [didCopyAddress, setDidCopyAddress] = React.useState(false);
+  const [isAtLeastSm, setIsAtLeastSm] = React.useState(false);
   const copyResetTimeoutRef = React.useRef<number | null>(null);
   const copyIconRef = React.useRef<CopyIconHandle | null>(null);
   const openInboxIconRef = React.useRef<ChevronRightIconHandle | null>(null);
@@ -305,6 +306,33 @@ const AddressLinkCell = ({
       if (copyResetTimeoutRef.current !== null) {
         window.clearTimeout(copyResetTimeoutRef.current);
       }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    const syncBreakpoint = () => {
+      setIsAtLeastSm(mediaQuery.matches);
+    };
+
+    syncBreakpoint();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncBreakpoint);
+
+      return () => {
+        mediaQuery.removeEventListener("change", syncBreakpoint);
+      };
+    }
+
+    mediaQuery.addListener(syncBreakpoint);
+
+    return () => {
+      mediaQuery.removeListener(syncBreakpoint);
     };
   }, []);
 
@@ -369,7 +397,9 @@ const AddressLinkCell = ({
             {address}
           </Link>
           <Link
+            aria-hidden={!isAtLeastSm}
             className="mt-px pointer-events-none absolute top-1/2 left-[calc(100%+0.5rem)] inline-flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[11px] text-muted-foreground opacity-0 transition-all duration-150 hover:text-foreground sm:translate-x-1 sm:group-hover/row:pointer-events-auto sm:group-hover/row:translate-x-0 sm:group-hover/row:opacity-100 sm:focus-visible:pointer-events-auto sm:focus-visible:translate-x-0 sm:focus-visible:opacity-100"
+            tabIndex={isAtLeastSm ? undefined : -1}
             to={`/inbox/${encodeURIComponent(addressId)}`}
             onMouseEnter={() => {
               openInboxIconRef.current?.startAnimation();
@@ -679,9 +709,11 @@ const AddressListContent = ({ domains }: AddressListProps) => {
   const editingAddressQuery = useAddressQuery(editingAddressId, {
     initialData: editingAddressFromPage ?? undefined,
   });
-  const editingAddress = editingAddressQuery.data ?? editingAddressFromPage;
+  const editingAddress = editingAddressQuery.isError
+    ? null
+    : (editingAddressQuery.data ?? editingAddressFromPage);
   const editSheetErrorMessage =
-    editingAddressId && editingAddressQuery.isError && !editingAddress
+    editingAddressId && editingAddressQuery.isError
       ? isNotFoundError(editingAddressQuery.error)
         ? "This address no longer exists."
         : toErrorMessage(
@@ -690,7 +722,10 @@ const AddressListContent = ({ domains }: AddressListProps) => {
           )
       : null;
   const isEditSheetLoading = Boolean(
-    editingAddressId && !editingAddress && editingAddressQuery.isPending
+    editingAddressId &&
+    !editSheetErrorMessage &&
+    !editingAddress &&
+    editingAddressQuery.isPending
   );
   const isEditSheetOpen = Boolean(
     editingAddressId &&
@@ -972,15 +1007,6 @@ const AddressListContent = ({ domains }: AddressListProps) => {
                         {addressesQuery.error.message}
                       </TableCell>
                     </TableRow>
-                  ) : isPageOutOfRange ? (
-                    <TableRow>
-                      <TableCell
-                        className="h-20 text-center text-muted-foreground"
-                        colSpan={5}
-                      >
-                        Returning to page {totalPages}...
-                      </TableCell>
-                    </TableRow>
                   ) : addresses.length > 0 ? (
                     addresses.map(address => (
                       <AddressTableRow
@@ -1054,11 +1080,9 @@ const AddressListContent = ({ domains }: AddressListProps) => {
               ? addressesQuery.error.message
               : isTableLoading
                 ? "Loading addresses..."
-                : isPageOutOfRange
-                  ? `Redirecting to page ${totalPages}...`
-                  : isPageTransitioning
-                    ? `Updating page ${currentPage}...`
-                    : `Showing ${addresses.length} of ${totalItems}`}
+                : isPageTransitioning
+                  ? `Updating page ${currentPage}...`
+                  : `Showing ${addresses.length} of ${totalItems}`}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
