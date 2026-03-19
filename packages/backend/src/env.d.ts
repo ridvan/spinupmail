@@ -1,6 +1,12 @@
 declare global {
   interface CloudflareBindings {
+    API_KEY_RATE_LIMIT_MAX?: string;
+    API_KEY_RATE_LIMIT_WINDOW?: string;
+    AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX?: string;
+    AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW?: string;
     AUTH_ALLOWED_EMAIL_DOMAIN?: string;
+    AUTH_RATE_LIMIT_MAX?: string;
+    AUTH_RATE_LIMIT_WINDOW?: string;
     BETTER_AUTH_SECRET?: string;
     ENABLE_E2E_TEST_UTILS?: string;
     E2E_TEST_SECRET?: string;

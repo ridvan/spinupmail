@@ -21,7 +21,12 @@ import {
   createResendResetPasswordEmailSender,
   createResendVerificationEmailSender,
 } from "./email-sender";
-import { getAuthAllowedEmailDomain, isE2ETestUtilsEnabled } from "@/shared/env";
+import {
+  getAuthAllowedEmailDomain,
+  getAuthRateLimitConfig,
+  getApiKeyUsageRateLimitConfig,
+  isE2ETestUtilsEnabled,
+} from "@/shared/env";
 
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_DERIVED_KEY_BYTES = 64;
@@ -90,6 +95,8 @@ function createAuth(
   const googleClientSecret = env?.GOOGLE_CLIENT_SECRET?.trim();
   const hasGoogleOAuth = Boolean(googleClientId) && Boolean(googleClientSecret);
   const authAllowedEmailDomain = getAuthAllowedEmailDomain(env);
+  const authRateLimit = getAuthRateLimitConfig(env);
+  const apiKeyRateLimit = getApiKeyUsageRateLimitConfig(env);
   const trustedOrigins = env?.CORS_ORIGIN?.split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
@@ -218,6 +225,13 @@ function createAuth(
             enableSessionForAPIKeys: true,
             apiKeyHeaders: ["x-api-key"],
             defaultPrefix: "spin_",
+            storage: "secondary-storage",
+            fallbackToDatabase: true,
+            rateLimit: {
+              enabled: true,
+              timeWindow: apiKeyRateLimit.window * 1000,
+              maxRequests: apiKeyRateLimit.max,
+            },
           }),
           twoFactor({
             issuer: "Spinupmail",
@@ -228,13 +242,22 @@ function createAuth(
           // `get-session` calls across workers, which makes production
           // throttling introduce test-only sign-in redirects.
           enabled: !enableE2ETestUtils,
-          window: 60,
+          window: authRateLimit.window,
+          ...(authRateLimit.max ? { max: authRateLimit.max } : {}),
           customRules: {
             // It's here to prevent abuse,
             // you might not need this based on your service provider's limits.
             "/change-email": {
-              window: 60 * 60,
-              max: 2,
+              window: authRateLimit.changeEmail.window,
+              max: authRateLimit.changeEmail.max,
+            },
+            "/get-session": {
+              window: apiKeyRateLimit.window,
+              max: apiKeyRateLimit.max,
+            },
+            "/organization/get-full-organization": {
+              window: apiKeyRateLimit.window,
+              max: apiKeyRateLimit.max,
             },
           },
         },

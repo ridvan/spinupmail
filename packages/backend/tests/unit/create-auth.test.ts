@@ -136,6 +136,158 @@ describe("createAuth", () => {
     expect(auth.rateLimit?.enabled).toBe(false);
   });
 
+  it("applies Better Auth rate limit overrides from env", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth({
+      AUTH_RATE_LIMIT_WINDOW: "120",
+      AUTH_RATE_LIMIT_MAX: "25",
+      AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW: "7200",
+      AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX: "5",
+    } as CloudflareBindings) as {
+      rateLimit?: {
+        enabled?: boolean;
+        window?: number;
+        max?: number;
+        customRules?: {
+          "/change-email"?: {
+            window?: number;
+            max?: number;
+          };
+          "/get-session"?: {
+            window?: number;
+            max?: number;
+          };
+          "/organization/get-full-organization"?: {
+            window?: number;
+            max?: number;
+          };
+        };
+      };
+    };
+
+    expect(auth.rateLimit).toMatchObject({
+      enabled: true,
+      window: 120,
+      max: 25,
+      customRules: {
+        "/change-email": {
+          window: 7200,
+          max: 5,
+        },
+      },
+    });
+  });
+
+  it("uses higher default API key rate limits", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth({} as CloudflareBindings) as {
+      plugins?: Array<{
+        id?: string;
+        configurations?: Array<{
+          storage?: string;
+          fallbackToDatabase?: boolean;
+          rateLimit?: {
+            enabled?: boolean;
+            timeWindow?: number;
+            maxRequests?: number;
+          };
+        }>;
+      }>;
+      rateLimit?: {
+        customRules?: {
+          "/get-session"?: {
+            window?: number;
+            max?: number;
+          };
+          "/organization/get-full-organization"?: {
+            window?: number;
+            max?: number;
+          };
+        };
+      };
+    };
+
+    const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
+
+    expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
+      enabled: true,
+      timeWindow: 60000,
+      maxRequests: 120,
+    });
+    expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe(
+      "secondary-storage"
+    );
+    expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
+    expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
+      window: 60,
+      max: 120,
+    });
+    expect(
+      auth.rateLimit?.customRules?.["/organization/get-full-organization"]
+    ).toEqual({
+      window: 60,
+      max: 120,
+    });
+  });
+
+  it("applies API key rate limits to the api-key plugin and auth endpoint overrides", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth({
+      API_KEY_RATE_LIMIT_WINDOW: "120",
+      API_KEY_RATE_LIMIT_MAX: "250",
+    } as CloudflareBindings) as {
+      plugins?: Array<{
+        id?: string;
+        configurations?: Array<{
+          storage?: string;
+          fallbackToDatabase?: boolean;
+          rateLimit?: {
+            enabled?: boolean;
+            timeWindow?: number;
+            maxRequests?: number;
+          };
+        }>;
+      }>;
+      rateLimit?: {
+        customRules?: {
+          "/get-session"?: {
+            window?: number;
+            max?: number;
+          };
+          "/organization/get-full-organization"?: {
+            window?: number;
+            max?: number;
+          };
+        };
+      };
+    };
+
+    const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
+
+    expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
+      enabled: true,
+      timeWindow: 120000,
+      maxRequests: 250,
+    });
+    expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe(
+      "secondary-storage"
+    );
+    expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
+    expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
+      window: 120,
+      max: 250,
+    });
+    expect(
+      auth.rateLimit?.customRules?.["/organization/get-full-organization"]
+    ).toEqual({
+      window: 120,
+      max: 250,
+    });
+  });
+
   it("configures Google hosted domain restrictions when enabled", async () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
 

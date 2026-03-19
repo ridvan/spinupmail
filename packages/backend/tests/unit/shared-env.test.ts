@@ -1,9 +1,12 @@
 import {
+  getApiKeyUsageRateLimitConfig,
   getAuthAllowedEmailDomain,
+  getAuthRateLimitConfig,
   getAllowedDomains,
   getMaxAddressesPerOrganization,
   normalizeDomain,
   parseBooleanEnv,
+  parsePositiveInteger,
   parsePositiveNumber,
 } from "@/shared/env";
 
@@ -40,6 +43,14 @@ describe("shared env helpers", () => {
     expect(parsePositiveNumber("nope")).toBeUndefined();
   });
 
+  it("parses positive integers and rejects non-integer values", () => {
+    expect(parsePositiveInteger("5")).toBe(5);
+    expect(parsePositiveInteger("1.5")).toBeUndefined();
+    expect(parsePositiveInteger("0")).toBeUndefined();
+    expect(parsePositiveInteger("-1")).toBeUndefined();
+    expect(parsePositiveInteger("nope")).toBeUndefined();
+  });
+
   it("parses max addresses per organization and falls back to default", () => {
     expect(
       getMaxAddressesPerOrganization({
@@ -71,5 +82,66 @@ describe("shared env helpers", () => {
     expect(parseBooleanEnv("no", true)).toBe(false);
     expect(parseBooleanEnv("invalid", true)).toBe(true);
     expect(parseBooleanEnv(undefined, false)).toBe(false);
+  });
+
+  it("parses Better Auth rate limit env overrides and preserves defaults", () => {
+    expect(
+      getAuthRateLimitConfig({
+        AUTH_RATE_LIMIT_WINDOW: "120",
+        AUTH_RATE_LIMIT_MAX: "25",
+        AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW: "7200",
+        AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX: "5",
+      } as CloudflareBindings)
+    ).toEqual({
+      window: 120,
+      max: 25,
+      changeEmail: {
+        window: 7200,
+        max: 5,
+      },
+    });
+
+    expect(
+      getAuthRateLimitConfig({
+        AUTH_RATE_LIMIT_WINDOW: "invalid",
+        AUTH_RATE_LIMIT_MAX: "1.5",
+        AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW: "0",
+        AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX: "-1",
+      } as CloudflareBindings)
+    ).toEqual({
+      window: 60,
+      max: undefined,
+      changeEmail: {
+        window: 3600,
+        max: 2,
+      },
+    });
+  });
+
+  it("parses API key usage rate limit env overrides and preserves defaults", () => {
+    expect(
+      getApiKeyUsageRateLimitConfig({
+        API_KEY_RATE_LIMIT_WINDOW: "60",
+        API_KEY_RATE_LIMIT_MAX: "120",
+      } as CloudflareBindings)
+    ).toEqual({
+      window: 60,
+      max: 120,
+    });
+
+    expect(
+      getApiKeyUsageRateLimitConfig({
+        API_KEY_RATE_LIMIT_WINDOW: "invalid",
+        API_KEY_RATE_LIMIT_MAX: "120",
+      } as CloudflareBindings)
+    ).toEqual({
+      window: 60,
+      max: 120,
+    });
+
+    expect(getApiKeyUsageRateLimitConfig({} as CloudflareBindings)).toEqual({
+      window: 60,
+      max: 120,
+    });
   });
 });

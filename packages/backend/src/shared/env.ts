@@ -2,6 +2,11 @@ export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
 const MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT = 100;
+const API_KEY_RATE_LIMIT_WINDOW_DEFAULT = 60;
+const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
+const AUTH_RATE_LIMIT_WINDOW_DEFAULT = 60;
+const AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT = 60 * 60;
+const AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX_DEFAULT = 2;
 
 export const getAllowedOrigins = (env: CloudflareBindings) => {
   const configured = env.CORS_ORIGIN?.split(",")
@@ -46,6 +51,13 @@ export const parsePositiveNumber = (value: string | null | undefined) => {
   return parsed;
 };
 
+export const parsePositiveInteger = (value: string | null | undefined) => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
+};
+
 export const parseBooleanEnv = (
   value: string | null | undefined,
   fallback = false
@@ -56,6 +68,43 @@ export const parseBooleanEnv = (
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
 };
+
+export const getAuthRateLimitConfig = (
+  env?: Pick<
+    CloudflareBindings,
+    | "AUTH_RATE_LIMIT_WINDOW"
+    | "AUTH_RATE_LIMIT_MAX"
+    | "AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW"
+    | "AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX"
+  >
+) => ({
+  window:
+    parsePositiveInteger(env?.AUTH_RATE_LIMIT_WINDOW?.trim()) ??
+    AUTH_RATE_LIMIT_WINDOW_DEFAULT,
+  max: parsePositiveInteger(env?.AUTH_RATE_LIMIT_MAX?.trim()),
+  changeEmail: {
+    window:
+      parsePositiveInteger(env?.AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW?.trim()) ??
+      AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT,
+    max:
+      parsePositiveInteger(env?.AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX?.trim()) ??
+      AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX_DEFAULT,
+  },
+});
+
+export const getApiKeyUsageRateLimitConfig = (
+  env?: Pick<
+    CloudflareBindings,
+    "API_KEY_RATE_LIMIT_WINDOW" | "API_KEY_RATE_LIMIT_MAX"
+  >
+) => ({
+  window:
+    parsePositiveInteger(env?.API_KEY_RATE_LIMIT_WINDOW?.trim()) ??
+    API_KEY_RATE_LIMIT_WINDOW_DEFAULT,
+  max:
+    parsePositiveInteger(env?.API_KEY_RATE_LIMIT_MAX?.trim()) ??
+    API_KEY_RATE_LIMIT_MAX_DEFAULT,
+});
 
 const readProcessEnv = (key: string) => {
   if (typeof process === "undefined" || !process.env) return undefined;

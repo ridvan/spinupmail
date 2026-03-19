@@ -92,6 +92,11 @@ Edit `packages/backend/wrangler.toml` with:
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
   - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
+  - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic)
+  - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
+  - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
+  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)
+  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` (default: `2`)
   - `[vars].RESEND_FROM_EMAIL` (e.g. `Spinupmail <verify@your-domain.com>`)
   - `[vars].EMAIL_STORE_HEADERS_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_DB`
@@ -208,6 +213,12 @@ In `packages/backend/wrangler.toml`:
 EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
 AUTH_ALLOWED_EMAIL_DOMAIN = "spinupmail.com"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
+API_KEY_RATE_LIMIT_WINDOW = "60"
+API_KEY_RATE_LIMIT_MAX = "120"
+AUTH_RATE_LIMIT_WINDOW = "60"
+AUTH_RATE_LIMIT_MAX = "100"
+AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW = "3600"
+AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX = "2"
 ```
 
 ### 2) Email Routing rules
