@@ -10,7 +10,7 @@ class ResizeObserverMock {
 }
 
 beforeAll(() => {
-  if (!("ResizeObserver" in window)) {
+  if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
     Object.defineProperty(window, "ResizeObserver", {
       configurable: true,
       writable: true,
@@ -18,7 +18,10 @@ beforeAll(() => {
     });
   }
 
-  if (!("scrollIntoView" in Element.prototype)) {
+  if (
+    typeof Element !== "undefined" &&
+    !("scrollIntoView" in Element.prototype)
+  ) {
     Object.defineProperty(Element.prototype, "scrollIntoView", {
       configurable: true,
       writable: true,
