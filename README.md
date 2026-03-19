@@ -92,7 +92,7 @@ Edit `packages/backend/wrangler.toml` with:
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
   - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
-  - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic)
+  - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
   - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
   - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
   - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)

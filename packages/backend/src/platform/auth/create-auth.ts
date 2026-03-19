@@ -243,7 +243,9 @@ function createAuth(
           // throttling introduce test-only sign-in redirects.
           enabled: !enableE2ETestUtils,
           window: authRateLimit.window,
-          ...(authRateLimit.max ? { max: authRateLimit.max } : {}),
+          ...(authRateLimit.max !== undefined
+            ? { max: authRateLimit.max }
+            : {}),
           customRules: {
             // It's here to prevent abuse,
             // you might not need this based on your service provider's limits.

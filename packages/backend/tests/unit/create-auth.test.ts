@@ -18,6 +18,63 @@ vi.mock("better-auth/adapters/drizzle", () => ({
   drizzleAdapter: drizzleAdapterMock,
 }));
 
+type AuthWithApiKeyPluginConfig = {
+  plugins?: Array<{
+    id?: string;
+    configurations?: Array<{
+      storage?: string;
+      fallbackToDatabase?: boolean;
+      rateLimit?: {
+        enabled?: boolean;
+        timeWindow?: number;
+        maxRequests?: number;
+      };
+    }>;
+  }>;
+  rateLimit?: {
+    customRules?: {
+      "/get-session"?: {
+        window?: number;
+        max?: number;
+      };
+      "/organization/get-full-organization"?: {
+        window?: number;
+        max?: number;
+      };
+    };
+  };
+};
+
+const assertApiKeyPluginConfig = (
+  auth: AuthWithApiKeyPluginConfig,
+  expected: {
+    timeWindow: number;
+    maxRequests: number;
+    window: number;
+    max: number;
+  }
+) => {
+  const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
+
+  expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
+    enabled: true,
+    timeWindow: expected.timeWindow,
+    maxRequests: expected.maxRequests,
+  });
+  expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe("secondary-storage");
+  expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
+  expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
+    window: expected.window,
+    max: expected.max,
+  });
+  expect(
+    auth.rateLimit?.customRules?.["/organization/get-full-organization"]
+  ).toEqual({
+    window: expected.window,
+    max: expected.max,
+  });
+};
+
 describe("createAuth", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -182,51 +239,13 @@ describe("createAuth", () => {
   it("uses higher default API key rate limits", async () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
 
-    const auth = createAuth({} as CloudflareBindings) as {
-      plugins?: Array<{
-        id?: string;
-        configurations?: Array<{
-          storage?: string;
-          fallbackToDatabase?: boolean;
-          rateLimit?: {
-            enabled?: boolean;
-            timeWindow?: number;
-            maxRequests?: number;
-          };
-        }>;
-      }>;
-      rateLimit?: {
-        customRules?: {
-          "/get-session"?: {
-            window?: number;
-            max?: number;
-          };
-          "/organization/get-full-organization"?: {
-            window?: number;
-            max?: number;
-          };
-        };
-      };
-    };
+    const auth = createAuth(
+      {} as CloudflareBindings
+    ) as AuthWithApiKeyPluginConfig;
 
-    const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
-
-    expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
-      enabled: true,
+    assertApiKeyPluginConfig(auth, {
       timeWindow: 60000,
       maxRequests: 120,
-    });
-    expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe(
-      "secondary-storage"
-    );
-    expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
-    expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
-      window: 60,
-      max: 120,
-    });
-    expect(
-      auth.rateLimit?.customRules?.["/organization/get-full-organization"]
-    ).toEqual({
       window: 60,
       max: 120,
     });
@@ -238,51 +257,11 @@ describe("createAuth", () => {
     const auth = createAuth({
       API_KEY_RATE_LIMIT_WINDOW: "120",
       API_KEY_RATE_LIMIT_MAX: "250",
-    } as CloudflareBindings) as {
-      plugins?: Array<{
-        id?: string;
-        configurations?: Array<{
-          storage?: string;
-          fallbackToDatabase?: boolean;
-          rateLimit?: {
-            enabled?: boolean;
-            timeWindow?: number;
-            maxRequests?: number;
-          };
-        }>;
-      }>;
-      rateLimit?: {
-        customRules?: {
-          "/get-session"?: {
-            window?: number;
-            max?: number;
-          };
-          "/organization/get-full-organization"?: {
-            window?: number;
-            max?: number;
-          };
-        };
-      };
-    };
+    } as CloudflareBindings) as AuthWithApiKeyPluginConfig;
 
-    const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
-
-    expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
-      enabled: true,
+    assertApiKeyPluginConfig(auth, {
       timeWindow: 120000,
       maxRequests: 250,
-    });
-    expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe(
-      "secondary-storage"
-    );
-    expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
-    expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
-      window: 120,
-      max: 250,
-    });
-    expect(
-      auth.rateLimit?.customRules?.["/organization/get-full-organization"]
-    ).toEqual({
       window: 120,
       max: 250,
     });
