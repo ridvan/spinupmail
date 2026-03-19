@@ -20,7 +20,7 @@ import {
   useFilteredTimeZones,
 } from "@/features/settings/lib/timezone-picker";
 import { TimezoneCommandList } from "@/features/settings/components/timezone-picker";
-import { UserProfileTimezoneSection } from "@/features/settings/components/timezone-panel";
+import { UserProfileTimezoneSection } from "@/features/settings/components/user-profile-timezone-section";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";

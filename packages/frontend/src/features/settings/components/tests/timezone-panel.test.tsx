@@ -45,6 +45,9 @@ describe("TimezonePanel", () => {
     render(<TimezonePanel />);
 
     fireEvent.click(screen.getByRole("checkbox"));
+    expect(
+      screen.getByRole("combobox", { name: "Search timezones" })
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save timezone" }));
 
     expect(setTimeZone).toHaveBeenCalledWith("UTC");

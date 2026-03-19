@@ -149,13 +149,28 @@ describe("TwoFactorPanel", () => {
     fireEvent.change(screen.getByLabelText("Current password"), {
       target: { value: "password-123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start setup" }));
 
     await waitFor(() =>
       expect(mockedEnable).toHaveBeenCalledWith({ password: "password-123" })
     );
     await waitFor(() => expect(screen.getByText("Scan QR code")).toBeTruthy());
     expect(screen.getByText("Manual setup key")).toBeTruthy();
+  });
+
+  it("renders setup guidance as an ordered list and accepts card class overrides", () => {
+    mockedUseAuth.mockReturnValue(buildAuthState({ twoFactorEnabled: false }));
+
+    const { container } = render(
+      <TwoFactorPanel cardClassName="rounded-xl border-border" />
+    );
+
+    const orderedList = container.querySelector("ol");
+    expect(orderedList).toBeTruthy();
+    expect(orderedList?.querySelectorAll("li")).toHaveLength(3);
+
+    const card = container.querySelector('[data-slot="card"]');
+    expect(card?.getAttribute("class")).toContain("rounded-xl");
   });
 
   it("disables 2FA after confirmation input and refreshes session", async () => {

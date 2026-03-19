@@ -75,8 +75,11 @@ describe("SettingsPage", () => {
     const cards = container.querySelectorAll('[data-slot="card"]');
     expect(cards).toHaveLength(1);
 
-    expect(container.innerHTML).toContain("lg:grid-rows-[auto_1fr]");
-    expect(container.innerHTML).toContain('orientation="vertical"');
+    const responsiveGrid = cards[0]?.firstElementChild;
+    expect(responsiveGrid).toBeTruthy();
+    expect(responsiveGrid?.getAttribute("class")).toContain(
+      "lg:grid-rows-[auto_1fr]"
+    );
 
     const desktopUserProfilePanel = userProfilePanels[0];
     const desktopChangePasswordPanel = changePasswordPanels[0];
@@ -102,6 +105,15 @@ describe("SettingsPage", () => {
 
     const separators = container.querySelectorAll('[data-slot="separator"]');
     expect(separators).toHaveLength(2);
+    const verticalSeparator = Array.from(separators).find(separator =>
+      separator.className.includes("lg:block")
+    );
+    expect(verticalSeparator).toBeTruthy();
+    expect(
+      verticalSeparator?.getAttribute("data-orientation") === "vertical" ||
+        verticalSeparator?.getAttribute("aria-orientation") === "vertical" ||
+        verticalSeparator?.hasAttribute("data-vertical")
+    ).toBe(true);
     expect(
       desktopUserProfilePanel.compareDocumentPosition(
         desktopChangePasswordPanel

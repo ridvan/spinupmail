@@ -27,8 +27,13 @@ export const TimezoneCommandList = ({
   onInputKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) => {
   return (
-    <Command className={commandClassName} shouldFilter={false}>
+    <Command
+      className={commandClassName}
+      label="Search timezones"
+      shouldFilter={false}
+    >
       <CommandInput
+        aria-label="Search timezones"
         placeholder={TIMEZONE_SEARCH_PLACEHOLDER}
         value={searchValue}
         onValueChange={onSearchValueChange}

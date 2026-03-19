@@ -1,67 +1,12 @@
 import * as React from "react";
-import { Clock3 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FieldLabel } from "@/components/ui/field";
 import { TimezoneCommandList } from "@/features/settings/components/timezone-picker";
+import { UserProfileTimezoneSection } from "@/features/settings/components/user-profile-timezone-section";
 import { useFilteredTimeZones } from "@/features/settings/lib/timezone-picker";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
-import { type TimeZoneSource } from "@/features/timezone/lib/resolve-timezone";
-
-const describeSource = (source: string) => {
-  switch (source) {
-    case "user":
-      return "Saved preference";
-    case "browser":
-      return "Device timezone";
-    case "session":
-      return "Cloudflare geolocation";
-    default:
-      return "UTC fallback";
-  }
-};
-
-export const UserProfileTimezoneSection = ({
-  effectiveTimeZone,
-  source,
-  previewValue,
-  manualTimezoneField,
-  timezoneField,
-}: {
-  effectiveTimeZone: string;
-  source: TimeZoneSource;
-  previewValue: string;
-  manualTimezoneField: React.ReactNode;
-  timezoneField: React.ReactNode;
-}) => {
-  return (
-    <div className="space-y-3 rounded-lg border border-border/60 bg-background/40 p-4">
-      <FieldLabel className="flex items-center gap-1.5 text-muted-foreground">
-        <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-        <span>Timezone</span>
-      </FieldLabel>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span>Current:</span>{" "}
-        <Badge variant="secondary">{effectiveTimeZone}</Badge>
-        <Badge variant="outline">{describeSource(source)}</Badge>
-      </div>
-
-      {manualTimezoneField}
-      {timezoneField}
-
-      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
-        <p className="text-xs text-muted-foreground">
-          Current time in selected timezone:
-        </p>
-        <p className="font-medium">{previewValue}</p>
-      </div>
-    </div>
-  );
-};
 
 export const TimezonePanel = () => {
   const {
@@ -132,56 +77,52 @@ export const TimezonePanel = () => {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Current: {effectiveTimeZone}</Badge>
-          <Badge variant="outline">{describeSource(source)}</Badge>
-        </div>
-
-        <label className="flex items-start gap-3 text-sm">
-          <Checkbox
-            className="mt-0.5"
-            checked={manualMode}
-            onCheckedChange={checked => {
-              setLocalError(null);
-              setManualMode(Boolean(checked));
-            }}
-          />
-          <span className="space-y-0.5">
-            <span className="block font-medium">Use specific timezone</span>
-            <span className="block text-muted-foreground">
-              Turn off to automatically follow your device timezone.
-            </span>
-          </span>
-        </label>
-
-        {manualMode ? (
-          <div className="space-y-2">
-            <TimezoneCommandList
-              commandClassName="border border-border/70 bg-card"
-              searchValue={searchValue}
-              selectedTimeZone={selectedTimeZone}
-              timeZones={filteredTimeZones}
-              onSearchValueChange={setSearchValue}
-              onSelectTimeZone={timeZone => {
-                setLocalError(null);
-                setSelectedTimeZone(timeZone);
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              Selected:{" "}
-              <span className="font-mono text-foreground">
-                {selectedTimeZone}
+        <UserProfileTimezoneSection
+          effectiveTimeZone={effectiveTimeZone}
+          source={source}
+          previewValue={previewValue}
+          manualTimezoneField={
+            <label className="flex items-start gap-3 text-sm">
+              <Checkbox
+                className="mt-0.5"
+                checked={manualMode}
+                onCheckedChange={checked => {
+                  setLocalError(null);
+                  setManualMode(Boolean(checked));
+                }}
+              />
+              <span className="space-y-0.5">
+                <span className="block font-medium">Use specific timezone</span>
+                <span className="block text-muted-foreground">
+                  Turn off to automatically follow your device timezone.
+                </span>
               </span>
-            </p>
-          </div>
-        ) : null}
-
-        <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
-          <p className="text-xs text-muted-foreground">
-            Current time in selected timezone:
-          </p>
-          <p className="font-medium">{previewValue}</p>
-        </div>
+            </label>
+          }
+          timezoneField={
+            manualMode ? (
+              <div className="space-y-2">
+                <TimezoneCommandList
+                  commandClassName="border border-border/70 bg-card"
+                  searchValue={searchValue}
+                  selectedTimeZone={selectedTimeZone}
+                  timeZones={filteredTimeZones}
+                  onSearchValueChange={setSearchValue}
+                  onSelectTimeZone={timeZone => {
+                    setLocalError(null);
+                    setSelectedTimeZone(timeZone);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Selected:{" "}
+                  <span className="font-mono text-foreground">
+                    {selectedTimeZone}
+                  </span>
+                </p>
+              </div>
+            ) : null
+          }
+        />
 
         {error || localError ? (
           <p className="text-sm text-destructive">{localError || error}</p>

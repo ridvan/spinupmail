@@ -34,6 +34,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient, type AuthUser } from "@/lib/auth";
 import { QRCode } from "@/lib/react-qr-code";
+import { cn } from "@/lib/utils";
 
 const OTP_LENGTH = 6;
 
@@ -50,6 +51,27 @@ type SetupState = {
   secret: string;
   backupCodes: string[];
 };
+
+const setupSteps = [
+  {
+    id: "authenticator-app",
+    title: "Authenticator app",
+    icon: SmartPhone01Icon,
+    description: "1. Install Google Authenticator or similar apps.",
+  },
+  {
+    id: "quick-setup",
+    title: "Quick setup",
+    icon: QrCodeIcon,
+    description: "2. Scan the QR code and enter one verification code.",
+  },
+  {
+    id: "backup-codes",
+    title: "Backup codes",
+    icon: Key01Icon,
+    description: "3. Save recovery codes in case you lose your device.",
+  },
+] as const;
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -72,7 +94,11 @@ const isTwoFactorEnabled = (user: AuthUser | null) => {
   );
 };
 
-export const TwoFactorPanel = () => {
+export const TwoFactorPanel = ({
+  cardClassName,
+}: {
+  cardClassName?: string;
+}) => {
   const { user, refreshSession } = useAuth();
 
   const [setupState, setSetupState] = React.useState<SetupState | null>(null);
@@ -276,7 +302,9 @@ export const TwoFactorPanel = () => {
   };
 
   return (
-    <Card className="border-border/70 bg-card/60 rounded-none">
+    <Card
+      className={cn("border-border/70 bg-card/60 rounded-none", cardClassName)}
+    >
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="flex items-center gap-2 text-[15px]">
@@ -371,7 +399,7 @@ export const TwoFactorPanel = () => {
                   >
                     {enableForm.state.isSubmitting
                       ? "Preparing..."
-                      : "Enable 2FA"}
+                      : "Start setup"}
                   </Button>
                 </div>
               </form>
@@ -395,52 +423,27 @@ export const TwoFactorPanel = () => {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
-                  <div className="flex items-center gap-2">
-                    <HugeiconsIcon
-                      aria-hidden="true"
-                      icon={SmartPhone01Icon}
-                      className="h-4 w-4 shrink-0 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                    <p className="text-sm font-medium">Authenticator app</p>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    1. Install Google Authenticator or similar apps.
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
-                  <div className="flex items-center gap-2">
-                    <HugeiconsIcon
-                      aria-hidden="true"
-                      icon={QrCodeIcon}
-                      className="h-4 w-4 shrink-0 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                    <p className="text-sm font-medium">Quick setup</p>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    2. Scan the QR code and enter one verification code.
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
-                  <div className="flex items-center gap-2">
-                    <HugeiconsIcon
-                      aria-hidden="true"
-                      icon={Key01Icon}
-                      className="h-4 w-4 shrink-0 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                    <p className="text-sm font-medium">Backup codes</p>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    3. Save recovery codes in case you lose your device.
-                  </p>
-                </div>
-              </div>
+              <ol className="grid list-none gap-3 sm:grid-cols-3">
+                {setupSteps.map(step => (
+                  <li
+                    key={step.id}
+                    className="rounded-lg border border-border/60 bg-background/55 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <HugeiconsIcon
+                        aria-hidden="true"
+                        icon={step.icon}
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
+                        strokeWidth={2}
+                      />
+                      <p className="text-sm font-medium">{step.title}</p>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {step.description}
+                    </p>
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         ) : null}
