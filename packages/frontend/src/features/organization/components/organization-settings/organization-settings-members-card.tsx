@@ -1,12 +1,8 @@
+import { UserMultiple02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -45,12 +41,16 @@ export const OrganizationMembersCard = ({
       <Card className="border-border/70 bg-card/60">
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-lg">Members</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-[15px]">
+              <HugeiconsIcon
+                icon={UserMultiple02Icon}
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span>Members</span>
+            </CardTitle>
             <Skeleton className="h-5 w-8 rounded-full" />
           </div>
-          <CardDescription>
-            Manage roles and organization access.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -58,7 +58,6 @@ export const OrganizationMembersCard = ({
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -66,16 +65,13 @@ export const OrganizationMembersCard = ({
               {Array.from({ length: 3 }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell>
-                    <div className="space-y-1 w-[170px]">
+                    <div className="space-y-1 w-[180px]">
                       <Skeleton className="h-4 w-28 max-w-full" />
                       <Skeleton className="h-3 w-36 max-w-full" />
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-10" />
+                    <Skeleton className="h-5 w-12 rounded-full" />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">
@@ -93,13 +89,19 @@ export const OrganizationMembersCard = ({
   }
 
   return (
-    <Card className="border-border/70 bg-card/60">
+    <Card className="border-border/70 bg-card/60 rounded-none">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg">Members</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-[15px]">
+            <HugeiconsIcon
+              icon={UserMultiple02Icon}
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span>Members</span>
+          </CardTitle>
           <Badge variant="outline">{members.length}</Badge>
         </div>
-        <CardDescription>Manage roles and organization access.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -107,7 +109,6 @@ export const OrganizationMembersCard = ({
             <TableRow>
               <TableHead>Member</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -130,13 +131,6 @@ export const OrganizationMembersCard = ({
                     <Badge variant={roleBadgeVariant(member.role)}>
                       {formatRole(member.role)}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {isCurrentUser ? (
-                      <span className="text-xs text-muted-foreground">You</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">

@@ -51,8 +51,8 @@ export const OrganizationProfileCard = ({
             <div className="flex min-w-0 items-center gap-3">
               <Skeleton className="size-10 rounded-md" />
               <div className="min-w-0 space-y-2">
-                <Skeleton className="h-6 w-56 max-w-full" />
-                <Skeleton className="h-5 w-32 max-w-full" />
+                <Skeleton className="h-5 w-48 max-w-full" />
+                <Skeleton className="h-4 w-36 max-w-full" />
               </div>
             </div>
             <Skeleton className="h-6 w-24 rounded-full" />
@@ -65,11 +65,11 @@ export const OrganizationProfileCard = ({
                 Organization ID
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <div className="h-8 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
-                  <Skeleton className="h-4 w-64 max-w-full" />
+                <div className="max-w-90 h-8 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+                  <Skeleton className="h-4 w-full" />
                 </div>
                 <Button disabled type="button" variant="outline">
-                  <Skeleton className="h-4 w-14" />
+                  Copy ID
                 </Button>
               </div>
             </div>
@@ -81,7 +81,7 @@ export const OrganizationProfileCard = ({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Skeleton className="h-8 w-full sm:max-w-sm" />
                 <Button disabled type="button">
-                  <Skeleton className="h-4 w-10" />
+                  Save
                 </Button>
               </div>
             </div>
@@ -113,7 +113,7 @@ export const OrganizationProfileCard = ({
   }
 
   return (
-    <Card className="border-border/70 bg-card/60">
+    <Card className="border-border/70 bg-card/60 rounded-none">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -123,15 +123,17 @@ export const OrganizationProfileCard = ({
               size="lg"
             />
             <div className="min-w-0">
-              <CardTitle className="text-lg">Organization Profile</CardTitle>
-              <CardDescription className="truncate">
+              <CardTitle className="text-[15px] leading-tight">
+                Organization Profile
+              </CardTitle>
+              <CardDescription className="truncate leading-tight">
                 {activeOrganization.name}
               </CardDescription>
             </div>
           </div>
 
           <Badge variant={canManage ? "outline" : "ghost"}>
-            {canManage ? "Can manage" : "View only"}
+            {canManage ? "Authorized" : "View only"}
           </Badge>
         </div>
       </CardHeader>
@@ -142,7 +144,7 @@ export const OrganizationProfileCard = ({
               Organization ID
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <p className="max-w-full flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2 font-mono text-xs break-all text-muted-foreground">
+              <p className="max-w-90 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2 font-mono text-xs break-all text-muted-foreground">
                 {activeOrganization.id}
               </p>
               <Button

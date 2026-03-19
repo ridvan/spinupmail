@@ -1,13 +1,9 @@
 import * as React from "react";
+import { Mail01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -68,15 +64,19 @@ export const OrganizationInvitationsCard = ({
       <Card className="border-border/70 bg-card/60">
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-lg">Invitations</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-[15px]">
+              <HugeiconsIcon
+                icon={Mail01Icon}
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span>Invitations</span>
+            </CardTitle>
             <Skeleton className="h-5 w-20 rounded-full" />
           </div>
-          <CardDescription>
-            Invite teammates and manage pending invites.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="max-w-3xl">
+          <div className="max-w-xl">
             <div className="grid gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto]">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Email
@@ -89,7 +89,7 @@ export const OrganizationInvitationsCard = ({
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
               <Button className="md:self-end" disabled type="button">
-                <Skeleton className="h-4 w-10" />
+                Invite
               </Button>
             </div>
           </div>
@@ -132,17 +132,21 @@ export const OrganizationInvitationsCard = ({
   const inviteControlsDisabled = isLoading || isInviteMemberPending;
 
   return (
-    <Card className="border-border/70 bg-card/60">
+    <Card className="border-border/70 bg-card/60 rounded-none">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg">Invitations</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-[15px]">
+            <HugeiconsIcon
+              icon={Mail01Icon}
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span>Invitations</span>
+          </CardTitle>
           {canManage ? (
             <Badge variant="outline">{pendingInvitationsCount} pending</Badge>
           ) : null}
         </div>
-        <CardDescription>
-          Invite teammates and manage pending invites.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!canManage ? (
@@ -151,7 +155,7 @@ export const OrganizationInvitationsCard = ({
             invitations.
           </p>
         ) : (
-          <form className="max-w-3xl" onSubmit={onInviteMember}>
+          <form className="max-w-xl" onSubmit={onInviteMember}>
             <div className="grid gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto]">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Email
@@ -179,7 +183,10 @@ export const OrganizationInvitationsCard = ({
                   }
                 }}
               >
-                <SelectTrigger className="h-8 w-full" aria-label="Role">
+                <SelectTrigger
+                  className="h-8 w-full capitalize"
+                  aria-label="Role"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
@@ -282,14 +289,16 @@ export const OrganizationInvitationsCard = ({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        onClick={() => onCopyInvitationLink(invitation.id)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        Copy link
-                      </Button>
+                      {invitation.status !== "accepted" ? (
+                        <Button
+                          onClick={() => onCopyInvitationLink(invitation.id)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          Copy link
+                        </Button>
+                      ) : null}
                       {invitation.status === "pending" ? (
                         <Button
                           disabled={isCancelInvitationPending}
