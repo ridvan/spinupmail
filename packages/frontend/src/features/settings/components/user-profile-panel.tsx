@@ -76,6 +76,10 @@ const getChangeEmailCallbackURL = () => {
 const CHANGE_EMAIL_RETRY_LATER_MESSAGE =
   "Unable to send verification email right now. Please try again later.";
 
+type TimezonePopoverChangeDetails = Parameters<
+  NonNullable<React.ComponentProps<typeof Popover>["onOpenChange"]>
+>[1];
+
 const getErrorStatusCode = (error: unknown) => {
   if (typeof error !== "object" || !error) return null;
 
@@ -279,7 +283,7 @@ const UserProfilePanelBody = ({
   }, [isTimezoneMenuOpen]);
 
   const handleTimezonePopoverOpenChange = React.useCallback(
-    (open: boolean) => {
+    (open: boolean, eventDetails: TimezonePopoverChangeDetails) => {
       setIsTimezoneMenuOpen(open);
       if (open) {
         timezoneChevronsRef.current?.startAnimation();
@@ -288,7 +292,9 @@ const UserProfilePanelBody = ({
 
       setSearchValue("");
       timezoneChevronsRef.current?.stopAnimation();
-      restoreTimezoneTriggerFocus();
+      if (eventDetails.reason === "escape-key") {
+        restoreTimezoneTriggerFocus();
+      }
     },
     [restoreTimezoneTriggerFocus]
   );
