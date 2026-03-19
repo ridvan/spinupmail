@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  ArrowRight01Icon,
   Mail01Icon,
   Mailbox01Icon,
   PlusSignIcon,
@@ -22,6 +23,11 @@ import {
   ChevronsUpDownIcon,
   type ChevronsUpDownIconHandle,
 } from "@/components/ui/chevrons-up-down";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +61,7 @@ import {
   useOrganizationsQuery,
   useOrganizationStatsQuery,
   useSetActiveOrganizationMutation,
+  useUserInvitationsQuery,
 } from "@/features/organization/hooks/use-organizations";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +78,7 @@ export const OrganizationSwitcher = () => {
   } = useAuth();
   const organizationsQuery = useOrganizationsQuery();
   const organizationStatsQuery = useOrganizationStatsQuery();
+  const userInvitationsQuery = useUserInvitationsQuery();
   const setActiveMutation = useSetActiveOrganizationMutation();
   const createMutation = useCreateOrganizationMutation();
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -95,6 +103,16 @@ export const OrganizationSwitcher = () => {
   const activeOrganizationStats = activeOrganization
     ? organizationStatsById.get(activeOrganization.id)
     : undefined;
+  const pendingInvitations = React.useMemo(
+    () =>
+      (userInvitationsQuery.data ?? []).filter(
+        invitation => invitation.status === "pending"
+      ),
+    [userInvitationsQuery.data]
+  );
+  const pendingInvitationCount = pendingInvitations.length;
+  const hasPendingInvitations = pendingInvitationCount > 0;
+  const isPendingInvitationsLoading = userInvitationsQuery.isLoading;
   const hasLoadedStats = organizationStatsQuery.data !== undefined;
   const formatCountValue = (value: number | undefined) => {
     if (typeof value === "number") return value.toLocaleString();
@@ -210,6 +228,13 @@ export const OrganizationSwitcher = () => {
       return;
     }
     chevronsRef.current?.stopAnimation();
+  };
+
+  const handleInvitationClick = (invitationId: string) => {
+    handleOpenChange(false);
+    void navigate(
+      `/onboarding/organization?invitationId=${encodeURIComponent(invitationId)}`
+    );
   };
 
   if (!activeOrganization) {
@@ -344,10 +369,17 @@ export const OrganizationSwitcher = () => {
                   </span>
                 </TooltipProvider>
               </div>
+              {hasPendingInvitations ? (
+                <span
+                  aria-hidden="true"
+                  data-testid="pending-invitations-indicator"
+                  className="size-2 rounded-full bg-sidebar-foreground/35 shadow-[0_0_0_0_rgba(148,163,184,0.12)] animate-[pulse_3.6s_ease-in-out_infinite] group-data-[collapsible=icon]:hidden"
+                />
+              ) : null}
               <ChevronsUpDownIcon
                 ref={chevronsRef}
                 size={16}
-                className="ml-1 text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
+                className="ml-0 text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden"
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -385,6 +417,71 @@ export const OrganizationSwitcher = () => {
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
+              {isPendingInvitationsLoading || hasPendingInvitations ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <Collapsible className="group/pending-invitations">
+                      <CollapsibleTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="focus:bg-accent focus:text-accent-foreground hover:bg-accent/60 flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm outline-hidden bg-muted-foreground/10"
+                          />
+                        }
+                      >
+                        <span className="text-[13px]">Pending invitations</span>
+                        <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                          {!isPendingInvitationsLoading &&
+                          hasPendingInvitations ? (
+                            <span
+                              aria-hidden="true"
+                              className="size-2 rounded-full bg-sidebar-foreground/35 shadow-[0_0_0_0_rgba(148,163,184,0.12)] animate-[pulse_3.6s_ease-in-out_infinite]"
+                            />
+                          ) : null}
+                          <span>
+                            {isPendingInvitationsLoading
+                              ? "Loading..."
+                              : pendingInvitationCount}
+                          </span>
+                        </span>
+                        <HugeiconsIcon
+                          icon={ArrowRight01Icon}
+                          strokeWidth={2}
+                          className="text-muted-foreground size-4 transition-transform duration-200 group-data-open/pending-invitations:rotate-90"
+                        />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-1 space-y-1">
+                        {isPendingInvitationsLoading ? (
+                          <p className="px-1.5 py-1 text-xs text-muted-foreground">
+                            Checking invitations...
+                          </p>
+                        ) : (
+                          pendingInvitations.map(invitation => (
+                            <DropdownMenuItem
+                              key={invitation.id}
+                              className="cursor-pointer"
+                              onClick={() =>
+                                handleInvitationClick(invitation.id)
+                              }
+                            >
+                              <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate text-sm">
+                                  {invitation.organizationName ??
+                                    invitation.email}
+                                </span>
+                                <span className="truncate text-xs text-muted-foreground">
+                                  Role: {invitation.role}
+                                </span>
+                              </span>
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </DropdownMenuGroup>
+                </>
+              ) : null}
               <DropdownMenuSeparator />
               <TooltipProvider delay={120}>
                 <Tooltip>

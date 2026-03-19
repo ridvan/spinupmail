@@ -17,6 +17,7 @@ import {
   useOrganizationsQuery,
   useOrganizationStatsQuery,
   useSetActiveOrganizationMutation,
+  useUserInvitationsQuery,
 } from "@/features/organization/hooks/use-organizations";
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
@@ -38,6 +39,7 @@ vi.mock("@/features/organization/hooks/use-organizations", () => ({
   useOrganizationsQuery: vi.fn(),
   useOrganizationStatsQuery: vi.fn(),
   useSetActiveOrganizationMutation: vi.fn(),
+  useUserInvitationsQuery: vi.fn(),
 }));
 
 vi.mock("@/components/ui/sidebar", async () => {
@@ -142,6 +144,7 @@ const mockedUseSetActiveOrganizationMutation = vi.mocked(
 const mockedUseCreateOrganizationMutation = vi.mocked(
   useCreateOrganizationMutation
 );
+const mockedUseUserInvitationsQuery = vi.mocked(useUserInvitationsQuery);
 
 const createOrganizationMutateAsync = vi.fn();
 const navigate = vi.fn();
@@ -200,6 +203,10 @@ describe("OrganizationSwitcher", () => {
       mutateAsync: createOrganizationMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useCreateOrganizationMutation>);
+    mockedUseUserInvitationsQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUserInvitationsQuery>);
     mockedUseNavigate.mockReturnValue(navigate);
   });
 
@@ -268,5 +275,38 @@ describe("OrganizationSwitcher", () => {
         )
       ).toBeTruthy()
     );
+  });
+
+  it("shows pending invitations in a dedicated list", async () => {
+    mockedUseUserInvitationsQuery.mockReturnValue({
+      data: [
+        {
+          id: "inv-1",
+          email: "owner@example.com",
+          role: "member",
+          status: "pending",
+          organizationName: "Orbit Labs",
+        },
+        {
+          id: "inv-2",
+          email: "owner@example.com",
+          role: "member",
+          status: "accepted",
+          organizationName: "Past Invite",
+        },
+      ],
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUserInvitationsQuery>);
+
+    render(<OrganizationSwitcher />);
+
+    expect(screen.getByTestId("pending-invitations-indicator")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /pending invitations/i })
+    );
+
+    expect(screen.getByText("Orbit Labs")).toBeTruthy();
+    expect(screen.queryByText("Past Invite")).toBeNull();
   });
 });
