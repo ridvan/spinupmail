@@ -303,7 +303,10 @@ export const ChangePasswordPanel = ({
   return (
     <Card
       id={wrapperId}
-      className="border-border/70 bg-card/60 scroll-mt-24 md:scroll-mt-28"
+      className={cn(
+        "border-border/70 bg-card/60 scroll-mt-24 md:scroll-mt-28",
+        wrapperClassName
+      )}
     >
       {content}
     </Card>

@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
@@ -35,10 +36,12 @@ const buildMockUser = () => ({
   twoFactorEnabled: false,
 });
 
-const renderChangePasswordPanel = () =>
+const renderChangePasswordPanel = (
+  props?: Partial<ComponentProps<typeof ChangePasswordPanel>>
+) =>
   render(
     <TestQueryProvider>
-      <ChangePasswordPanel />
+      <ChangePasswordPanel {...props} />
     </TestQueryProvider>
   );
 
@@ -132,5 +135,32 @@ describe("ChangePasswordPanel", () => {
       name: "Update password",
     });
     expect((submitButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("applies wrapperClassName when rendering with the default card wrapper", () => {
+    mockedUseAuth.mockReturnValue({
+      session: null,
+      user: buildMockUser(),
+      activeOrganizationId: null,
+      isAuthenticated: true,
+      hasActiveOrganization: false,
+      isSigningOut: false,
+      isOrganizationSwitching: false,
+      isLoading: false,
+      isRefetching: false,
+      refreshSession: vi.fn(),
+      beginOrganizationSwitch: vi.fn(),
+      completeOrganizationSwitch: vi.fn(),
+      cancelOrganizationSwitch: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderChangePasswordPanel({
+      wrapperClassName: "password-wrapper-test",
+    });
+
+    expect(
+      screen.getByText("Password").closest(".password-wrapper-test")
+    ).toBeTruthy();
   });
 });
