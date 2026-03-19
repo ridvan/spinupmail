@@ -38,7 +38,7 @@ export const OrganizationMembersCard = ({
 }: OrganizationMembersCardProps) => {
   if (isLoading) {
     return (
-      <Card className="border-border/70 bg-card/60">
+      <Card className="border-border/70 bg-card/60 rounded-none">
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-[15px]">

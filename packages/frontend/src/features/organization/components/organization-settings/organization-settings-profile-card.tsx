@@ -45,7 +45,7 @@ export const OrganizationProfileCard = ({
 }: OrganizationProfileCardProps) => {
   if (isLoading || !activeOrganization) {
     return (
-      <Card className="border-border/70 bg-card/60">
+      <Card className="border-border/70 bg-card/60 rounded-none">
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -65,7 +65,7 @@ export const OrganizationProfileCard = ({
                 Organization ID
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <div className="max-w-90 h-8 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+                <div className="max-w-[360px] h-8 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
                   <Skeleton className="h-4 w-full" />
                 </div>
                 <Button disabled type="button" variant="outline">
@@ -144,7 +144,7 @@ export const OrganizationProfileCard = ({
               Organization ID
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <p className="max-w-90 flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2 font-mono text-xs break-all text-muted-foreground">
+              <p className="max-w-[360px] flex-1 rounded-md border border-border/70 bg-muted/30 px-3 py-2 font-mono text-xs break-all text-muted-foreground">
                 {activeOrganization.id}
               </p>
               <Button
