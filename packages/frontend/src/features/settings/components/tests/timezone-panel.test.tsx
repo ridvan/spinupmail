@@ -77,4 +77,39 @@ describe("TimezonePanel", () => {
     expect(clearTimeZone).toHaveBeenCalledTimes(1);
     expect(setTimeZone).not.toHaveBeenCalled();
   });
+
+  it("clears the timezone search when manual mode is turned off", () => {
+    mockedUseTimezone.mockReturnValue({
+      effectiveTimeZone: "UTC",
+      savedTimeZone: null,
+      sessionTimeZone: "America/New_York",
+      source: "browser",
+      isSaving: false,
+      error: null,
+      setTimeZone: vi.fn(),
+      clearTimeZone: vi.fn(),
+    });
+
+    render(<TimezonePanel />);
+
+    const checkbox = screen.getByRole("checkbox");
+    fireEvent.click(checkbox);
+
+    const searchInput = screen.getByRole("combobox", {
+      name: "Search timezones",
+    });
+    fireEvent.change(searchInput, { target: { value: "new york" } });
+    expect((searchInput as HTMLInputElement).value).toBe("new york");
+
+    fireEvent.click(checkbox);
+    fireEvent.click(checkbox);
+
+    expect(
+      (
+        screen.getByRole("combobox", {
+          name: "Search timezones",
+        }) as HTMLInputElement
+      ).value
+    ).toBe("");
+  });
 });

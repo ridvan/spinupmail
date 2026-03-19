@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { FieldLabel } from "@/components/ui/field";
 import { type TimeZoneSource } from "@/features/timezone/lib/resolve-timezone";
 
-const describeSource = (source: string) => {
+const describeSource = (source: TimeZoneSource) => {
   switch (source) {
     case "user":
       return "Saved preference";
@@ -12,8 +12,10 @@ const describeSource = (source: string) => {
       return "Device timezone";
     case "session":
       return "Cloudflare geolocation";
-    default:
+    case "utc":
       return "UTC fallback";
+    default:
+      return source satisfies never;
   }
 };
 

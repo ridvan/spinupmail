@@ -6,12 +6,16 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChevronsUpDownIcon,
+  type ChevronsUpDownIconHandle,
+} from "@/components/ui/chevrons-up-down";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -145,6 +149,11 @@ const UserProfilePanelBody = ({
 }) => {
   const [searchValue, setSearchValue] = React.useState("");
   const [isTimezoneMenuOpen, setIsTimezoneMenuOpen] = React.useState(false);
+  const timezoneTriggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const timezoneChevronsRef = React.useRef<ChevronsUpDownIconHandle | null>(
+    null
+  );
+  const timezoneSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const [visibleTimezoneCount, setVisibleTimezoneCount] = React.useState(
     TIMEZONE_INITIAL_RENDER_COUNT
   );
@@ -242,6 +251,47 @@ const UserProfilePanelBody = ({
     if (normalizedSearchValue.length > 0) return filteredTimeZones;
     return filteredTimeZones.slice(0, visibleTimezoneCount);
   }, [filteredTimeZones, normalizedSearchValue, visibleTimezoneCount]);
+
+  const restoreTimezoneTriggerFocus = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      timezoneTriggerRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (!isTimezoneMenuOpen || typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      timezoneSearchInputRef.current?.focus({ preventScroll: true });
+    });
+  }, [isTimezoneMenuOpen]);
+
+  const handleTimezoneTriggerMouseEnter = React.useCallback(() => {
+    if (isTimezoneMenuOpen) return;
+    timezoneChevronsRef.current?.startAnimation();
+  }, [isTimezoneMenuOpen]);
+
+  const handleTimezoneTriggerMouseLeave = React.useCallback(() => {
+    if (isTimezoneMenuOpen) return;
+    timezoneChevronsRef.current?.stopAnimation();
+  }, [isTimezoneMenuOpen]);
+
+  const handleTimezonePopoverOpenChange = React.useCallback(
+    (open: boolean) => {
+      setIsTimezoneMenuOpen(open);
+      if (open) {
+        timezoneChevronsRef.current?.startAnimation();
+        return;
+      }
+
+      setSearchValue("");
+      timezoneChevronsRef.current?.stopAnimation();
+      restoreTimezoneTriggerFocus();
+    },
+    [restoreTimezoneTriggerFocus]
+  );
 
   return (
     <form.Subscribe
@@ -375,16 +425,13 @@ const UserProfilePanelBody = ({
                           <FieldLabel className="text-muted-foreground">
                             Timezone
                           </FieldLabel>
-                          <DropdownMenu
+                          <Popover
                             open={isTimezoneMenuOpen}
-                            onOpenChange={open => {
-                              setIsTimezoneMenuOpen(open);
-                              if (!open) {
-                                setSearchValue("");
-                              }
-                            }}
+                            modal={false}
+                            onOpenChange={handleTimezonePopoverOpenChange}
                           >
-                            <DropdownMenuTrigger
+                            <PopoverTrigger
+                              ref={timezoneTriggerRef}
                               render={
                                 <Button
                                   type="button"
@@ -394,16 +441,29 @@ const UserProfilePanelBody = ({
                                     !isAuthenticated ||
                                     updateProfileMutation.isPending
                                   }
+                                  onMouseEnter={handleTimezoneTriggerMouseEnter}
+                                  onMouseLeave={handleTimezoneTriggerMouseLeave}
                                 />
                               }
                             >
-                              <span className="truncate">
+                              <span className="min-w-0 flex-1 truncate text-left">
                                 {field.state.value || "Select timezone"}
                               </span>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="p-0">
+                              <ChevronsUpDownIcon
+                                ref={timezoneChevronsRef}
+                                size={16}
+                                className="ml-2 shrink-0 text-muted-foreground"
+                              />
+                            </PopoverTrigger>
+                            <PopoverContent
+                              align="start"
+                              className="p-0"
+                              initialFocus={false}
+                              finalFocus={false}
+                            >
                               <TimezoneCommandList
                                 commandClassName="border-0 bg-card"
+                                inputRef={timezoneSearchInputRef}
                                 searchValue={searchValue}
                                 selectedTimeZone={field.state.value}
                                 timeZones={visibleTimeZones}
@@ -418,10 +478,11 @@ const UserProfilePanelBody = ({
                                   field.handleChange(timeZone);
                                   setIsTimezoneMenuOpen(false);
                                   setSearchValue("");
+                                  restoreTimezoneTriggerFocus();
                                 }}
                               />
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            </PopoverContent>
+                          </Popover>
                           {isInvalid ? (
                             <FieldError
                               errors={toFieldErrors(field.state.meta.errors)}
@@ -649,5 +710,9 @@ export const UserProfilePanel = ({
     return <div className={cn("min-w-0", wrapperClassName)}>{content}</div>;
   }
 
-  return <Card className="border-border/70 bg-card/60">{content}</Card>;
+  return (
+    <Card className={cn("border-border/70 bg-card/60", wrapperClassName)}>
+      {content}
+    </Card>
+  );
 };

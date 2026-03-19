@@ -68,6 +68,15 @@ const renderUserProfilePanel = () =>
     </TestQueryProvider>
   );
 
+const renderUserProfilePanelWithProps = (
+  props: React.ComponentProps<typeof UserProfilePanel>
+) =>
+  render(
+    <TestQueryProvider>
+      <UserProfilePanel {...props} />
+    </TestQueryProvider>
+  );
+
 const buildAuthenticatedAuthState = (refreshSession = vi.fn()) => ({
   session: null,
   user: buildMockUser("Jane Doe"),
@@ -266,5 +275,19 @@ describe("UserProfilePanel", () => {
     expect(
       screen.getByRole("button", { name: "America/New_York" })
     ).toBeTruthy();
+  });
+
+  it("applies wrapperClassName when rendering with the default card wrapper", () => {
+    mockedUseAuth.mockReturnValue(buildAuthenticatedAuthState());
+
+    const { container } = renderUserProfilePanelWithProps({
+      wrapperClassName: "profile-wrapper-test",
+    });
+
+    expect(
+      container
+        .querySelector('[data-slot="card"]')
+        ?.className.includes("profile-wrapper-test")
+    ).toBe(true);
   });
 });

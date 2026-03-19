@@ -17,6 +17,7 @@ export const TimezoneCommandList = ({
   onSelectTimeZone,
   commandClassName,
   onInputKeyDown,
+  inputRef,
 }: {
   timeZones: string[];
   selectedTimeZone: string;
@@ -25,6 +26,7 @@ export const TimezoneCommandList = ({
   onSelectTimeZone: (timeZone: string) => void;
   commandClassName?: string;
   onInputKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  inputRef?: React.Ref<HTMLInputElement>;
 }) => {
   return (
     <Command
@@ -35,6 +37,7 @@ export const TimezoneCommandList = ({
       <CommandInput
         aria-label="Search timezones"
         placeholder={TIMEZONE_SEARCH_PLACEHOLDER}
+        ref={inputRef}
         value={searchValue}
         onValueChange={onSearchValueChange}
         onKeyDown={onInputKeyDown}

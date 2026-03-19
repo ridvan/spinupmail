@@ -87,8 +87,12 @@ export const TimezonePanel = () => {
                 className="mt-0.5"
                 checked={manualMode}
                 onCheckedChange={checked => {
+                  const nextManualMode = Boolean(checked);
                   setLocalError(null);
-                  setManualMode(Boolean(checked));
+                  setManualMode(nextManualMode);
+                  if (!nextManualMode) {
+                    setSearchValue("");
+                  }
                 }}
               />
               <span className="space-y-0.5">
