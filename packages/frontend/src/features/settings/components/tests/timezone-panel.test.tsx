@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { TimezonePanel } from "@/features/settings/components/timezone-panel";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 
+vi.mock("@/features/timezone/lib/timezone-options", () => ({
+  getSupportedTimeZones: () => ["UTC", "America/New_York", "Europe/Istanbul"],
+}));
+
 vi.mock("@/features/timezone/hooks/use-timezone", () => ({
   useTimezone: vi.fn(),
 }));
