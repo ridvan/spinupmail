@@ -1,4 +1,5 @@
 import * as React from "react";
+import { KeyRound } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -141,10 +142,13 @@ export const ApiKeysPanel = () => {
   return (
     <Card className="border-border/70 bg-card/60">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <CardTitle className="text-lg">API Keys</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Create keys for automation and integrations.
-        </p>
+        <CardTitle className="flex items-center gap-2 text-[15px]">
+          <KeyRound
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+          <span>API Keys</span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 pt-1">
         <form

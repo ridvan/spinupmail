@@ -1,19 +1,15 @@
 import * as React from "react";
+import { Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { FieldLabel } from "@/components/ui/field";
+import { TimezoneCommandList } from "@/features/settings/components/timezone-picker";
+import { useFilteredTimeZones } from "@/features/settings/lib/timezone-picker";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
-import { getSupportedTimeZones } from "@/features/timezone/lib/timezone-options";
+import { type TimeZoneSource } from "@/features/timezone/lib/resolve-timezone";
 
 const describeSource = (source: string) => {
   switch (source) {
@@ -28,12 +24,44 @@ const describeSource = (source: string) => {
   }
 };
 
-const normalizeTimezoneSearchValue = (value: string) =>
-  value
-    .toLowerCase()
-    .replaceAll(/[_/.-]+/g, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim();
+export const UserProfileTimezoneSection = ({
+  effectiveTimeZone,
+  source,
+  previewValue,
+  manualTimezoneField,
+  timezoneField,
+}: {
+  effectiveTimeZone: string;
+  source: TimeZoneSource;
+  previewValue: string;
+  manualTimezoneField: React.ReactNode;
+  timezoneField: React.ReactNode;
+}) => {
+  return (
+    <div className="space-y-3 rounded-lg border border-border/60 bg-background/40 p-4">
+      <FieldLabel className="flex items-center gap-1.5 text-muted-foreground">
+        <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+        <span>Timezone</span>
+      </FieldLabel>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span>Current:</span>{" "}
+        <Badge variant="secondary">{effectiveTimeZone}</Badge>
+        <Badge variant="outline">{describeSource(source)}</Badge>
+      </div>
+
+      {manualTimezoneField}
+      {timezoneField}
+
+      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+        <p className="text-xs text-muted-foreground">
+          Current time in selected timezone:
+        </p>
+        <p className="font-medium">{previewValue}</p>
+      </div>
+    </div>
+  );
+};
 
 export const TimezonePanel = () => {
   const {
@@ -51,21 +79,12 @@ export const TimezonePanel = () => {
   const [selectedTimeZone, setSelectedTimeZone] = React.useState<string>(
     savedTimeZone ?? effectiveTimeZone
   );
-
-  const supportedTimeZones = React.useMemo(() => getSupportedTimeZones(), []);
+  const { filteredTimeZones } = useFilteredTimeZones(searchValue);
 
   React.useEffect(() => {
     setManualMode(Boolean(savedTimeZone));
     setSelectedTimeZone(savedTimeZone ?? effectiveTimeZone);
   }, [effectiveTimeZone, savedTimeZone]);
-
-  const filteredTimeZones = React.useMemo(() => {
-    if (!searchValue.trim()) return supportedTimeZones;
-    const query = normalizeTimezoneSearchValue(searchValue);
-    return supportedTimeZones.filter(timeZone =>
-      normalizeTimezoneSearchValue(timeZone).includes(query)
-    );
-  }, [searchValue, supportedTimeZones]);
 
   const previewTimeZone = manualMode ? selectedTimeZone : effectiveTimeZone;
   const previewValue = formatDateTimeInTimeZone({
@@ -137,36 +156,17 @@ export const TimezonePanel = () => {
 
         {manualMode ? (
           <div className="space-y-2">
-            <Command
-              className="border border-border/70 bg-card"
-              shouldFilter={false}
-            >
-              <CommandInput
-                placeholder="Search timezone (e.g. America/New_York)"
-                value={searchValue}
-                onValueChange={setSearchValue}
-              />
-              <CommandList className="max-h-64">
-                <CommandEmpty>No timezone found.</CommandEmpty>
-                <CommandGroup>
-                  {filteredTimeZones.map(timeZone => (
-                    <CommandItem
-                      key={timeZone}
-                      value={timeZone}
-                      data-checked={
-                        selectedTimeZone === timeZone ? true : undefined
-                      }
-                      onSelect={() => {
-                        setLocalError(null);
-                        setSelectedTimeZone(timeZone);
-                      }}
-                    >
-                      <span className="truncate">{timeZone}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+            <TimezoneCommandList
+              commandClassName="border border-border/70 bg-card"
+              searchValue={searchValue}
+              selectedTimeZone={selectedTimeZone}
+              timeZones={filteredTimeZones}
+              onSearchValueChange={setSearchValue}
+              onSelectTimeZone={timeZone => {
+                setLocalError(null);
+                setSelectedTimeZone(timeZone);
+              }}
+            />
             <p className="text-xs text-muted-foreground">
               Selected:{" "}
               <span className="font-mono text-foreground">

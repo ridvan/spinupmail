@@ -1,8 +1,16 @@
 import * as React from "react";
-import { Copy01Icon } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  Key01Icon,
+  LockIcon,
+  QrCodeIcon,
+  SecurityCheckIcon,
+  SmartPhone01Icon,
+  SquareUnlock02Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
-import { Lock, LockOpen } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +33,7 @@ import {
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient, type AuthUser } from "@/lib/auth";
-import QRCode from "react-qr-code";
+import { QRCode } from "@/lib/react-qr-code";
 
 const OTP_LENGTH = 6;
 
@@ -268,78 +276,172 @@ export const TwoFactorPanel = () => {
   };
 
   return (
-    <Card className="border-border/70 bg-card/60">
+    <Card className="border-border/70 bg-card/60 rounded-none">
       <CardHeader className="space-y-1 border-b border-border/70 pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-lg">Two-Factor Authentication</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-[15px]">
+            <HugeiconsIcon
+              aria-hidden="true"
+              icon={SecurityCheckIcon}
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              strokeWidth={2}
+            />
+            <span>Two-Factor Authentication</span>
+          </CardTitle>
           <Badge
             className="inline-flex items-center gap-1.5"
             variant={twoFactorEnabled ? "default" : "outline"}
           >
             {twoFactorEnabled ? (
-              <Lock className="size-3.5" aria-hidden="true" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                icon={LockIcon}
+                className="size-3.5"
+                strokeWidth={2}
+              />
             ) : (
-              <LockOpen className="size-3.5" aria-hidden="true" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                icon={SquareUnlock02Icon}
+                className="size-3.5"
+                strokeWidth={2}
+              />
             )}
             {twoFactorEnabled ? "Enabled" : "Disabled"}
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Add an additional layer of security to your account.
-        </p>
       </CardHeader>
       <CardContent className="space-y-5 pt-1">
         {!twoFactorEnabled && !setupState ? (
-          <div className="max-w-md rounded-lg border border-border/70 bg-background/40 p-4">
-            <form
-              className="space-y-3"
-              noValidate
-              onSubmit={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                void enableForm.handleSubmit();
-              }}
-            >
-              <enableForm.Field
-                name="password"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={field.name}>
-                        Current password
-                      </FieldLabel>
-                      <Input
-                        autoComplete="current-password"
-                        aria-invalid={isInvalid}
-                        id={field.name}
-                        name={field.name}
-                        type="password"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
-                        }
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-stretch">
+            <div className="w-full max-w-none rounded-lg border border-border/70 bg-background/40 p-4 xl:max-w-md">
+              <form
+                className="space-y-4"
+                noValidate
+                onSubmit={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void enableForm.handleSubmit();
                 }}
-              />
-              <Button
-                className="min-w-32"
-                disabled={enableForm.state.isSubmitting}
-                type="submit"
               >
-                {enableForm.state.isSubmitting ? "Preparing..." : "Enable 2FA"}
-              </Button>
-            </form>
+                <div className="space-y-1.5">
+                  <p className="text-[15px] font-medium">Start setup</p>
+                </div>
+
+                <enableForm.Field
+                  name="password"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel
+                          htmlFor={field.name}
+                          className="text-muted-foreground"
+                        >
+                          Current password
+                        </FieldLabel>
+                        <Input
+                          autoComplete="current-password"
+                          aria-invalid={isInvalid}
+                          id={field.name}
+                          name={field.name}
+                          type="password"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={event =>
+                            field.handleChange(event.target.value)
+                          }
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    className="min-w-32"
+                    disabled={enableForm.state.isSubmitting}
+                    type="submit"
+                  >
+                    {enableForm.state.isSubmitting
+                      ? "Preparing..."
+                      : "Enable 2FA"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            <div className="space-y-4 py-1">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-[15px] font-semibold leading-tight text-balance">
+                    Secure your sign-in with 2FA
+                  </h3>
+                  <div className="inline-flex items-center gap-2 border border-border/70 bg-background/70 px-2.5 py-1 text-[12px] rounded-full font-medium text-muted-foreground">
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      icon={Tick02Icon}
+                      className="h-3.5 w-3.5"
+                      strokeWidth={2}
+                    />
+                    Recommended
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
+                  <div className="flex items-center gap-2">
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      icon={SmartPhone01Icon}
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
+                      strokeWidth={2}
+                    />
+                    <p className="text-sm font-medium">Authenticator app</p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    1. Install Google Authenticator or similar apps.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
+                  <div className="flex items-center gap-2">
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      icon={QrCodeIcon}
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
+                      strokeWidth={2}
+                    />
+                    <p className="text-sm font-medium">Quick setup</p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    2. Scan the QR code and enter one verification code.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/55 p-3">
+                  <div className="flex items-center gap-2">
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      icon={Key01Icon}
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
+                      strokeWidth={2}
+                    />
+                    <p className="text-sm font-medium">Backup codes</p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    3. Save recovery codes in case you lose your device.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -411,7 +513,10 @@ export const TwoFactorPanel = () => {
 
                       return (
                         <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={field.name}>
+                          <FieldLabel
+                            htmlFor={field.name}
+                            className="text-muted-foreground"
+                          >
                             Verification code
                           </FieldLabel>
                           <InputOTP
@@ -483,7 +588,10 @@ export const TwoFactorPanel = () => {
 
                   return (
                     <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={`regen-${field.name}`}>
+                      <FieldLabel
+                        htmlFor={`regen-${field.name}`}
+                        className="text-muted-foreground"
+                      >
                         Current password
                       </FieldLabel>
                       <Input
@@ -507,16 +615,18 @@ export const TwoFactorPanel = () => {
                   );
                 }}
               />
-              <Button
-                className="min-w-44"
-                disabled={regenerateBackupCodesForm.state.isSubmitting}
-                type="submit"
-                variant="outline"
-              >
-                {regenerateBackupCodesForm.state.isSubmitting
-                  ? "Generating..."
-                  : "Generate new backup codes"}
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  className="min-w-44"
+                  disabled={regenerateBackupCodesForm.state.isSubmitting}
+                  type="submit"
+                  variant="outline"
+                >
+                  {regenerateBackupCodesForm.state.isSubmitting
+                    ? "Generating..."
+                    : "Generate new backup codes"}
+                </Button>
+              </div>
             </form>
 
             <form
@@ -537,7 +647,10 @@ export const TwoFactorPanel = () => {
 
                   return (
                     <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={`disable-${field.name}`}>
+                      <FieldLabel
+                        htmlFor={`disable-${field.name}`}
+                        className="text-muted-foreground"
+                      >
                         Current password
                       </FieldLabel>
                       <Input
@@ -561,16 +674,18 @@ export const TwoFactorPanel = () => {
                   );
                 }}
               />
-              <Button
-                className="min-w-32"
-                disabled={disableForm.state.isSubmitting}
-                type="submit"
-                variant="destructive"
-              >
-                {disableForm.state.isSubmitting
-                  ? "Disabling..."
-                  : "Disable 2FA"}
-              </Button>
+              <div className="flex justify-end">
+                <Button
+                  className="min-w-32"
+                  disabled={disableForm.state.isSubmitting}
+                  type="submit"
+                  variant="destructive"
+                >
+                  {disableForm.state.isSubmitting
+                    ? "Disabling..."
+                    : "Disable 2FA"}
+                </Button>
+              </div>
             </form>
           </div>
         ) : null}

@@ -1,20 +1,12 @@
 import * as React from "react";
+import { UserRound } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +15,12 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import {
+  shouldStopMenuTypeaheadKey,
+  useFilteredTimeZones,
+} from "@/features/settings/lib/timezone-picker";
+import { TimezoneCommandList } from "@/features/settings/components/timezone-picker";
+import { UserProfileTimezoneSection } from "@/features/settings/components/timezone-panel";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
@@ -30,8 +28,8 @@ import {
   normalizeTimeZone,
   type TimeZoneSource,
 } from "@/features/timezone/lib/resolve-timezone";
-import { getSupportedTimeZones } from "@/features/timezone/lib/timezone-options";
 import { authClient } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 const userProfileSchema = z
   .object({
@@ -58,30 +56,8 @@ const changeEmailSchema = z.object({
   newEmail: z.string().email("Enter a valid email address."),
 });
 
-const describeSource = (source: TimeZoneSource) => {
-  switch (source) {
-    case "user":
-      return "Saved preference";
-    case "browser":
-      return "Device timezone";
-    case "session":
-      return "Cloudflare geolocation";
-    default:
-      return "UTC fallback";
-  }
-};
-
-const normalizeTimezoneSearchValue = (value: string) =>
-  value
-    .toLowerCase()
-    .replaceAll(/[_/.-]+/g, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim();
-
 const TIMEZONE_INITIAL_RENDER_COUNT = 120;
 const TIMEZONE_RENDER_CHUNK = 120;
-const shouldStopMenuTypeaheadKey = (key: string) =>
-  key.length === 1 || key === "Backspace" || key === "Delete";
 
 const updateUserProfile = authClient.updateUser as unknown as (payload: {
   name?: string;
@@ -172,15 +148,8 @@ const UserProfilePanelBody = ({
   const [visibleTimezoneCount, setVisibleTimezoneCount] = React.useState(
     TIMEZONE_INITIAL_RENDER_COUNT
   );
-  const supportedTimeZones = React.useMemo(() => getSupportedTimeZones(), []);
-  const searchableTimeZones = React.useMemo(
-    () =>
-      supportedTimeZones.map(timeZone => ({
-        timeZone,
-        normalized: normalizeTimezoneSearchValue(timeZone),
-      })),
-    [supportedTimeZones]
-  );
+  const { filteredTimeZones, normalizedSearchValue } =
+    useFilteredTimeZones(searchValue);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (payload: {
@@ -232,23 +201,6 @@ const UserProfilePanelBody = ({
       });
     },
   });
-
-  const normalizedSearchValue = React.useMemo(
-    () => normalizeTimezoneSearchValue(searchValue),
-    [searchValue]
-  );
-
-  const filteredTimeZones = React.useMemo(() => {
-    if (!searchValue.trim()) return supportedTimeZones;
-    return searchableTimeZones
-      .filter(({ normalized }) => normalized.includes(normalizedSearchValue))
-      .map(({ timeZone }) => timeZone);
-  }, [
-    normalizedSearchValue,
-    searchValue,
-    searchableTimeZones,
-    supportedTimeZones,
-  ]);
 
   React.useEffect(() => {
     if (!isTimezoneMenuOpen) {
@@ -374,146 +326,114 @@ const UserProfilePanelBody = ({
               <div className="space-y-2">{emailSection}</div>
             ) : null}
 
-            <div className="space-y-3 rounded-lg border border-border/60 bg-background/40 p-4">
-              <FieldLabel className="text-muted-foreground">
-                Timezone
-              </FieldLabel>
-              <div className="flex flex-wrap items-center gap-2">
-                <span>Current:</span>{" "}
-                <Badge variant="secondary">{effectiveTimeZone}</Badge>
-                <Badge variant="outline">{describeSource(source)}</Badge>
-              </div>
-
-              <form.Field
-                name="manualTimezone"
-                children={field => (
-                  <label className="flex items-start gap-3 text-sm">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={field.state.value}
-                      onCheckedChange={checked => {
-                        const nextManualMode = Boolean(checked);
-                        field.handleChange(nextManualMode);
-                        if (!nextManualMode) {
-                          setIsTimezoneMenuOpen(false);
-                          setSearchValue("");
-                        }
-                      }}
-                      disabled={
-                        !isAuthenticated || updateProfileMutation.isPending
-                      }
-                    />
-                    <span className="space-y-0.5">
-                      <span className="block font-medium">
-                        Use specific timezone
-                      </span>
-                      <span className="block text-muted-foreground">
-                        Turn off to automatically follow your device timezone.
-                      </span>
-                    </span>
-                  </label>
-                )}
-              />
-
-              {values.manualTimezone ? (
+            <UserProfileTimezoneSection
+              effectiveTimeZone={effectiveTimeZone}
+              source={source}
+              previewValue={previewValue}
+              manualTimezoneField={
                 <form.Field
-                  name="timezone"
-                  children={field => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
+                  name="manualTimezone"
+                  children={field => (
+                    <label className="flex items-start gap-3 text-sm">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={field.state.value}
+                        onCheckedChange={checked => {
+                          const nextManualMode = Boolean(checked);
+                          field.handleChange(nextManualMode);
+                          if (!nextManualMode) {
+                            setIsTimezoneMenuOpen(false);
+                            setSearchValue("");
+                          }
+                        }}
+                        disabled={
+                          !isAuthenticated || updateProfileMutation.isPending
+                        }
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block font-medium">
+                          Use specific timezone
+                        </span>
+                        <span className="block text-muted-foreground">
+                          Turn off to automatically follow your device timezone.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                />
+              }
+              timezoneField={
+                values.manualTimezone ? (
+                  <form.Field
+                    name="timezone"
+                    children={field => {
+                      const isInvalid =
+                        field.state.meta.isTouched && !field.state.meta.isValid;
 
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel className="text-muted-foreground">
-                          Timezone
-                        </FieldLabel>
-                        <DropdownMenu
-                          open={isTimezoneMenuOpen}
-                          onOpenChange={open => {
-                            setIsTimezoneMenuOpen(open);
-                            if (!open) {
-                              setSearchValue("");
-                            }
-                          }}
-                        >
-                          <DropdownMenuTrigger
-                            render={
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full justify-between font-normal"
-                                disabled={
-                                  !isAuthenticated ||
-                                  updateProfileMutation.isPending
-                                }
-                              />
-                            }
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel className="text-muted-foreground">
+                            Timezone
+                          </FieldLabel>
+                          <DropdownMenu
+                            open={isTimezoneMenuOpen}
+                            onOpenChange={open => {
+                              setIsTimezoneMenuOpen(open);
+                              if (!open) {
+                                setSearchValue("");
+                              }
+                            }}
                           >
-                            <span className="truncate">
-                              {field.state.value || "Select timezone"}
-                            </span>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="p-0">
-                            <Command
-                              className="border-0 bg-card"
-                              shouldFilter={false}
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-between font-normal"
+                                  disabled={
+                                    !isAuthenticated ||
+                                    updateProfileMutation.isPending
+                                  }
+                                />
+                              }
                             >
-                              <CommandInput
-                                placeholder="Search timezone (e.g. America/New_York)"
-                                value={searchValue}
-                                onValueChange={setSearchValue}
-                                onKeyDown={event => {
-                                  if (!shouldStopMenuTypeaheadKey(event.key))
+                              <span className="truncate">
+                                {field.state.value || "Select timezone"}
+                              </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="p-0">
+                              <TimezoneCommandList
+                                commandClassName="border-0 bg-card"
+                                searchValue={searchValue}
+                                selectedTimeZone={field.state.value}
+                                timeZones={visibleTimeZones}
+                                onSearchValueChange={setSearchValue}
+                                onInputKeyDown={event => {
+                                  if (!shouldStopMenuTypeaheadKey(event.key)) {
                                     return;
+                                  }
                                   event.stopPropagation();
                                 }}
+                                onSelectTimeZone={timeZone => {
+                                  field.handleChange(timeZone);
+                                  setIsTimezoneMenuOpen(false);
+                                  setSearchValue("");
+                                }}
                               />
-                              <CommandList className="max-h-64">
-                                <CommandEmpty>No timezone found.</CommandEmpty>
-                                <CommandGroup>
-                                  {visibleTimeZones.map(timeZone => (
-                                    <CommandItem
-                                      key={timeZone}
-                                      value={timeZone}
-                                      data-checked={
-                                        field.state.value === timeZone
-                                          ? true
-                                          : undefined
-                                      }
-                                      onSelect={() => {
-                                        field.handleChange(timeZone);
-                                        setIsTimezoneMenuOpen(false);
-                                        setSearchValue("");
-                                      }}
-                                    >
-                                      <span className="truncate">
-                                        {timeZone}
-                                      </span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        {isInvalid ? (
-                          <FieldError
-                            errors={toFieldErrors(field.state.meta.errors)}
-                          />
-                        ) : null}
-                      </Field>
-                    );
-                  }}
-                />
-              ) : null}
-
-              <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm">
-                <p className="text-xs text-muted-foreground">
-                  Current time in selected timezone:
-                </p>
-                <p className="font-medium">{previewValue}</p>
-              </div>
-            </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {isInvalid ? (
+                            <FieldError
+                              errors={toFieldErrors(field.state.meta.errors)}
+                            />
+                          ) : null}
+                        </Field>
+                      );
+                    }}
+                  />
+                ) : null
+              }
+            />
 
             <div className="flex justify-end">
               <Button
@@ -536,7 +456,17 @@ const UserProfilePanelBody = ({
   );
 };
 
-export const UserProfilePanel = () => {
+export const UserProfilePanel = ({
+  withCard = true,
+  wrapperClassName,
+  headerClassName,
+  contentClassName,
+}: {
+  withCard?: boolean;
+  wrapperClassName?: string;
+  headerClassName?: string;
+  contentClassName?: string;
+}) => {
   const { user, refreshSession } = useAuth();
   const { effectiveTimeZone, savedTimeZone, source } = useTimezone();
   const [isEditingEmail, setIsEditingEmail] = React.useState(false);
@@ -582,15 +512,23 @@ export const UserProfilePanel = () => {
     },
   });
 
-  return (
-    <Card className="border-border/70 bg-card/60">
-      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <CardTitle className="text-lg">User Profile</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Manage your account details and timezone preferences.
-        </p>
+  const content = (
+    <>
+      <CardHeader
+        className={cn(
+          "space-y-1 border-b border-border/70 pb-4",
+          headerClassName
+        )}
+      >
+        <CardTitle className="flex items-center gap-2 text-[15px]">
+          <UserRound
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+          <span>User Profile</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent className="pt-1 text-sm">
+      <CardContent className={cn("pt-3 text-sm", contentClassName)}>
         <emailForm.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,
@@ -704,6 +642,12 @@ export const UserProfilePanel = () => {
           )}
         </emailForm.Subscribe>
       </CardContent>
-    </Card>
+    </>
   );
+
+  if (!withCard) {
+    return <div className={cn("min-w-0", wrapperClassName)}>{content}</div>;
+  }
+
+  return <Card className="border-border/70 bg-card/60">{content}</Card>;
 };

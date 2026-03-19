@@ -1,3 +1,4 @@
+import { LockKeyhole } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 const changePasswordSchema = z
   .object({
@@ -30,7 +32,17 @@ const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
-export const ChangePasswordPanel = () => {
+export const ChangePasswordPanel = ({
+  withCard = true,
+  wrapperClassName,
+  headerClassName,
+  contentClassName,
+}: {
+  withCard?: boolean;
+  wrapperClassName?: string;
+  headerClassName?: string;
+  contentClassName?: string;
+}) => {
   const { user, refreshSession } = useAuth();
 
   const changePasswordMutation = useMutation({
@@ -83,15 +95,23 @@ export const ChangePasswordPanel = () => {
     },
   });
 
-  return (
-    <Card className="border-border/70 bg-card/60">
-      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <CardTitle className="text-lg">Password</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Update your password for email/password sign-in.
-        </p>
+  const content = (
+    <>
+      <CardHeader
+        className={cn(
+          "space-y-1 border-b border-border/70 pb-4",
+          headerClassName
+        )}
+      >
+        <CardTitle className="flex items-center gap-2 text-[15px]">
+          <LockKeyhole
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+          <span>Password</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent className="pt-1">
+      <CardContent className={cn("pt-3", contentClassName)}>
         <form.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,
@@ -116,7 +136,10 @@ export const ChangePasswordPanel = () => {
 
                   return (
                     <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={field.name}>
+                      <FieldLabel
+                        htmlFor={field.name}
+                        className="text-muted-foreground"
+                      >
                         Current password
                       </FieldLabel>
                       <Input
@@ -151,7 +174,12 @@ export const ChangePasswordPanel = () => {
 
                   return (
                     <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={field.name}>New password</FieldLabel>
+                      <FieldLabel
+                        htmlFor={field.name}
+                        className="text-muted-foreground"
+                      >
+                        New password
+                      </FieldLabel>
                       <Input
                         id={field.name}
                         name={field.name}
@@ -184,7 +212,10 @@ export const ChangePasswordPanel = () => {
 
                   return (
                     <Field data-invalid={isInvalid}>
-                      <FieldLabel htmlFor={field.name}>
+                      <FieldLabel
+                        htmlFor={field.name}
+                        className="text-muted-foreground"
+                      >
                         Confirm new password
                       </FieldLabel>
                       <Input
@@ -253,6 +284,12 @@ export const ChangePasswordPanel = () => {
           )}
         </form.Subscribe>
       </CardContent>
-    </Card>
+    </>
   );
+
+  if (!withCard) {
+    return <div className={cn("min-w-0", wrapperClassName)}>{content}</div>;
+  }
+
+  return <Card className="border-border/70 bg-card/60">{content}</Card>;
 };
