@@ -94,7 +94,7 @@ export const useAddressQuery = (
   });
 };
 
-export const useAllAddressesQuery = () => {
+export const useAllAddressesQuery = (options?: { enabled?: boolean }) => {
   const { activeOrganizationId, isOrganizationSwitching } = useAuth();
 
   return useQuery({
@@ -104,7 +104,11 @@ export const useAllAddressesQuery = () => {
         signal,
         organizationId: activeOrganizationId,
       }),
-    enabled: Boolean(activeOrganizationId && !isOrganizationSwitching),
+    enabled: Boolean(
+      activeOrganizationId &&
+      !isOrganizationSwitching &&
+      (options?.enabled ?? true)
+    ),
     staleTime: 20_000,
   });
 };

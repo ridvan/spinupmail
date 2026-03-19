@@ -22,8 +22,16 @@ vi.mock("@/components/app-sidebar", () => ({
   ),
 }));
 
+vi.mock("@/components/app-command-menu", () => ({
+  AppCommandMenu: () => <div>command-menu</div>,
+}));
+
 vi.mock("@/components/mode-toggle", () => ({
   ModeToggle: () => <div>mode-toggle</div>,
+}));
+
+vi.mock("@/hooks/use-hash-navigation", () => ({
+  useHashNavigation: vi.fn(),
 }));
 
 vi.mock("@/components/ui/sidebar", () => ({
@@ -160,6 +168,40 @@ describe("ProtectedLayoutPage", () => {
     });
 
     expect(screen.getByText("Inbox")).toBeTruthy();
+  });
+
+  it("renders the command menu before the theme toggle", () => {
+    mockedUseAuth.mockReturnValue(
+      buildAuthState({
+        user: buildMockUser(),
+        isLoading: false,
+      })
+    );
+
+    renderWithRouter({
+      routes: [
+        {
+          path: "/",
+          element: <ProtectedLayoutPage />,
+          children: [
+            {
+              index: true,
+              element: <div>Overview content</div>,
+              handle: { title: "Overview" },
+            },
+          ],
+        },
+      ],
+      initialEntries: ["/"],
+    });
+
+    const commandMenu = screen.getByText("command-menu");
+    const modeToggle = screen.getByText("mode-toggle");
+
+    expect(
+      commandMenu.compareDocumentPosition(modeToggle) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it("surfaces sign-out errors", async () => {

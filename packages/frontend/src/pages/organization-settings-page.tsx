@@ -203,66 +203,84 @@ export const OrganizationSettingsPage = () => {
 
   return (
     <div className="space-y-6 [&_button]:cursor-pointer">
-      <OrganizationProfileCard
-        activeOrganization={activeOrganization ?? null}
-        isLoading={isProfileLoading}
-        canManage={canManage}
-        membersCount={members.length}
-        pendingInvitationsCount={pendingInvitationsCount}
-        currentUserRole={currentUserRole}
-        organizationName={organizationName}
-        organizationNameChanged={organizationNameChanged}
-        isRenamePending={updateOrganizationMutation.isPending}
-        onOrganizationNameChange={handleOrganizationNameChange}
-        onRenameOrganization={handleRenameOrganization}
-        onCopyOrganizationId={() =>
-          activeOrganization
-            ? void copyToClipboard(
-                activeOrganization.id,
-                "Organization ID copied."
-              )
-            : undefined
-        }
-      />
+      <section
+        id="organization-profile"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Organization profile"
+      >
+        <OrganizationProfileCard
+          activeOrganization={activeOrganization ?? null}
+          isLoading={isProfileLoading}
+          canManage={canManage}
+          membersCount={members.length}
+          pendingInvitationsCount={pendingInvitationsCount}
+          currentUserRole={currentUserRole}
+          organizationName={organizationName}
+          organizationNameChanged={organizationNameChanged}
+          isRenamePending={updateOrganizationMutation.isPending}
+          onOrganizationNameChange={handleOrganizationNameChange}
+          onRenameOrganization={handleRenameOrganization}
+          onCopyOrganizationId={() =>
+            activeOrganization
+              ? void copyToClipboard(
+                  activeOrganization.id,
+                  "Organization ID copied."
+                )
+              : undefined
+          }
+        />
+      </section>
 
-      <OrganizationMembersCard
-        members={members}
-        isLoading={isMembersLoading}
-        currentUserId={user?.id}
-        canManage={canManage}
-        isUpdateRolePending={updateMemberRoleMutation.isPending}
-        isRemoveMemberPending={removeMemberMutation.isPending}
-        onToggleAdmin={(memberId, role) =>
-          void handleToggleAdmin(memberId, role)
-        }
-        onRemoveMember={memberId => void handleRemoveMember(memberId)}
-      />
+      <section
+        id="organization-members"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Organization members"
+      >
+        <OrganizationMembersCard
+          members={members}
+          isLoading={isMembersLoading}
+          currentUserId={user?.id}
+          canManage={canManage}
+          isUpdateRolePending={updateMemberRoleMutation.isPending}
+          isRemoveMemberPending={removeMemberMutation.isPending}
+          onToggleAdmin={(memberId, role) =>
+            void handleToggleAdmin(memberId, role)
+          }
+          onRemoveMember={memberId => void handleRemoveMember(memberId)}
+        />
+      </section>
 
-      <OrganizationInvitationsCard
-        canManage={canManage}
-        isLoading={isInvitationsLoading}
-        pendingInvitationsCount={pendingInvitationsCount}
-        inviteEmail={inviteEmail}
-        inviteRole={inviteRole}
-        createdInviteLink={createdInviteLink}
-        invitations={invitations}
-        isInviteMemberPending={inviteMemberMutation.isPending}
-        isCancelInvitationPending={cancelInvitationMutation.isPending}
-        onInviteEmailChange={setInviteEmail}
-        onInviteRoleChange={setInviteRole}
-        onInviteMember={handleInviteMember}
-        onCopyCreatedInviteLink={() => {
-          if (!createdInviteLink) return;
-          void copyToClipboard(createdInviteLink, "Invitation link copied.");
-        }}
-        onCopyInvitationLink={invitationId =>
-          void copyToClipboard(
-            buildInvitationUrl(invitationId),
-            "Invitation link copied."
-          )
-        }
-        onCancelInvite={invitationId => void handleCancelInvite(invitationId)}
-      />
+      <section
+        id="organization-invitations"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Organization invitations"
+      >
+        <OrganizationInvitationsCard
+          canManage={canManage}
+          isLoading={isInvitationsLoading}
+          pendingInvitationsCount={pendingInvitationsCount}
+          inviteEmail={inviteEmail}
+          inviteRole={inviteRole}
+          createdInviteLink={createdInviteLink}
+          invitations={invitations}
+          isInviteMemberPending={inviteMemberMutation.isPending}
+          isCancelInvitationPending={cancelInvitationMutation.isPending}
+          onInviteEmailChange={setInviteEmail}
+          onInviteRoleChange={setInviteRole}
+          onInviteMember={handleInviteMember}
+          onCopyCreatedInviteLink={() => {
+            if (!createdInviteLink) return;
+            void copyToClipboard(createdInviteLink, "Invitation link copied.");
+          }}
+          onCopyInvitationLink={invitationId =>
+            void copyToClipboard(
+              buildInvitationUrl(invitationId),
+              "Invitation link copied."
+            )
+          }
+          onCancelInvite={invitationId => void handleCancelInvite(invitationId)}
+        />
+      </section>
 
       {errorMessage ? (
         <p role="alert" className="text-sm text-destructive">

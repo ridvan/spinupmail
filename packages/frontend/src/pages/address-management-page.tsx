@@ -11,11 +11,24 @@ export const AddressManagementPage = () => {
         <p className="text-sm text-destructive">{domainsQuery.error.message}</p>
       ) : null}
 
-      <CreateAddressForm
-        domains={domainsQuery.data?.items ?? []}
-        isDomainsLoading={domainsQuery.isLoading}
-      />
-      <AddressList domains={domainsQuery.data?.items ?? []} />
+      <section
+        id="create-address"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Create email address"
+      >
+        <CreateAddressForm
+          domains={domainsQuery.data?.items ?? []}
+          isDomainsLoading={domainsQuery.isLoading}
+        />
+      </section>
+
+      <section
+        id="addresses-list"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Addresses list"
+      >
+        <AddressList domains={domainsQuery.data?.items ?? []} />
+      </section>
     </div>
   );
 };

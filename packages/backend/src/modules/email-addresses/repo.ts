@@ -8,6 +8,7 @@ const addressListSelect = {
   localPart: emailAddresses.localPart,
   domain: emailAddresses.domain,
   meta: emailAddresses.meta,
+  emailCount: emailAddresses.emailCount,
   createdAt: emailAddresses.createdAt,
   expiresAt: emailAddresses.expiresAt,
   lastReceivedAt: emailAddresses.lastReceivedAt,

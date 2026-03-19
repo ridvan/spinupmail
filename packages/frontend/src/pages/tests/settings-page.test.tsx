@@ -5,11 +5,13 @@ import { SettingsPage } from "@/pages/settings-page";
 vi.mock("@/features/settings/components/user-profile-panel", () => ({
   UserProfilePanel: ({
     withCard = true,
+    wrapperId,
     wrapperClassName,
     headerClassName,
     contentClassName,
   }: {
     withCard?: boolean;
+    wrapperId?: string;
     wrapperClassName?: string;
     headerClassName?: string;
     contentClassName?: string;
@@ -17,6 +19,7 @@ vi.mock("@/features/settings/components/user-profile-panel", () => ({
     <div
       data-testid="user-profile-panel"
       data-with-card={String(withCard)}
+      data-wrapper-id={wrapperId ?? ""}
       data-wrapper-class={wrapperClassName ?? ""}
       data-header-class={headerClassName ?? ""}
       data-content-class={contentClassName ?? ""}
@@ -29,11 +32,13 @@ vi.mock("@/features/settings/components/user-profile-panel", () => ({
 vi.mock("@/features/settings/components/change-password-panel", () => ({
   ChangePasswordPanel: ({
     withCard = true,
+    wrapperId,
     wrapperClassName,
     headerClassName,
     contentClassName,
   }: {
     withCard?: boolean;
+    wrapperId?: string;
     wrapperClassName?: string;
     headerClassName?: string;
     contentClassName?: string;
@@ -41,6 +46,7 @@ vi.mock("@/features/settings/components/change-password-panel", () => ({
     <div
       data-testid="change-password-panel"
       data-with-card={String(withCard)}
+      data-wrapper-id={wrapperId ?? ""}
       data-wrapper-class={wrapperClassName ?? ""}
       data-header-class={headerClassName ?? ""}
       data-content-class={contentClassName ?? ""}
@@ -102,6 +108,12 @@ describe("SettingsPage", () => {
     expect(
       desktopChangePasswordPanel.getAttribute("data-content-class")
     ).toContain("row-start-2");
+    expect(desktopUserProfilePanel.getAttribute("data-wrapper-id")).toBe(
+      "profile"
+    );
+    expect(desktopChangePasswordPanel.getAttribute("data-wrapper-id")).toBe(
+      "password"
+    );
 
     const separators = container.querySelectorAll('[data-slot="separator"]');
     expect(separators).toHaveLength(2);
@@ -119,5 +131,15 @@ describe("SettingsPage", () => {
         desktopChangePasswordPanel
       ) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+
+    const twoFactorSection = screen
+      .getByTestId("two-factor-panel")
+      .closest("section");
+    const apiKeysSection = screen
+      .getByTestId("api-keys-panel")
+      .closest("section");
+
+    expect(twoFactorSection?.id).toBe("two-factor");
+    expect(apiKeysSection?.id).toBe("api-keys");
   });
 });

@@ -84,6 +84,7 @@ export type EmailAddress = {
   localPart: string;
   domain: string;
   meta?: unknown;
+  emailCount: number;
   allowedFromDomains?: string[];
   maxReceivedEmailCount: number | null;
   maxReceivedEmailAction: "cleanAll" | "rejectNew" | null;

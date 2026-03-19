@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Outlet, useMatches, useNavigate, type UIMatch } from "react-router";
+import { AppCommandMenu } from "@/components/app-command-menu";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import {
@@ -8,6 +9,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useHashNavigation } from "@/hooks/use-hash-navigation";
 import { resolveRouteTitle } from "@/lib/route-title";
 
 export const ProtectedLayoutPage = () => {
@@ -18,6 +20,8 @@ export const ProtectedLayoutPage = () => {
   const [signOutError, setSignOutError] = React.useState<string | null>(null);
 
   const pageTitle = resolveRouteTitle(matches as UIMatch[]);
+
+  useHashNavigation();
 
   React.useEffect(() => {
     if (isLoading || user) return;
@@ -46,7 +50,10 @@ export const ProtectedLayoutPage = () => {
                 <p className="text-sm font-medium">{pageTitle}</p>
               </div>
             </div>
-            <ModeToggle />
+            <div className="flex items-center gap-2">
+              <AppCommandMenu onSignOut={handleSignOut} />
+              <ModeToggle />
+            </div>
           </div>
         </header>
 

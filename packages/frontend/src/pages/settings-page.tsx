@@ -12,6 +12,7 @@ export const SettingsPage = () => {
         <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:space-y-0">
           <UserProfilePanel
             withCard={false}
+            wrapperId="profile"
             wrapperClassName="min-w-0 lg:contents"
             headerClassName="min-w-0 lg:col-start-1 lg:row-start-1"
             contentClassName="min-w-0 pt-4 lg:col-start-1 lg:row-start-2 lg:pr-6"
@@ -24,6 +25,7 @@ export const SettingsPage = () => {
           />
           <ChangePasswordPanel
             withCard={false}
+            wrapperId="password"
             wrapperClassName="min-w-0 lg:contents"
             headerClassName="min-w-0 lg:col-start-3 lg:row-start-1"
             contentClassName="min-w-0 pt-4 lg:col-start-3 lg:row-start-2 lg:pl-6"
@@ -31,9 +33,21 @@ export const SettingsPage = () => {
         </div>
       </Card>
 
-      <TwoFactorPanel />
+      <section
+        id="two-factor"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Two-factor authentication"
+      >
+        <TwoFactorPanel />
+      </section>
 
-      <ApiKeysPanel />
+      <section
+        id="api-keys"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="API keys"
+      >
+        <ApiKeysPanel />
+      </section>
     </div>
   );
 };

@@ -34,11 +34,13 @@ const changePasswordSchema = z
 
 export const ChangePasswordPanel = ({
   withCard = true,
+  wrapperId,
   wrapperClassName,
   headerClassName,
   contentClassName,
 }: {
   withCard?: boolean;
+  wrapperId?: string;
   wrapperClassName?: string;
   headerClassName?: string;
   contentClassName?: string;
@@ -288,8 +290,22 @@ export const ChangePasswordPanel = ({
   );
 
   if (!withCard) {
-    return <div className={cn("min-w-0", wrapperClassName)}>{content}</div>;
+    return (
+      <div
+        id={wrapperId}
+        className={cn("min-w-0 scroll-mt-24 md:scroll-mt-28", wrapperClassName)}
+      >
+        {content}
+      </div>
+    );
   }
 
-  return <Card className="border-border/70 bg-card/60">{content}</Card>;
+  return (
+    <Card
+      id={wrapperId}
+      className="border-border/70 bg-card/60 scroll-mt-24 md:scroll-mt-28"
+    >
+      {content}
+    </Card>
+  );
 };

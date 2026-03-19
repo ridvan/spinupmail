@@ -274,6 +274,14 @@ describe("OrganizationSettingsPage", () => {
     expect((inviteEmailInput as HTMLInputElement).value).toBe("");
   });
 
+  it("renders stable section anchors for deep links", () => {
+    renderPage();
+
+    expect(document.getElementById("organization-profile")).toBeTruthy();
+    expect(document.getElementById("organization-members")).toBeTruthy();
+    expect(document.getElementById("organization-invitations")).toBeTruthy();
+  });
+
   it("copies organization id and invitation links to clipboard", async () => {
     renderPage();
 
