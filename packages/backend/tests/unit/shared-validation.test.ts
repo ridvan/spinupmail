@@ -99,6 +99,29 @@ describe("shared validation helpers", () => {
     });
   });
 
+  it("treats explicit empty policy overlays as clears", () => {
+    const stored = buildAddressMetaForStorage(
+      {
+        allowedFromDomains: ["allowed.example.com"],
+        blockedSenderDomains: ["blocked.example.com"],
+        inboundRatePolicy: {
+          senderDomainBlockMax: 12,
+        },
+      },
+      {
+        allowedFromDomains: [],
+        blockedSenderDomains: [],
+        inboundRatePolicy: null,
+      }
+    );
+    expect(stored).toBeTypeOf("string");
+
+    const parsed = parseAddressMeta(stored as string);
+    expect(getAllowedFromDomainsFromMeta(parsed)).toEqual([]);
+    expect(getBlockedSenderDomainsFromMeta(parsed)).toEqual([]);
+    expect(getInboundRatePolicyFromMeta(parsed)).toBeNull();
+  });
+
   it("stores and reads max received email settings in address meta", () => {
     const stored = applyMaxReceivedEmailLimitToMeta({
       meta: JSON.stringify({ hello: "world" }),

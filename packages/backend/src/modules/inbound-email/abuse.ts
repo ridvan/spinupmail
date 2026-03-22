@@ -3,8 +3,8 @@ import {
   extractSenderDomain,
   getBlockedSenderDomainsFromMeta,
   getInboundRatePolicyFromMeta,
-  isSenderDomainAllowed,
   normalizeAddress,
+  isSenderDomainAllowed,
   parseAddressMeta,
   parseSenderIdentity,
   type InboundRatePolicy,
@@ -336,6 +336,11 @@ const logDrop = ({
   });
 };
 
+const isSenderDomainBlocked = (
+  senderDomain: string,
+  blockedSenderDomains: string[]
+) => isSenderDomainAllowed(senderDomain, blockedSenderDomains);
+
 export const checkInboundAbuse = async ({
   env,
   addressId,
@@ -368,7 +373,7 @@ export const checkInboundAbuse = async ({
   if (
     senderDomain &&
     blockedSenderDomains.length > 0 &&
-    isSenderDomainAllowed(senderDomain, blockedSenderDomains)
+    isSenderDomainBlocked(senderDomain, blockedSenderDomains)
   ) {
     logDrop({
       addressId,

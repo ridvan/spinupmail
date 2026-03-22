@@ -275,20 +275,32 @@ export const applyMaxReceivedEmailLimitToMeta = ({
 
 export const buildAddressMetaForStorage = (
   meta: unknown,
-  {
-    allowedFromDomains = [],
-    blockedSenderDomains = [],
-    inboundRatePolicy,
-  }: {
+  options: {
     allowedFromDomains?: string[];
     blockedSenderDomains?: string[];
     inboundRatePolicy?: InboundRatePolicy | null;
   } = {}
 ): string | undefined | null => {
+  const hasAllowedFromDomainsOverlay = Object.prototype.hasOwnProperty.call(
+    options,
+    "allowedFromDomains"
+  );
+  const hasBlockedSenderDomainsOverlay = Object.prototype.hasOwnProperty.call(
+    options,
+    "blockedSenderDomains"
+  );
+  const hasInboundRatePolicyOverlay = Object.prototype.hasOwnProperty.call(
+    options,
+    "inboundRatePolicy"
+  );
+
+  const { allowedFromDomains, blockedSenderDomains, inboundRatePolicy } =
+    options;
+
   const noOverlays =
-    allowedFromDomains.length === 0 &&
-    blockedSenderDomains.length === 0 &&
-    inboundRatePolicy === undefined;
+    !hasAllowedFromDomainsOverlay &&
+    !hasBlockedSenderDomainsOverlay &&
+    !hasInboundRatePolicyOverlay;
 
   if (noOverlays) {
     if (meta === undefined) return undefined;
@@ -300,6 +312,8 @@ export const buildAddressMetaForStorage = (
     }
   }
 
+  const nextAllowedFromDomains = allowedFromDomains ?? [];
+  const nextBlockedSenderDomains = blockedSenderDomains ?? [];
   let record: Record<string, unknown>;
 
   if (meta === undefined || meta === null) {
@@ -317,19 +331,19 @@ export const buildAddressMetaForStorage = (
     record = { ...meta };
   }
 
-  if (allowedFromDomains.length > 0) {
-    record.allowedFromDomains = allowedFromDomains;
-  } else {
+  if (hasAllowedFromDomainsOverlay && nextAllowedFromDomains.length > 0) {
+    record.allowedFromDomains = nextAllowedFromDomains;
+  } else if (hasAllowedFromDomainsOverlay) {
     delete record.allowedFromDomains;
   }
 
-  if (blockedSenderDomains.length > 0) {
-    record.blockedSenderDomains = blockedSenderDomains;
-  } else {
+  if (hasBlockedSenderDomainsOverlay && nextBlockedSenderDomains.length > 0) {
+    record.blockedSenderDomains = nextBlockedSenderDomains;
+  } else if (hasBlockedSenderDomainsOverlay) {
     delete record.blockedSenderDomains;
   }
 
-  if (inboundRatePolicy !== undefined) {
+  if (hasInboundRatePolicyOverlay) {
     const normalizedInboundRatePolicy =
       inboundRatePolicy === null
         ? null
