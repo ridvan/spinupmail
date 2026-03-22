@@ -262,6 +262,7 @@ describe("inbound email handler", () => {
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
     expect(mocks.clearInboundDedupeKey).toHaveBeenCalledWith(
       {} as CloudflareBindings,
+      "address-1",
       "dedupe-key-1"
     );
   });
@@ -334,6 +335,7 @@ describe("inbound email handler", () => {
       {
         R2_BUCKET: {} as R2Bucket,
       } as CloudflareBindings,
+      "address-1",
       "dedupe-key-2"
     );
   });
