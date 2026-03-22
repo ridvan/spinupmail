@@ -1,10 +1,12 @@
 import { __private__, checkInboundAbuse } from "@/modules/inbound-email/abuse";
 import { hashForRateLimitKey } from "@/shared/utils/crypto";
+import { FakeAbuseCounterNamespace } from "../fixtures/fake-abuse-counter-namespace";
 import { FakeKvNamespace } from "../fixtures/fake-kv";
 import { withFixedNow } from "../fixtures/time";
 
 const buildEnv = (kv = new FakeKvNamespace()) =>
   ({
+    ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
     SUM_KV: kv,
   }) as unknown as CloudflareBindings;
 
@@ -64,6 +66,40 @@ describe("inbound abuse policy", () => {
         allowed: false,
         reason: "duplicate_message_id",
       });
+    });
+  });
+
+  it("does not persist dedupe keys for attempts denied by later rate-limit checks", async () => {
+    const kv = new FakeKvNamespace();
+    const env = buildEnv(kv);
+    const blockedMeta = JSON.stringify({
+      inboundRatePolicy: {
+        senderDomainBlockMax: 100,
+        senderAddressBlockMax: 1,
+        inboxBlockMax: 100,
+      },
+    });
+
+    await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
+      const blocked = await checkInboundAbuse(
+        buildArgs({
+          env,
+          meta: blockedMeta,
+        })
+      );
+      const dedupeHash = await hashForRateLimitKey(
+        "inbox@spinupmail.com|msg-1"
+      );
+
+      expect(blocked).toMatchObject({
+        allowed: false,
+        reason: "sender_address_rate_limit",
+      });
+      expect(
+        await kv.get(
+          `email:abuse:dedupe:address:address-1:message:${dedupeHash}`
+        )
+      ).toBeNull();
     });
   });
 
@@ -172,6 +208,25 @@ describe("inbound abuse policy", () => {
     expect(result).toMatchObject({
       allowed: false,
       reason: "blocked_sender_domain",
+    });
+  });
+
+  it("falls back to plain address normalization when canonical email normalization fails", async () => {
+    const env = buildEnv();
+    const result = await withFixedNow("2026-03-22T10:00:00.000Z", () =>
+      checkInboundAbuse(
+        buildArgs({
+          env,
+          messageId: null,
+          senderRaw: '"Sender" <Invalid Sender@Example.com>',
+        })
+      )
+    );
+
+    expect(result).toMatchObject({
+      allowed: true,
+      senderAddress: "invalid sender@example.com",
+      senderDomain: "example.com",
     });
   });
 

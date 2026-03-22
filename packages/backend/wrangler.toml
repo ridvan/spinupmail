@@ -12,6 +12,14 @@ enabled = true
 [placement]
 mode = "smart"
 
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["InboundAbuseCounterDurableObject"]
+
+[[durable_objects.bindings]]
+name = "ABUSE_COUNTERS"
+class_name = "InboundAbuseCounterDurableObject"
+
 [[d1_databases]]
 binding = "SUM_DB"
 database_name = "SUM_DB"

@@ -10,6 +10,11 @@ import {
   type InboundRatePolicy,
 } from "@/shared/validation";
 import { hashForRateLimitKey } from "@/shared/utils/crypto";
+import {
+  getAbuseCounter,
+  incrementAbuseCounter,
+  trackDistinctAbuseCounter,
+} from "./abuse-counter";
 
 const COUNTER_TTL_BUFFER_SECONDS = 60;
 const STRIKE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -136,14 +141,14 @@ const resolveInboundRatePolicy = (
 };
 
 const incrementWindowCounter = async ({
-  kv,
+  env,
   addressId,
   bucket,
   nowSeconds,
   windowSeconds,
   subjectHash,
 }: {
-  kv: KVNamespace;
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
   addressId: string;
   bucket: string;
   nowSeconds: number;
@@ -157,22 +162,22 @@ const incrementWindowCounter = async ({
     slot,
     subjectHash,
   });
-  const current = parseCounter(await kv.get(key));
-  const next = current + 1;
-  await kv.put(key, String(next), {
-    expirationTtl: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
+  return incrementAbuseCounter({
+    env,
+    addressId,
+    key,
+    ttlSeconds: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
   });
-  return next;
 };
 
 const trackDistinctSenderCount = async ({
-  kv,
+  env,
   addressId,
   nowSeconds,
   windowSeconds,
   senderHash,
 }: {
-  kv: KVNamespace;
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
   addressId: string;
   nowSeconds: number;
   windowSeconds: number;
@@ -186,7 +191,11 @@ const trackDistinctSenderCount = async ({
   });
 
   if (!senderHash) {
-    return parseCounter(await kv.get(counterKey));
+    return getAbuseCounter({
+      env,
+      addressId,
+      key: counterKey,
+    });
   }
 
   const seenKey = buildSeenKey({
@@ -194,21 +203,13 @@ const trackDistinctSenderCount = async ({
     slot,
     senderHash,
   });
-  const seen = await kv.get(seenKey);
-  if (seen) {
-    return parseCounter(await kv.get(counterKey));
-  }
-
-  await kv.put(seenKey, "1", {
-    expirationTtl: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
+  return trackDistinctAbuseCounter({
+    env,
+    addressId,
+    counterKey,
+    seenKey,
+    ttlSeconds: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
   });
-
-  const current = parseCounter(await kv.get(counterKey));
-  const next = current + 1;
-  await kv.put(counterKey, String(next), {
-    expirationTtl: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
-  });
-  return next;
 };
 
 const parseActiveBlockPayload = (value: string | null) => {
@@ -359,14 +360,11 @@ export const checkInboundAbuse = async ({
   const kv = env.SUM_KV;
   const parsedMeta = parseAddressMeta(meta);
   const senderIdentity = parseSenderIdentity(senderRaw);
-  const normalizedSenderAddress = senderIdentity?.address
-    ? normalizeEmailAddress(senderIdentity.address)
+  const addr = senderIdentity?.address;
+  const senderAddress = addr
+    ? // Fall back to plain normalization when canonical email normalization rejects the parsed address.
+      (normalizeEmailAddress(addr) ?? normalizeAddress(addr))
     : null;
-  const senderAddress = normalizedSenderAddress
-    ? normalizedSenderAddress
-    : senderIdentity?.address
-      ? normalizeAddress(senderIdentity.address)
-      : null;
   const senderDomain = extractSenderDomain(senderRaw);
   const blockedSenderDomains = getBlockedSenderDomainsFromMeta(parsedMeta);
 
@@ -519,14 +517,10 @@ export const checkInboundAbuse = async ({
         senderDomain,
       };
     }
-
-    await kv.put(dedupeKey, now.toISOString(), {
-      expirationTtl: policy.dedupeWindowSeconds,
-    });
   }
 
   const inboxBlockCount = await incrementWindowCounter({
-    kv,
+    env,
     addressId,
     bucket: "inbox",
     nowSeconds,
@@ -534,7 +528,7 @@ export const checkInboundAbuse = async ({
   });
 
   const distinctSenderCount = await trackDistinctSenderCount({
-    kv,
+    env,
     addressId,
     nowSeconds,
     windowSeconds: policy.inboxBlockWindowSeconds,
@@ -543,7 +537,7 @@ export const checkInboundAbuse = async ({
 
   if (senderDomainHash) {
     const senderDomainSoftCount = await incrementWindowCounter({
-      kv,
+      env,
       addressId,
       bucket: "sender-domain-soft",
       nowSeconds,
@@ -562,7 +556,7 @@ export const checkInboundAbuse = async ({
     }
 
     const senderDomainBlockCount = await incrementWindowCounter({
-      kv,
+      env,
       addressId,
       bucket: "sender-domain-block",
       nowSeconds,
@@ -606,7 +600,7 @@ export const checkInboundAbuse = async ({
 
   if (senderAddressHash) {
     const senderAddressBlockCount = await incrementWindowCounter({
-      kv,
+      env,
       addressId,
       bucket: "sender-address-block",
       nowSeconds,
@@ -678,6 +672,12 @@ export const checkInboundAbuse = async ({
       senderAddress,
       senderDomain,
     };
+  }
+
+  if (dedupeKey) {
+    await kv.put(dedupeKey, now.toISOString(), {
+      expirationTtl: policy.dedupeWindowSeconds,
+    });
   }
 
   return {

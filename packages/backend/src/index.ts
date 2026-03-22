@@ -12,6 +12,7 @@ import { createOrganizationsRouter } from "@/modules/organizations/router";
 import { createEmailAddressesRouter } from "@/modules/email-addresses/router";
 import { createEmailsRouter } from "@/modules/emails/router";
 import { createE2EAuthTestRouter } from "@/modules/e2e-auth/router";
+import { InboundAbuseCounterDurableObject } from "@/modules/inbound-email/abuse-counter";
 import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 
 type AppFactoryOptions = {
@@ -67,5 +68,7 @@ export const createWorkerHandler = (options: WorkerHandlerOptions = {}) => {
     email: options.emailHandler ?? handleIncomingEmail,
   };
 };
+
+export { InboundAbuseCounterDurableObject };
 
 export default createWorkerHandler();
