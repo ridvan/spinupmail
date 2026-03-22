@@ -3,11 +3,14 @@ import {
   buildAddressMetaForStorage,
   extractSenderDomain,
   getAllowedFromDomainsFromMeta,
+  getBlockedSenderDomainsFromMeta,
+  getInboundRatePolicyFromMeta,
   getMaxReceivedEmailActionFromMeta,
   getMaxReceivedEmailCountFromMeta,
   hasReservedLocalPartKeyword,
   isSenderDomainAllowed,
   normalizeAllowedFromDomains,
+  normalizeInboundRatePolicy,
   parseSenderIdentity,
   parseAddressMeta,
   sanitizeLocalPart,
@@ -56,7 +59,10 @@ describe("shared validation helpers", () => {
   });
 
   it("builds and parses meta payload for allowedFromDomains", () => {
-    const stored = buildAddressMetaForStorage({ hello: "world" }, ["foo.com"]);
+    const stored = buildAddressMetaForStorage(
+      { hello: "world" },
+      { allowedFromDomains: ["foo.com"] }
+    );
     expect(stored).toBeTypeOf("string");
 
     const parsed = parseAddressMeta(stored as string);
@@ -64,8 +70,33 @@ describe("shared validation helpers", () => {
   });
 
   it("rejects non-object string metadata when allow-list is present", () => {
-    const stored = buildAddressMetaForStorage("[]", ["foo.com"]);
+    const stored = buildAddressMetaForStorage("[]", {
+      allowedFromDomains: ["foo.com"],
+    });
     expect(stored).toBeNull();
+  });
+
+  it("stores blocked sender domains and inbound rate policy metadata", () => {
+    const stored = buildAddressMetaForStorage(
+      { hello: "world" },
+      {
+        blockedSenderDomains: ["abusive.example.com"],
+        inboundRatePolicy: {
+          senderDomainBlockMax: 12,
+          inboxBlockMax: 40,
+        },
+      }
+    );
+    expect(stored).toBeTypeOf("string");
+
+    const parsed = parseAddressMeta(stored as string);
+    expect(getBlockedSenderDomainsFromMeta(parsed)).toEqual([
+      "abusive.example.com",
+    ]);
+    expect(getInboundRatePolicyFromMeta(parsed)).toEqual({
+      senderDomainBlockMax: 12,
+      inboxBlockMax: 40,
+    });
   });
 
   it("stores and reads max received email settings in address meta", () => {
@@ -104,5 +135,16 @@ describe("shared validation helpers", () => {
     expect(hasReservedLocalPartKeyword("postmaster")).toBe(true);
     expect(hasReservedLocalPartKeyword("support")).toBe(true);
     expect(hasReservedLocalPartKeyword("customer-success")).toBe(false);
+  });
+
+  it("normalizes inbound rate policy values and drops invalid fields", () => {
+    expect(
+      normalizeInboundRatePolicy({
+        senderDomainBlockMax: 30,
+        dedupeWindowSeconds: -1,
+      })
+    ).toEqual({
+      senderDomainBlockMax: 30,
+    });
   });
 });

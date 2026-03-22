@@ -9,19 +9,25 @@ import {
   applyMaxReceivedEmailLimitToMeta,
   buildAddressMetaForStorage,
   getAllowedFromDomainsFromMeta,
+  getBlockedSenderDomainsFromMeta,
+  getInboundRatePolicyFromMeta,
   getMaxReceivedEmailActionFromMeta,
   getMaxReceivedEmailCountFromMeta,
   hasReservedLocalPartKeyword,
   isValidDomain,
   normalizeAddress,
   normalizeAllowedFromDomains,
+  normalizeBlockedSenderDomains,
+  normalizeInboundRatePolicy,
   parseAddressMeta,
   sanitizeLocalPart,
 } from "@/shared/validation";
+import type { InboundRatePolicy } from "@/shared/validation";
 import { clampNumber } from "@/shared/utils/dates";
 import {
   ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
+  ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS,
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TTL_MAX_MINUTES,
@@ -94,6 +100,67 @@ const parseUpdateBody = (payload: unknown): UpdateEmailAddressBody => {
 
 const normalizeMaxReceivedEmailAction = (value: unknown) =>
   value === "rejectNew" ? "rejectNew" : "cleanAll";
+
+const validateDomainList = ({
+  domains,
+  maxItems,
+  label,
+}: {
+  domains: string[];
+  maxItems: number;
+  label: "allowedFromDomains" | "blockedSenderDomains";
+}) => {
+  if (domains.length > maxItems) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `${label} must contain at most ${maxItems} items`,
+      },
+    };
+  }
+
+  if (
+    domains.some(
+      domainValue => domainValue.length > ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH
+    )
+  ) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `${label} items must be ${ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
+
+  if (!domains.every(isValidDomain)) {
+    return {
+      status: 400 as const,
+      body: { error: `${label} contains invalid domain(s)` },
+    };
+  }
+
+  return null;
+};
+
+const validateInboundRatePolicy = (value: unknown) => {
+  if (value === undefined) {
+    return { policy: undefined as InboundRatePolicy | undefined };
+  }
+
+  if (value === null) {
+    return { policy: null as InboundRatePolicy | null };
+  }
+
+  const policy = normalizeInboundRatePolicy(value);
+  if (!policy) {
+    return {
+      error:
+        "inboundRatePolicy must be an object with at least one positive whole-number limit",
+    };
+  }
+
+  return { policy };
+};
 
 const encodeRecentAddressActivityCursor = (value: {
   sortValueMs: number;
@@ -303,6 +370,18 @@ export const createEmailAddress = async ({
   const allowedFromDomains = normalizeAllowedFromDomains(
     body.allowedFromDomains
   );
+  const blockedSenderDomains = normalizeBlockedSenderDomains(
+    body.blockedSenderDomains
+  );
+  const inboundRatePolicyResult = validateInboundRatePolicy(
+    body.inboundRatePolicy
+  );
+  if ("error" in inboundRatePolicyResult) {
+    return {
+      status: 400 as const,
+      body: { error: inboundRatePolicyResult.error },
+    };
+  }
 
   if (!domain || allowedDomains.length === 0) {
     return {
@@ -325,34 +404,19 @@ export const createEmailAddress = async ({
     };
   }
 
-  if (allowedFromDomains.length > ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `allowedFromDomains must contain at most ${ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS} items`,
-      },
-    };
-  }
+  const allowedFromDomainsValidation = validateDomainList({
+    domains: allowedFromDomains,
+    maxItems: ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
+    label: "allowedFromDomains",
+  });
+  if (allowedFromDomainsValidation) return allowedFromDomainsValidation;
 
-  if (
-    allowedFromDomains.some(
-      domainValue => domainValue.length > ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH
-    )
-  ) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `allowedFromDomains items must be ${ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`,
-      },
-    };
-  }
-
-  if (!allowedFromDomains.every(isValidDomain)) {
-    return {
-      status: 400 as const,
-      body: { error: "allowedFromDomains contains invalid domain(s)" },
-    };
-  }
+  const blockedSenderDomainsValidation = validateDomainList({
+    domains: blockedSenderDomains,
+    maxItems: ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS,
+    label: "blockedSenderDomains",
+  });
+  if (blockedSenderDomainsValidation) return blockedSenderDomainsValidation;
 
   const providedLocalPart =
     typeof body.localPart === "string" ? body.localPart : "";
@@ -430,13 +494,17 @@ export const createEmailAddress = async ({
     ttlMinutes && ttlMinutes > 0 ? now + ttlMinutes * 60 * 1000 : undefined;
   const expiresAt = expiresAtMs ? new Date(expiresAtMs) : undefined;
 
-  const baseMeta = buildAddressMetaForStorage(body.meta, allowedFromDomains);
+  const baseMeta = buildAddressMetaForStorage(body.meta, {
+    allowedFromDomains,
+    blockedSenderDomains,
+    inboundRatePolicy: inboundRatePolicyResult.policy,
+  });
   if (baseMeta === null) {
     return {
       status: 400 as const,
       body: {
         error:
-          "allowedFromDomains requires meta to be an object (or JSON object string)",
+          "address policy controls require meta to be an object (or JSON object string)",
       },
     };
   }
@@ -465,6 +533,9 @@ export const createEmailAddress = async ({
     responseMaxReceivedEmailCount === null
       ? null
       : getMaxReceivedEmailActionFromMeta(responseMeta);
+  const responseBlockedSenderDomains =
+    getBlockedSenderDomainsFromMeta(responseMeta);
+  const responseInboundRatePolicy = getInboundRatePolicyFromMeta(responseMeta);
 
   const db = getDb(env);
   const addressLimit = getMaxAddressesPerOrganization(env);
@@ -516,6 +587,8 @@ export const createEmailAddress = async ({
       domain,
       meta: responseMeta,
       allowedFromDomains,
+      blockedSenderDomains: responseBlockedSenderDomains,
+      inboundRatePolicy: responseInboundRatePolicy,
       maxReceivedEmailCount: responseMaxReceivedEmailCount,
       maxReceivedEmailAction: responseMaxReceivedEmailAction,
       createdAt: new Date(now).toISOString(),
@@ -675,35 +748,35 @@ export const updateEmailAddress = async ({
     body.allowedFromDomains !== undefined
       ? normalizeAllowedFromDomains(body.allowedFromDomains)
       : getAllowedFromDomainsFromMeta(existingMeta);
-
-  if (allowedFromDomains.length > ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS) {
+  const blockedSenderDomains =
+    body.blockedSenderDomains !== undefined
+      ? normalizeBlockedSenderDomains(body.blockedSenderDomains)
+      : getBlockedSenderDomainsFromMeta(existingMeta);
+  const inboundRatePolicyResult = validateInboundRatePolicy(
+    body.inboundRatePolicy === undefined
+      ? getInboundRatePolicyFromMeta(existingMeta)
+      : body.inboundRatePolicy
+  );
+  if ("error" in inboundRatePolicyResult) {
     return {
       status: 400 as const,
-      body: {
-        error: `allowedFromDomains must contain at most ${ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS} items`,
-      },
+      body: { error: inboundRatePolicyResult.error },
     };
   }
 
-  if (
-    allowedFromDomains.some(
-      domainValue => domainValue.length > ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH
-    )
-  ) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `allowedFromDomains items must be ${ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH} characters or fewer`,
-      },
-    };
-  }
+  const allowedFromDomainsValidation = validateDomainList({
+    domains: allowedFromDomains,
+    maxItems: ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
+    label: "allowedFromDomains",
+  });
+  if (allowedFromDomainsValidation) return allowedFromDomainsValidation;
 
-  if (!allowedFromDomains.every(isValidDomain)) {
-    return {
-      status: 400 as const,
-      body: { error: "allowedFromDomains contains invalid domain(s)" },
-    };
-  }
+  const blockedSenderDomainsValidation = validateDomainList({
+    domains: blockedSenderDomains,
+    maxItems: ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS,
+    label: "blockedSenderDomains",
+  });
+  if (blockedSenderDomainsValidation) return blockedSenderDomainsValidation;
 
   const existingMaxReceivedEmailCount =
     getMaxReceivedEmailCountFromMeta(existingMeta);
@@ -759,6 +832,8 @@ export const updateEmailAddress = async ({
   const shouldUpdateMeta =
     body.meta !== undefined ||
     body.allowedFromDomains !== undefined ||
+    body.blockedSenderDomains !== undefined ||
+    body.inboundRatePolicy !== undefined ||
     body.maxReceivedEmailCount !== undefined ||
     body.maxReceivedEmailAction !== undefined;
   if (shouldUpdateMeta) {
@@ -766,17 +841,23 @@ export const updateEmailAddress = async ({
     if (
       metaBase === null &&
       allowedFromDomains.length === 0 &&
+      blockedSenderDomains.length === 0 &&
+      inboundRatePolicyResult.policy === null &&
       nextMaxReceivedEmailCount === null
     ) {
       metaForStorage = null;
     } else {
-      const nextMeta = buildAddressMetaForStorage(metaBase, allowedFromDomains);
+      const nextMeta = buildAddressMetaForStorage(metaBase, {
+        allowedFromDomains,
+        blockedSenderDomains,
+        inboundRatePolicy: inboundRatePolicyResult.policy,
+      });
       if (nextMeta === null) {
         return {
           status: 400 as const,
           body: {
             error:
-              "allowedFromDomains requires meta to be an object (or JSON object string)",
+              "address policy controls require meta to be an object (or JSON object string)",
           },
         };
       }

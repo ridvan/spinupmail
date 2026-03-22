@@ -8,7 +8,12 @@ describe("email address dto", () => {
       address: "hello@example.com",
       localPart: "hello",
       domain: "example.com",
-      meta: null,
+      meta: JSON.stringify({
+        blockedSenderDomains: ["blocked.example.com"],
+        inboundRatePolicy: {
+          senderDomainBlockMax: 12,
+        },
+      }),
       emailCount: 12,
       createdAt: new Date("2026-03-01T10:00:00.000Z"),
       expiresAt: null,
@@ -16,5 +21,9 @@ describe("email address dto", () => {
     });
 
     expect(result.emailCount).toBe(12);
+    expect(result.blockedSenderDomains).toEqual(["blocked.example.com"]);
+    expect(result.inboundRatePolicy).toEqual({
+      senderDomainBlockMax: 12,
+    });
   });
 });

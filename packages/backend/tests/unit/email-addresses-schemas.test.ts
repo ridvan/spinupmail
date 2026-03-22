@@ -1,6 +1,7 @@
 import {
   ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS,
+  ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS,
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TTL_MAX_MINUTES,
@@ -15,6 +16,11 @@ describe("email address request schemas", () => {
     acceptedRiskNotice: true,
     ttlMinutes: 60,
     allowedFromDomains: ["sender.example.com"],
+    blockedSenderDomains: ["blocked.example.com"],
+    inboundRatePolicy: {
+      senderDomainBlockMax: 12,
+      inboxBlockMax: 40,
+    },
     maxReceivedEmailCount: 500,
     maxReceivedEmailAction: "cleanAll",
   };
@@ -72,6 +78,26 @@ describe("email address request schemas", () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  it("rejects more than 50 blockedSenderDomains", () => {
+    const parsed = createEmailAddressBodySchema.safeParse({
+      ...validCreatePayload,
+      blockedSenderDomains: Array.from(
+        { length: ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS + 1 },
+        (_, index) => `blocked${index}.example.com`
+      ),
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts inboundRatePolicy null in update payload", () => {
+    const parsed = updateEmailAddressBodySchema.safeParse({
+      inboundRatePolicy: null,
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   it("accepts ttlMinutes null in update payload", () => {

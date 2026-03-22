@@ -1,5 +1,7 @@
 import {
   getAllowedFromDomainsFromMeta,
+  getBlockedSenderDomainsFromMeta,
+  getInboundRatePolicyFromMeta,
   getMaxReceivedEmailActionFromMeta,
   getMaxReceivedEmailCountFromMeta,
   parseAddressMeta,
@@ -18,6 +20,8 @@ export const toEmailAddressListItem = (row: {
 }) => {
   const parsedMeta = parseAddressMeta(row.meta);
   const allowedFromDomains = getAllowedFromDomainsFromMeta(parsedMeta);
+  const blockedSenderDomains = getBlockedSenderDomainsFromMeta(parsedMeta);
+  const inboundRatePolicy = getInboundRatePolicyFromMeta(parsedMeta);
   const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(parsedMeta);
   const maxReceivedEmailAction =
     maxReceivedEmailCount === null
@@ -32,6 +36,8 @@ export const toEmailAddressListItem = (row: {
     meta: parsedMeta,
     emailCount: row.emailCount,
     allowedFromDomains,
+    blockedSenderDomains,
+    inboundRatePolicy,
     maxReceivedEmailCount,
     maxReceivedEmailAction,
     createdAt: row.createdAt ? row.createdAt.toISOString() : null,

@@ -4,6 +4,7 @@ export const ADDRESS_LOCAL_PART_MAX_LENGTH = 30;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
 export const ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
 export const ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH = 50;
+export const ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS = 50;
 export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
 export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
   "cleanAll",
@@ -24,6 +25,53 @@ const allowedFromDomainsSchema = z
   )
   .max(ADDRESS_ALLOWED_FROM_DOMAINS_MAX_ITEMS);
 
+const blockedSenderDomainsSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH)
+      .regex(DOMAIN_HOSTNAME_REGEX, "Invalid domain hostname")
+  )
+  .max(ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS);
+
+const inboundRatePolicySchema = z
+  .object({
+    senderDomainSoftMax: z.number().int().positive().max(864_000).optional(),
+    senderDomainSoftWindowSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(864_000)
+      .optional(),
+    senderDomainBlockMax: z.number().int().positive().max(864_000).optional(),
+    senderDomainBlockWindowSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(864_000)
+      .optional(),
+    senderAddressBlockMax: z.number().int().positive().max(864_000).optional(),
+    senderAddressBlockWindowSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(864_000)
+      .optional(),
+    inboxBlockMax: z.number().int().positive().max(864_000).optional(),
+    inboxBlockWindowSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(864_000)
+      .optional(),
+    dedupeWindowSeconds: z.number().int().positive().max(864_000).optional(),
+    initialBlockSeconds: z.number().int().positive().max(864_000).optional(),
+    maxBlockSeconds: z.number().int().positive().max(864_000).optional(),
+  })
+  .partial();
+
 export const createEmailAddressBodySchema = z
   .object({
     localPart: z
@@ -43,6 +91,10 @@ export const createEmailAddressBodySchema = z
     allowedFromDomains: z
       .union([allowedFromDomainsSchema, z.string()])
       .optional(),
+    blockedSenderDomains: z
+      .union([blockedSenderDomainsSchema, z.string()])
+      .optional(),
+    inboundRatePolicy: inboundRatePolicySchema.optional(),
     maxReceivedEmailCount: z
       .number()
       .int()
@@ -89,6 +141,10 @@ export const updateEmailAddressBodySchema = z
     allowedFromDomains: z
       .union([allowedFromDomainsSchema, z.string()])
       .optional(),
+    blockedSenderDomains: z
+      .union([blockedSenderDomainsSchema, z.string(), z.null()])
+      .optional(),
+    inboundRatePolicy: inboundRatePolicySchema.nullable().optional(),
     maxReceivedEmailCount: z
       .number()
       .int()

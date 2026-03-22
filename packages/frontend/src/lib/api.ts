@@ -86,6 +86,20 @@ export type EmailAddress = {
   meta?: unknown;
   emailCount: number;
   allowedFromDomains?: string[];
+  blockedSenderDomains?: string[];
+  inboundRatePolicy?: {
+    senderDomainSoftMax?: number;
+    senderDomainSoftWindowSeconds?: number;
+    senderDomainBlockMax?: number;
+    senderDomainBlockWindowSeconds?: number;
+    senderAddressBlockMax?: number;
+    senderAddressBlockWindowSeconds?: number;
+    inboxBlockMax?: number;
+    inboxBlockWindowSeconds?: number;
+    dedupeWindowSeconds?: number;
+    initialBlockSeconds?: number;
+    maxBlockSeconds?: number;
+  } | null;
   maxReceivedEmailCount: number | null;
   maxReceivedEmailAction: "cleanAll" | "rejectNew" | null;
   createdAt: string | null;
@@ -372,6 +386,8 @@ export const createEmailAddress = async (
     meta?: unknown;
     domain?: string;
     allowedFromDomains?: string[];
+    blockedSenderDomains?: string[];
+    inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number;
     maxReceivedEmailAction?: "cleanAll" | "rejectNew";
     acceptedRiskNotice: boolean;
@@ -409,6 +425,8 @@ export const updateEmailAddress = async (
     meta?: unknown;
     domain?: string;
     allowedFromDomains?: string[];
+    blockedSenderDomains?: string[] | null;
+    inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number | null;
     maxReceivedEmailAction?: "cleanAll" | "rejectNew";
   },

@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   deleteR2ObjectsByPrefix: vi.fn(),
   validateAddressAvailability: vi.fn(),
   shouldAcceptSenderDomain: vi.fn(),
+  checkInboundAbuse: vi.fn(),
+  clearInboundDedupeKey: vi.fn(),
   getDb: vi.fn(),
 }));
 
@@ -55,6 +57,11 @@ vi.mock("@/shared/utils/r2", () => ({
 vi.mock("@/modules/inbound-email/policy", () => ({
   validateAddressAvailability: mocks.validateAddressAvailability,
   shouldAcceptSenderDomain: mocks.shouldAcceptSenderDomain,
+}));
+
+vi.mock("@/modules/inbound-email/abuse", () => ({
+  checkInboundAbuse: mocks.checkInboundAbuse,
+  clearInboundDedupeKey: mocks.clearInboundDedupeKey,
 }));
 
 const buildMessage = () => {
@@ -116,6 +123,13 @@ describe("inbound email handler", () => {
       allowedFromDomains: [],
       senderDomain: "example.com",
     });
+    mocks.checkInboundAbuse.mockResolvedValue({
+      allowed: true,
+      dedupeKey: null,
+      senderAddress: "sender@example.com",
+      senderDomain: "example.com",
+    });
+    mocks.clearInboundDedupeKey.mockResolvedValue(undefined);
     mocks.validateAddressAvailability.mockReturnValue({ allowed: true });
   });
 
@@ -183,6 +197,35 @@ describe("inbound email handler", () => {
 
     expect(message.setReject).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+    expect(mocks.checkInboundAbuse).not.toHaveBeenCalled();
+  });
+
+  it("drops mail rejected by abuse policy before DB writes", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+    mocks.checkInboundAbuse.mockResolvedValue({
+      allowed: false,
+      dedupeKey: null,
+      reason: "sender_domain_rate_limit",
+      senderAddress: "sender@example.com",
+      senderDomain: "example.com",
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+    expect(mocks.readRawWithLimit).not.toHaveBeenCalled();
   });
 
   it("rejects incoming mail when inbox limit is reached in reject mode", async () => {

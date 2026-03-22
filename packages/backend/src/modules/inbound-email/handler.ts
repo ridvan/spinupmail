@@ -38,6 +38,7 @@ import {
   shouldAcceptSenderDomain,
   validateAddressAvailability,
 } from "./policy";
+import { checkInboundAbuse, clearInboundDedupeKey } from "./abuse";
 
 export const handleIncomingEmail = async (
   message: ForwardableEmailMessage,
@@ -46,6 +47,8 @@ export const handleIncomingEmail = async (
 ) => {
   let reservedAddressId: string | null = null;
   let reservedOrganizationId: string | null = null;
+  let dedupeKey: string | null = null;
+  let emailInserted = false;
 
   try {
     const recipient = normalizeAddress(message.to);
@@ -86,6 +89,19 @@ export const handleIncomingEmail = async (
       });
       return;
     }
+
+    const abuseCheck = await checkInboundAbuse({
+      env,
+      addressId: addressRow.id,
+      meta: addressRow.meta,
+      recipient,
+      senderRaw,
+      messageId: message.headers.get("message-id"),
+    });
+    if (!abuseCheck.allowed) {
+      return;
+    }
+    dedupeKey = abuseCheck.dedupeKey;
 
     const addressMeta = parseAddressMeta(addressRow.meta);
     const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(addressMeta);
@@ -207,6 +223,7 @@ export const handleIncomingEmail = async (
     });
     reservedAddressId = null;
     reservedOrganizationId = null;
+    emailInserted = true;
 
     await persistRawEmailToR2({
       env,
@@ -240,6 +257,9 @@ export const handleIncomingEmail = async (
       );
     }
   } catch (error) {
+    if (!emailInserted) {
+      await clearInboundDedupeKey(env, dedupeKey);
+    }
     if (reservedAddressId) {
       try {
         await decrementAddressEmailCount(getDb(env), reservedAddressId);
