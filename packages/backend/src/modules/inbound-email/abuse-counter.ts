@@ -1,10 +1,27 @@
 import { DurableObject } from "cloudflare:workers";
 
 const ABUSE_COUNTER_OBJECT_NAME_PREFIX = "email:abuse:counter-service:address";
+const STRIKE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const KV_PREFIX = "email:abuse";
 
 type ExpiringRecord<T> = {
   expiresAtMs: number;
   value: T;
+};
+
+export type ActiveBlockPayload = {
+  activatedAt: string;
+  expiresAt: string;
+  reason: string;
+  strikes: number;
+  threshold: string;
+};
+
+type AbuseBlockKind = "domain" | "sender" | "inbox";
+
+type AbuseBlockPolicy = {
+  initialBlockSeconds: number;
+  maxBlockSeconds: number;
 };
 
 const isExpiringRecord = <T>(value: unknown): value is ExpiringRecord<T> =>
@@ -36,6 +53,28 @@ const getAbuseCounterStub = (
   );
   return env.ABUSE_COUNTERS.get(id);
 };
+
+const buildBlockKey = ({
+  addressId,
+  kind,
+  subjectHash,
+}: {
+  addressId: string;
+  kind: AbuseBlockKind;
+  subjectHash?: string;
+}) =>
+  `${KV_PREFIX}:block:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
+
+const buildStrikeKey = ({
+  addressId,
+  kind,
+  subjectHash,
+}: {
+  addressId: string;
+  kind: AbuseBlockKind;
+  subjectHash?: string;
+}) =>
+  `${KV_PREFIX}:strikes:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
 
 export const incrementAbuseCounter = ({
   env,
@@ -77,6 +116,56 @@ export const trackDistinctAbuseCounter = ({
     seenKey,
     ttlSeconds
   );
+
+export const getActiveAbuseBlock = ({
+  env,
+  addressId,
+  kind,
+  subjectHash,
+}: {
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
+  addressId: string;
+  kind: AbuseBlockKind;
+  subjectHash?: string;
+}) =>
+  getAbuseCounterStub(env, addressId).getActiveBlock(
+    addressId,
+    kind,
+    subjectHash ?? null
+  ) as Promise<ActiveBlockPayload | null>;
+
+export const activateAbuseBlock = ({
+  env,
+  addressId,
+  kind,
+  subjectHash,
+  now,
+  reason,
+  threshold,
+  policy,
+}: {
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
+  addressId: string;
+  kind: AbuseBlockKind;
+  subjectHash?: string;
+  now: Date;
+  reason: string;
+  threshold: string;
+  policy: AbuseBlockPolicy;
+}) =>
+  getAbuseCounterStub(env, addressId).activateBlock(
+    addressId,
+    kind,
+    subjectHash ?? null,
+    now.toISOString(),
+    reason,
+    threshold,
+    policy
+  ) as Promise<{
+    blockSeconds: number;
+    expiresAt: string;
+    strikes: number;
+  }>;
 
 export class InboundAbuseCounterDurableObject extends DurableObject<CloudflareBindings> {
   async increment(key: string, ttlSeconds: number) {
@@ -120,6 +209,82 @@ export class InboundAbuseCounterDurableObject extends DurableObject<CloudflareBi
     await this.scheduleCleanupAt(expiresAtMs);
 
     return next;
+  }
+
+  getActiveBlock(
+    addressId: string,
+    kind: AbuseBlockKind,
+    subjectHash: string | null
+  ) {
+    return (
+      readRecord<ActiveBlockPayload>(
+        this.ctx.storage.kv,
+        buildBlockKey({
+          addressId,
+          kind,
+          subjectHash: subjectHash ?? undefined,
+        }),
+        Date.now()
+      )?.value ?? null
+    );
+  }
+
+  async activateBlock(
+    addressId: string,
+    kind: AbuseBlockKind,
+    subjectHash: string | null,
+    activatedAt: string,
+    reason: string,
+    threshold: string,
+    policy: AbuseBlockPolicy
+  ) {
+    const nowMs = Date.parse(activatedAt);
+    const storage = this.ctx.storage.kv;
+    const strikeExpiresAtMs = nowMs + STRIKE_TTL_SECONDS * 1000;
+    const strikeKey = buildStrikeKey({
+      addressId,
+      kind,
+      subjectHash: subjectHash ?? undefined,
+    });
+    const strikes =
+      (readRecord<number>(storage, strikeKey, nowMs)?.value ?? 0) + 1;
+
+    storage.put(strikeKey, {
+      value: strikes,
+      expiresAtMs: strikeExpiresAtMs,
+    });
+
+    const blockSeconds = Math.min(
+      policy.maxBlockSeconds,
+      policy.initialBlockSeconds * 2 ** (strikes - 1)
+    );
+    const expiresAtMs = nowMs + blockSeconds * 1000;
+    const payload: ActiveBlockPayload = {
+      activatedAt,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      reason,
+      strikes,
+      threshold,
+    };
+
+    storage.put(
+      buildBlockKey({
+        addressId,
+        kind,
+        subjectHash: subjectHash ?? undefined,
+      }),
+      {
+        value: payload,
+        expiresAtMs,
+      }
+    );
+    await this.scheduleCleanupAt(Math.min(expiresAtMs, strikeExpiresAtMs));
+
+    return {
+      blockSeconds,
+      expiresAt: payload.expiresAt,
+      strikes,
+    };
   }
 
   async alarm() {

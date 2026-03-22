@@ -4,10 +4,13 @@ import { FakeAbuseCounterNamespace } from "../fixtures/fake-abuse-counter-namesp
 import { FakeKvNamespace } from "../fixtures/fake-kv";
 import { withFixedNow } from "../fixtures/time";
 
-const buildEnv = (kv = new FakeKvNamespace()) =>
+const buildEnv = (
+  kv: FakeKvNamespace | null = new FakeKvNamespace(),
+  abuseCounters = new FakeAbuseCounterNamespace()
+) =>
   ({
-    ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
-    SUM_KV: kv,
+    ABUSE_COUNTERS: abuseCounters,
+    ...(kv ? { SUM_KV: kv } : {}),
   }) as unknown as CloudflareBindings;
 
 const buildArgs = (overrides?: {
@@ -28,6 +31,11 @@ describe("inbound abuse policy", () => {
   beforeEach(() => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("accepts normal mail below all thresholds", async () => {
@@ -67,6 +75,59 @@ describe("inbound abuse policy", () => {
         reason: "duplicate_message_id",
       });
     });
+  });
+
+  it("fails closed when SUM_KV is unavailable outside explicit test/local modes", async () => {
+    vi.stubEnv("VITEST", "");
+    vi.stubEnv("NODE_ENV", "production");
+
+    const result = await withFixedNow("2026-03-22T10:00:00.000Z", () =>
+      checkInboundAbuse(
+        buildArgs({
+          env: {
+            ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
+            BETTER_AUTH_BASE_URL: "https://api.spinupmail.com",
+          } as unknown as CloudflareBindings,
+        })
+      )
+    );
+
+    expect(result).toMatchObject({
+      allowed: false,
+      reason: "abuse_protection_unavailable",
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      "[email] Missing SUM_KV binding for inbound abuse protection",
+      expect.objectContaining({
+        metric: "email.inbound_abuse.missing_sum_kv",
+        value: 1,
+      })
+    );
+  });
+
+  it("allows a guarded bypass when SUM_KV is unavailable in local mode", async () => {
+    vi.stubEnv("VITEST", "");
+    vi.stubEnv("NODE_ENV", "production");
+
+    const result = await withFixedNow("2026-03-22T10:00:00.000Z", () =>
+      checkInboundAbuse(
+        buildArgs({
+          env: {
+            ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
+            BETTER_AUTH_BASE_URL: "http://localhost:8787/api/auth",
+          } as unknown as CloudflareBindings,
+        })
+      )
+    );
+
+    expect(result).toMatchObject({
+      allowed: true,
+      dedupeKey: null,
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      "[email] Bypassing inbound abuse protection because SUM_KV is unavailable in an explicit test/local mode",
+      expect.any(Object)
+    );
   });
 
   it("does not persist dedupe keys for attempts denied by later rate-limit checks", async () => {
@@ -209,6 +270,14 @@ describe("inbound abuse policy", () => {
       allowed: false,
       reason: "blocked_sender_domain",
     });
+    expect(console.info).toHaveBeenCalledWith(
+      "[email] Dropped inbound email due to abuse policy",
+      expect.objectContaining({
+        senderAddress: expect.not.stringContaining("sender@example.com"),
+        senderDomain: expect.not.stringContaining("example.com"),
+        blockedSenderDomains: expect.not.arrayContaining(["example.com"]),
+      })
+    );
   });
 
   it("falls back to plain address normalization when canonical email normalization fails", async () => {
@@ -262,10 +331,68 @@ describe("inbound abuse policy", () => {
     });
   });
 
+  it("redacts message ids and sender domains in abuse logs", async () => {
+    const env = buildEnv();
+    await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
+      await checkInboundAbuse(
+        buildArgs({
+          env,
+        })
+      );
+      await checkInboundAbuse(
+        buildArgs({
+          env,
+        })
+      );
+    });
+
+    expect(console.info).toHaveBeenCalledWith(
+      "[email] Dropped inbound email due to abuse policy",
+      expect.objectContaining({
+        reason: "duplicate_message_id",
+        senderAddress: expect.not.stringContaining("sender@example.com"),
+        senderDomain: expect.not.stringContaining("example.com"),
+        messageId: expect.not.stringContaining("msg-1"),
+      })
+    );
+  });
+
+  it("redacts sender domains in the soft-threshold warning", async () => {
+    const env = buildEnv();
+    const meta = JSON.stringify({
+      inboundRatePolicy: {
+        senderDomainSoftMax: 1,
+        senderDomainBlockMax: 100,
+        senderAddressBlockMax: 100,
+        inboxBlockMax: 100,
+      },
+    });
+
+    await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
+      await checkInboundAbuse(
+        buildArgs({
+          env,
+          meta,
+        })
+      );
+    });
+
+    expect(console.warn).toHaveBeenCalledWith(
+      "[email] Sender domain soft abuse threshold reached",
+      expect.objectContaining({
+        senderDomain: expect.not.stringContaining("example.com"),
+      })
+    );
+  });
+
   it("backs off block duration for repeat offenses up to the configured max", async () => {
     const kv = new FakeKvNamespace();
-    const env = buildEnv(kv);
+    const abuseCounters = new FakeAbuseCounterNamespace();
+    const env = buildEnv(kv, abuseCounters);
     const senderDomainHash = await hashForRateLimitKey("example.com");
+    const objectId = abuseCounters.idFromName(
+      "email:abuse:counter-service:address:address-1"
+    );
     const blockKey = __private__.buildBlockKey({
       addressId: "address-1",
       kind: "domain",
@@ -283,7 +410,7 @@ describe("inbound abuse policy", () => {
           }),
         });
       }
-      firstBlock = JSON.parse((await kv.get(blockKey)) as string) as {
+      firstBlock = abuseCounters.debugGetValue(objectId, blockKey) as {
         expiresAt: string;
       };
     });
@@ -297,7 +424,7 @@ describe("inbound abuse policy", () => {
           }),
         });
       }
-      secondBlock = JSON.parse((await kv.get(blockKey)) as string) as {
+      secondBlock = abuseCounters.debugGetValue(objectId, blockKey) as {
         expiresAt: string;
       };
     });

@@ -3,6 +3,33 @@ type ExpiringRecord = {
   value: unknown;
 };
 
+type BlockKind = "domain" | "sender" | "inbox";
+
+const KV_PREFIX = "email:abuse";
+const STRIKE_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+const buildBlockKey = ({
+  addressId,
+  kind,
+  subjectHash,
+}: {
+  addressId: string;
+  kind: BlockKind;
+  subjectHash?: string;
+}) =>
+  `${KV_PREFIX}:block:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
+
+const buildStrikeKey = ({
+  addressId,
+  kind,
+  subjectHash,
+}: {
+  addressId: string;
+  kind: BlockKind;
+  subjectHash?: string;
+}) =>
+  `${KV_PREFIX}:strikes:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
+
 class FakeAbuseCounterObject {
   private readonly records = new Map<string, ExpiringRecord>();
   private alarmAtMs: number | null = null;
@@ -44,6 +71,86 @@ class FakeAbuseCounterObject {
     });
     this.scheduleCleanupAt(expiresAtMs);
     return next;
+  }
+
+  getActiveBlock(
+    addressId: string,
+    kind: BlockKind,
+    subjectHash: string | null
+  ) {
+    this.cleanupExpired();
+    return (
+      this.readRecord(
+        buildBlockKey({
+          addressId,
+          kind,
+          subjectHash: subjectHash ?? undefined,
+        })
+      )?.value ?? null
+    );
+  }
+
+  async activateBlock(
+    addressId: string,
+    kind: BlockKind,
+    subjectHash: string | null,
+    activatedAt: string,
+    reason: string,
+    threshold: string,
+    policy: {
+      initialBlockSeconds: number;
+      maxBlockSeconds: number;
+    }
+  ) {
+    this.cleanupExpired();
+    const nowMs = Date.parse(activatedAt);
+    const strikeExpiresAtMs = nowMs + STRIKE_TTL_SECONDS * 1000;
+    const strikeKey = buildStrikeKey({
+      addressId,
+      kind,
+      subjectHash: subjectHash ?? undefined,
+    });
+    const strikes = Number(this.readRecord(strikeKey)?.value ?? 0) + 1;
+    this.records.set(strikeKey, {
+      value: strikes,
+      expiresAtMs: strikeExpiresAtMs,
+    });
+
+    const blockSeconds = Math.min(
+      policy.maxBlockSeconds,
+      policy.initialBlockSeconds * 2 ** (strikes - 1)
+    );
+    const expiresAtMs = nowMs + blockSeconds * 1000;
+    const payload = {
+      activatedAt,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      reason,
+      strikes,
+      threshold,
+    };
+
+    this.records.set(
+      buildBlockKey({
+        addressId,
+        kind,
+        subjectHash: subjectHash ?? undefined,
+      }),
+      {
+        value: payload,
+        expiresAtMs,
+      }
+    );
+    this.scheduleCleanupAt(Math.min(expiresAtMs, strikeExpiresAtMs));
+
+    return {
+      blockSeconds,
+      expiresAt: payload.expiresAt,
+      strikes,
+    };
+  }
+
+  debugGetValue(key: string) {
+    return this.readRecord(key)?.value ?? null;
   }
 
   private cleanupExpired() {
@@ -101,5 +208,9 @@ export class FakeAbuseCounterNamespace {
     }
 
     return object;
+  }
+
+  debugGetValue(id: string, key: string) {
+    return this.objects.get(id)?.debugGetValue(key) ?? null;
   }
 }

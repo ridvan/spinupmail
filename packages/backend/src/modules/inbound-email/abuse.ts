@@ -9,15 +9,17 @@ import {
   parseSenderIdentity,
   type InboundRatePolicy,
 } from "@/shared/validation";
+import { isE2ETestUtilsEnabled, parseBooleanEnv } from "@/shared/env";
 import { hashForRateLimitKey } from "@/shared/utils/crypto";
 import {
+  activateAbuseBlock,
+  getActiveAbuseBlock,
   getAbuseCounter,
   incrementAbuseCounter,
   trackDistinctAbuseCounter,
 } from "./abuse-counter";
 
 const COUNTER_TTL_BUFFER_SECONDS = 60;
-const STRIKE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const KV_PREFIX = "email:abuse";
 
 export const DEFAULT_INBOUND_RATE_POLICY = {
@@ -48,14 +50,6 @@ type ResolvedInboundRatePolicy = {
   maxBlockSeconds: number;
 };
 
-type ActiveBlockPayload = {
-  activatedAt: string;
-  expiresAt: string;
-  reason: string;
-  strikes: number;
-  threshold: string;
-};
-
 type InboundAbuseCheckResult =
   | {
       allowed: true;
@@ -70,11 +64,6 @@ type InboundAbuseCheckResult =
       senderAddress: string | null;
       senderDomain: string | null;
     };
-
-const parseCounter = (value: string | null) => {
-  const parsed = Number(value ?? "0");
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-};
 
 const getWindowSlot = (nowSeconds: number, windowSeconds: number) =>
   Math.floor(nowSeconds / windowSeconds);
@@ -114,17 +103,6 @@ const buildBlockKey = ({
 }) =>
   `${KV_PREFIX}:block:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
 
-const buildStrikeKey = ({
-  addressId,
-  kind,
-  subjectHash,
-}: {
-  addressId: string;
-  kind: "domain" | "sender" | "inbox";
-  subjectHash?: string;
-}) =>
-  `${KV_PREFIX}:strikes:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
-
 const resolveInboundRatePolicy = (
   policy: InboundRatePolicy | null | undefined
 ): ResolvedInboundRatePolicy => {
@@ -156,6 +134,7 @@ const incrementWindowCounter = async ({
   subjectHash?: string;
 }) => {
   const slot = getWindowSlot(nowSeconds, windowSeconds);
+  const slotEndSeconds = (slot + 1) * windowSeconds;
   const key = buildCounterKey({
     addressId,
     bucket,
@@ -166,7 +145,7 @@ const incrementWindowCounter = async ({
     env,
     addressId,
     key,
-    ttlSeconds: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
+    ttlSeconds: slotEndSeconds - nowSeconds + COUNTER_TTL_BUFFER_SECONDS,
   });
 };
 
@@ -184,6 +163,7 @@ const trackDistinctSenderCount = async ({
   senderHash: string | null;
 }) => {
   const slot = getWindowSlot(nowSeconds, windowSeconds);
+  const slotEndSeconds = (slot + 1) * windowSeconds;
   const counterKey = buildCounterKey({
     addressId,
     bucket: "distinct-senders",
@@ -208,111 +188,76 @@ const trackDistinctSenderCount = async ({
     addressId,
     counterKey,
     seenKey,
-    ttlSeconds: windowSeconds + COUNTER_TTL_BUFFER_SECONDS,
+    ttlSeconds: slotEndSeconds - nowSeconds + COUNTER_TTL_BUFFER_SECONDS,
   });
 };
 
-const parseActiveBlockPayload = (value: string | null) => {
-  if (!value) return null;
+const readProcessEnv = (key: string) =>
+  typeof process !== "undefined" && process.env ? process.env[key] : undefined;
+
+const isLocalUrl = (value: string | null | undefined) => {
+  if (!value) return false;
 
   try {
-    const parsed = JSON.parse(value) as Partial<ActiveBlockPayload>;
-    if (
-      typeof parsed.reason !== "string" ||
-      typeof parsed.expiresAt !== "string" ||
-      typeof parsed.threshold !== "string"
-    ) {
-      return null;
-    }
-
-    return parsed as ActiveBlockPayload;
+    const { hostname } = new URL(value);
+    return hostname === "localhost" || hostname === "127.0.0.1";
   } catch {
-    return null;
+    return false;
   }
 };
 
-const getActiveBlock = async ({
-  kv,
-  addressId,
-  kind,
-  subjectHash,
-}: {
-  kv: KVNamespace;
-  addressId: string;
-  kind: "domain" | "sender" | "inbox";
-  subjectHash?: string;
-}) => {
-  const payload = parseActiveBlockPayload(
-    await kv.get(
-      buildBlockKey({
-        addressId,
-        kind,
-        subjectHash,
-      })
-    )
+const shouldAllowMissingKvBypass = (env: CloudflareBindings) =>
+  parseBooleanEnv(readProcessEnv("VITEST")) ||
+  readProcessEnv("NODE_ENV") === "test" ||
+  isE2ETestUtilsEnabled(env) ||
+  isLocalUrl(
+    env.BETTER_AUTH_BASE_URL ?? readProcessEnv("BETTER_AUTH_BASE_URL")
   );
 
-  return payload;
+const redactToken = (value: string | null | undefined) => {
+  if (!value) return null;
+  if (value.length <= 4) return "*".repeat(value.length);
+  return `${value.slice(0, 2)}***${value.slice(-2)}`;
 };
 
-const activateBlock = async ({
-  kv,
-  addressId,
-  kind,
-  subjectHash,
-  now,
-  reason,
-  threshold,
-  policy,
-}: {
-  kv: KVNamespace;
-  addressId: string;
-  kind: "domain" | "sender" | "inbox";
-  subjectHash?: string;
-  now: Date;
-  reason: string;
-  threshold: string;
-  policy: ResolvedInboundRatePolicy;
-}) => {
-  const strikeKey = buildStrikeKey({
-    addressId,
-    kind,
-    subjectHash,
-  });
-  const strikes = parseCounter(await kv.get(strikeKey)) + 1;
-  await kv.put(strikeKey, String(strikes), {
-    expirationTtl: STRIKE_TTL_SECONDS,
-  });
+const redactDomain = (value: string | null | undefined) => {
+  if (!value) return null;
 
-  const blockSeconds = Math.min(
-    policy.maxBlockSeconds,
-    policy.initialBlockSeconds * 2 ** (strikes - 1)
-  );
-  const payload: ActiveBlockPayload = {
-    activatedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + blockSeconds * 1000).toISOString(),
-    reason,
-    strikes,
-    threshold,
-  };
+  return value
+    .split(".")
+    .map(label => redactToken(label) ?? "*")
+    .join(".");
+};
 
-  await kv.put(
-    buildBlockKey({
-      addressId,
-      kind,
-      subjectHash,
-    }),
-    JSON.stringify(payload),
-    {
-      expirationTtl: blockSeconds,
+const redactEmailAddress = (value: string | null | undefined) => {
+  if (!value) return null;
+
+  const [local, domain] = value.split("@");
+  if (!local || !domain) return redactToken(value);
+  return `${redactToken(local) ?? "***"}@${redactDomain(domain) ?? "***"}`;
+};
+
+const sanitizeLogExtra = (extra?: Record<string, unknown>) => {
+  if (!extra) return undefined;
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(extra)) {
+    if (key === "messageId" && typeof value === "string") {
+      sanitized[key] = redactToken(value);
+      continue;
     }
-  );
 
-  return {
-    blockSeconds,
-    expiresAt: payload.expiresAt,
-    strikes,
-  };
+    if (key === "blockedSenderDomains" && Array.isArray(value)) {
+      sanitized[key] = value.map(item =>
+        typeof item === "string" ? redactDomain(item) : item
+      );
+      continue;
+    }
+
+    sanitized[key] = value;
+  }
+
+  return sanitized;
 };
 
 const logDrop = ({
@@ -331,9 +276,9 @@ const logDrop = ({
   console.info("[email] Dropped inbound email due to abuse policy", {
     addressId,
     reason,
-    senderAddress: senderAddress ?? "unknown",
-    senderDomain: senderDomain ?? "unknown",
-    ...(extra ?? {}),
+    senderAddress: redactEmailAddress(senderAddress) ?? "unknown",
+    senderDomain: redactDomain(senderDomain) ?? "unknown",
+    ...(sanitizeLogExtra(extra) ?? {}),
   });
 };
 
@@ -390,9 +335,32 @@ export const checkInboundAbuse = async ({
   }
 
   if (!kv) {
+    console.error(
+      "[email] Missing SUM_KV binding for inbound abuse protection",
+      {
+        addressId,
+        metric: "email.inbound_abuse.missing_sum_kv",
+        value: 1,
+      }
+    );
+
+    if (shouldAllowMissingKvBypass(env)) {
+      console.warn(
+        "[email] Bypassing inbound abuse protection because SUM_KV is unavailable in an explicit test/local mode",
+        { addressId }
+      );
+      return {
+        allowed: true,
+        dedupeKey: null,
+        senderAddress,
+        senderDomain,
+      };
+    }
+
     return {
-      allowed: true,
+      allowed: false,
       dedupeKey: null,
+      reason: "abuse_protection_unavailable",
       senderAddress,
       senderDomain,
     };
@@ -410,8 +378,8 @@ export const checkInboundAbuse = async ({
     ? await hashForRateLimitKey(senderAddress)
     : null;
 
-  const activeInboxBlock = await getActiveBlock({
-    kv,
+  const activeInboxBlock = await getActiveAbuseBlock({
+    env,
     addressId,
     kind: "inbox",
   });
@@ -436,8 +404,8 @@ export const checkInboundAbuse = async ({
   }
 
   if (senderDomainHash) {
-    const activeDomainBlock = await getActiveBlock({
-      kv,
+    const activeDomainBlock = await getActiveAbuseBlock({
+      env,
       addressId,
       kind: "domain",
       subjectHash: senderDomainHash,
@@ -464,8 +432,8 @@ export const checkInboundAbuse = async ({
   }
 
   if (senderAddressHash) {
-    const activeSenderBlock = await getActiveBlock({
-      kv,
+    const activeSenderBlock = await getActiveAbuseBlock({
+      env,
       addressId,
       kind: "sender",
       subjectHash: senderAddressHash,
@@ -548,7 +516,7 @@ export const checkInboundAbuse = async ({
     if (senderDomainSoftCount >= policy.senderDomainSoftMax) {
       console.warn("[email] Sender domain soft abuse threshold reached", {
         addressId,
-        senderDomain,
+        senderDomain: redactDomain(senderDomain),
         count: senderDomainSoftCount,
         threshold: `${policy.senderDomainSoftMax}/${policy.senderDomainSoftWindowSeconds}s`,
         distinctSenderCount,
@@ -565,8 +533,8 @@ export const checkInboundAbuse = async ({
     });
 
     if (senderDomainBlockCount >= policy.senderDomainBlockMax) {
-      const block = await activateBlock({
-        kv,
+      const block = await activateAbuseBlock({
+        env,
         addressId,
         kind: "domain",
         subjectHash: senderDomainHash,
@@ -609,8 +577,8 @@ export const checkInboundAbuse = async ({
     });
 
     if (senderAddressBlockCount >= policy.senderAddressBlockMax) {
-      const block = await activateBlock({
-        kv,
+      const block = await activateAbuseBlock({
+        env,
         addressId,
         kind: "sender",
         subjectHash: senderAddressHash,
@@ -643,8 +611,8 @@ export const checkInboundAbuse = async ({
   }
 
   if (inboxBlockCount >= policy.inboxBlockMax) {
-    const block = await activateBlock({
-      kv,
+    const block = await activateAbuseBlock({
+      env,
       addressId,
       kind: "inbox",
       now,
