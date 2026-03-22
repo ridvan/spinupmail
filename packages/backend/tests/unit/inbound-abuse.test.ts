@@ -1,16 +1,11 @@
 import { __private__, checkInboundAbuse } from "@/modules/inbound-email/abuse";
 import { hashForRateLimitKey } from "@/shared/utils/crypto";
 import { FakeAbuseCounterNamespace } from "../fixtures/fake-abuse-counter-namespace";
-import { FakeKvNamespace } from "../fixtures/fake-kv";
 import { withFixedNow } from "../fixtures/time";
 
-const buildEnv = (
-  kv: FakeKvNamespace | null = new FakeKvNamespace(),
-  abuseCounters = new FakeAbuseCounterNamespace()
-) =>
+const buildEnv = (abuseCounters = new FakeAbuseCounterNamespace()) =>
   ({
     ABUSE_COUNTERS: abuseCounters,
-    ...(kv ? { SUM_KV: kv } : {}),
   }) as unknown as CloudflareBindings;
 
 const buildArgs = (overrides?: {
@@ -77,7 +72,7 @@ describe("inbound abuse policy", () => {
     });
   });
 
-  it("fails closed when SUM_KV is unavailable outside explicit test/local modes", async () => {
+  it("fails closed when ABUSE_COUNTERS is unavailable outside explicit test/local modes", async () => {
     vi.stubEnv("VITEST", "");
     vi.stubEnv("NODE_ENV", "production");
 
@@ -85,7 +80,6 @@ describe("inbound abuse policy", () => {
       checkInboundAbuse(
         buildArgs({
           env: {
-            ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
             BETTER_AUTH_BASE_URL: "https://api.spinupmail.com",
           } as unknown as CloudflareBindings,
         })
@@ -97,15 +91,15 @@ describe("inbound abuse policy", () => {
       reason: "abuse_protection_unavailable",
     });
     expect(console.error).toHaveBeenCalledWith(
-      "[email] Missing SUM_KV binding for inbound abuse protection",
+      "[email] Missing ABUSE_COUNTERS binding for inbound abuse protection",
       expect.objectContaining({
-        metric: "email.inbound_abuse.missing_sum_kv",
+        metric: "email.inbound_abuse.missing_abuse_counters",
         value: 1,
       })
     );
   });
 
-  it("allows a guarded bypass when SUM_KV is unavailable in local mode", async () => {
+  it("allows a guarded bypass when ABUSE_COUNTERS is unavailable in local mode", async () => {
     vi.stubEnv("VITEST", "");
     vi.stubEnv("NODE_ENV", "production");
 
@@ -113,7 +107,6 @@ describe("inbound abuse policy", () => {
       checkInboundAbuse(
         buildArgs({
           env: {
-            ABUSE_COUNTERS: new FakeAbuseCounterNamespace(),
             BETTER_AUTH_BASE_URL: "http://localhost:8787/api/auth",
           } as unknown as CloudflareBindings,
         })
@@ -125,14 +118,14 @@ describe("inbound abuse policy", () => {
       dedupeKey: null,
     });
     expect(console.warn).toHaveBeenCalledWith(
-      "[email] Bypassing inbound abuse protection because SUM_KV is unavailable in an explicit test/local mode",
+      "[email] Bypassing inbound abuse protection because ABUSE_COUNTERS is unavailable in an explicit test/local mode",
       expect.any(Object)
     );
   });
 
-  it("does not persist dedupe keys for attempts denied by later rate-limit checks", async () => {
-    const kv = new FakeKvNamespace();
-    const env = buildEnv(kv);
+  it("releases dedupe claims for attempts denied by later rate-limit checks", async () => {
+    const abuseCounters = new FakeAbuseCounterNamespace();
+    const env = buildEnv(abuseCounters);
     const blockedMeta = JSON.stringify({
       inboundRatePolicy: {
         senderDomainBlockMax: 100,
@@ -140,6 +133,9 @@ describe("inbound abuse policy", () => {
         inboxBlockMax: 100,
       },
     });
+    const objectId = abuseCounters.idFromName(
+      "email:abuse:counter-service:address:address-1"
+    );
 
     await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
       const blocked = await checkInboundAbuse(
@@ -148,16 +144,15 @@ describe("inbound abuse policy", () => {
           meta: blockedMeta,
         })
       );
-      const dedupeHash = await hashForRateLimitKey(
-        "inbox@spinupmail.com|msg-1"
-      );
+      const dedupeHash = await hashForRateLimitKey("msg-1");
 
       expect(blocked).toMatchObject({
         allowed: false,
         reason: "sender_address_rate_limit",
       });
       expect(
-        await kv.get(
+        abuseCounters.debugGetValue(
+          objectId,
           `email:abuse:dedupe:address:address-1:message:${dedupeHash}`
         )
       ).toBeNull();
@@ -386,9 +381,8 @@ describe("inbound abuse policy", () => {
   });
 
   it("backs off block duration for repeat offenses up to the configured max", async () => {
-    const kv = new FakeKvNamespace();
     const abuseCounters = new FakeAbuseCounterNamespace();
-    const env = buildEnv(kv, abuseCounters);
+    const env = buildEnv(abuseCounters);
     const senderDomainHash = await hashForRateLimitKey("example.com");
     const objectId = abuseCounters.idFromName(
       "email:abuse:counter-service:address:address-1"

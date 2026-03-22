@@ -30,6 +30,22 @@ const buildStrikeKey = ({
 }) =>
   `${KV_PREFIX}:strikes:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
 
+const buildDedupeStorageKey = ({
+  addressId,
+  dedupeHash,
+}: {
+  addressId: string;
+  dedupeHash: string;
+}) => `${KV_PREFIX}:dedupe:address:${addressId}:message:${dedupeHash}`;
+
+const hashForRateLimitKey = async (value: string) => {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 class FakeAbuseCounterObject {
   private readonly records = new Map<string, ExpiringRecord>();
   private alarmAtMs: number | null = null;
@@ -147,6 +163,49 @@ class FakeAbuseCounterObject {
       expiresAt: payload.expiresAt,
       strikes,
     };
+  }
+
+  async claimAbuseDedupe(
+    addressId: string,
+    normalizedMessageId: string,
+    ttlSeconds: number
+  ) {
+    this.cleanupExpired();
+    const nowMs = Date.now();
+    const dedupeHash = await hashForRateLimitKey(normalizedMessageId);
+    const dedupeKey = buildDedupeStorageKey({
+      addressId,
+      dedupeHash,
+    });
+
+    if (this.readRecord(dedupeKey)) {
+      return {
+        claimed: false,
+        dedupeKey,
+      };
+    }
+
+    const expiresAtMs = nowMs + ttlSeconds * 1000;
+    this.records.set(dedupeKey, {
+      value: normalizedMessageId,
+      expiresAtMs,
+    });
+    this.scheduleCleanupAt(expiresAtMs);
+
+    return {
+      claimed: true,
+      dedupeKey,
+    };
+  }
+
+  async releaseAbuseDedupe(addressId: string, dedupeKey: string) {
+    if (
+      !dedupeKey.startsWith(`${KV_PREFIX}:dedupe:address:${addressId}:message:`)
+    ) {
+      return;
+    }
+
+    this.records.delete(dedupeKey);
   }
 
   debugGetValue(key: string) {

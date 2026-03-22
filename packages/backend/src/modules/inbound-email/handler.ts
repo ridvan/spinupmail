@@ -262,7 +262,7 @@ export const handleIncomingEmail = async (
     } finally {
       if (!emailInserted) {
         try {
-          await clearInboundDedupeKey(env, dedupeKey);
+          await clearInboundDedupeKey(env, addressRow.id, dedupeKey);
         } catch (cleanupError) {
           console.error("[email] Failed to clear inbound dedupe key", {
             dedupeKey,

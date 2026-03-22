@@ -15,7 +15,9 @@ import {
   activateAbuseBlock,
   getActiveAbuseBlock,
   getAbuseCounter,
+  claimAbuseDedupe,
   incrementAbuseCounter,
+  releaseAbuseDedupe,
   trackDistinctAbuseCounter,
 } from "./abuse-counter";
 
@@ -206,7 +208,7 @@ const isLocalUrl = (value: string | null | undefined) => {
   }
 };
 
-const shouldAllowMissingKvBypass = (env: CloudflareBindings) =>
+const shouldAllowMissingAbuseProtectionBypass = (env: CloudflareBindings) =>
   parseBooleanEnv(readProcessEnv("VITEST")) ||
   readProcessEnv("NODE_ENV") === "test" ||
   isE2ETestUtilsEnabled(env) ||
@@ -302,7 +304,6 @@ export const checkInboundAbuse = async ({
   senderRaw: string | null | undefined;
   messageId: string | null | undefined;
 }): Promise<InboundAbuseCheckResult> => {
-  const kv = env.SUM_KV;
   const parsedMeta = parseAddressMeta(meta);
   const senderIdentity = parseSenderIdentity(senderRaw);
   const addr = senderIdentity?.address;
@@ -334,19 +335,19 @@ export const checkInboundAbuse = async ({
     };
   }
 
-  if (!kv) {
+  if (!env.ABUSE_COUNTERS) {
     console.error(
-      "[email] Missing SUM_KV binding for inbound abuse protection",
+      "[email] Missing ABUSE_COUNTERS binding for inbound abuse protection",
       {
         addressId,
-        metric: "email.inbound_abuse.missing_sum_kv",
+        metric: "email.inbound_abuse.missing_abuse_counters",
         value: 1,
       }
     );
 
-    if (shouldAllowMissingKvBypass(env)) {
+    if (shouldAllowMissingAbuseProtectionBypass(env)) {
       console.warn(
-        "[email] Bypassing inbound abuse protection because SUM_KV is unavailable in an explicit test/local mode",
+        "[email] Bypassing inbound abuse protection because ABUSE_COUNTERS is unavailable in an explicit test/local mode",
         { addressId }
       );
       return {
@@ -460,14 +461,27 @@ export const checkInboundAbuse = async ({
   }
 
   let dedupeKey: string | null = null;
+  const releaseClaimIfNeeded = async () => {
+    if (!dedupeKey) return;
+
+    await releaseAbuseDedupe({
+      env,
+      addressId,
+      dedupeKey,
+    });
+    dedupeKey = null;
+  };
   const normalizedMessageId = messageId?.trim();
   if (normalizedMessageId) {
-    const dedupeHash = await hashForRateLimitKey(
-      `${normalizeAddress(recipient)}|${normalizedMessageId}`
-    );
-    dedupeKey = `${KV_PREFIX}:dedupe:address:${addressId}:message:${dedupeHash}`;
-    const existing = await kv.get(dedupeKey);
-    if (existing) {
+    const dedupeClaim = await claimAbuseDedupe({
+      env,
+      addressId,
+      normalizedMessageId,
+      ttlSeconds: policy.dedupeWindowSeconds,
+    });
+    dedupeKey = dedupeClaim.dedupeKey;
+
+    if (!dedupeClaim.claimed) {
       logDrop({
         addressId,
         reason: "duplicate_message_id",
@@ -487,181 +501,188 @@ export const checkInboundAbuse = async ({
     }
   }
 
-  const inboxBlockCount = await incrementWindowCounter({
-    env,
-    addressId,
-    bucket: "inbox",
-    nowSeconds,
-    windowSeconds: policy.inboxBlockWindowSeconds,
-  });
-
-  const distinctSenderCount = await trackDistinctSenderCount({
-    env,
-    addressId,
-    nowSeconds,
-    windowSeconds: policy.inboxBlockWindowSeconds,
-    senderHash: senderAddressHash,
-  });
-
-  if (senderDomainHash) {
-    const senderDomainSoftCount = await incrementWindowCounter({
+  try {
+    const inboxBlockCount = await incrementWindowCounter({
       env,
       addressId,
-      bucket: "sender-domain-soft",
+      bucket: "inbox",
       nowSeconds,
-      windowSeconds: policy.senderDomainSoftWindowSeconds,
-      subjectHash: senderDomainHash,
+      windowSeconds: policy.inboxBlockWindowSeconds,
     });
 
-    if (senderDomainSoftCount >= policy.senderDomainSoftMax) {
-      console.warn("[email] Sender domain soft abuse threshold reached", {
-        addressId,
-        senderDomain: redactDomain(senderDomain),
-        count: senderDomainSoftCount,
-        threshold: `${policy.senderDomainSoftMax}/${policy.senderDomainSoftWindowSeconds}s`,
-        distinctSenderCount,
-      });
-    }
-
-    const senderDomainBlockCount = await incrementWindowCounter({
+    const distinctSenderCount = await trackDistinctSenderCount({
       env,
       addressId,
-      bucket: "sender-domain-block",
       nowSeconds,
-      windowSeconds: policy.senderDomainBlockWindowSeconds,
-      subjectHash: senderDomainHash,
+      windowSeconds: policy.inboxBlockWindowSeconds,
+      senderHash: senderAddressHash,
     });
 
-    if (senderDomainBlockCount >= policy.senderDomainBlockMax) {
-      const block = await activateAbuseBlock({
+    if (senderDomainHash) {
+      const senderDomainSoftCount = await incrementWindowCounter({
         env,
         addressId,
-        kind: "domain",
+        bucket: "sender-domain-soft",
+        nowSeconds,
+        windowSeconds: policy.senderDomainSoftWindowSeconds,
         subjectHash: senderDomainHash,
-        now,
-        reason: "sender_domain_rate_limit",
-        threshold: `${policy.senderDomainBlockMax}/${policy.senderDomainBlockWindowSeconds}s`,
-        policy,
       });
-      logDrop({
-        addressId,
-        reason: "sender_domain_rate_limit",
-        senderAddress,
-        senderDomain,
-        extra: {
-          expiresAt: block.expiresAt,
-          blockSeconds: block.blockSeconds,
-          strikes: block.strikes,
-          count: senderDomainBlockCount,
+
+      if (senderDomainSoftCount >= policy.senderDomainSoftMax) {
+        console.warn("[email] Sender domain soft abuse threshold reached", {
+          addressId,
+          senderDomain: redactDomain(senderDomain),
+          count: senderDomainSoftCount,
+          threshold: `${policy.senderDomainSoftMax}/${policy.senderDomainSoftWindowSeconds}s`,
           distinctSenderCount,
-        },
+        });
+      }
+
+      const senderDomainBlockCount = await incrementWindowCounter({
+        env,
+        addressId,
+        bucket: "sender-domain-block",
+        nowSeconds,
+        windowSeconds: policy.senderDomainBlockWindowSeconds,
+        subjectHash: senderDomainHash,
       });
-      return {
-        allowed: false,
-        dedupeKey: null,
-        reason: "sender_domain_rate_limit",
-        senderAddress,
-        senderDomain,
-      };
+
+      if (senderDomainBlockCount >= policy.senderDomainBlockMax) {
+        const block = await activateAbuseBlock({
+          env,
+          addressId,
+          kind: "domain",
+          subjectHash: senderDomainHash,
+          now,
+          reason: "sender_domain_rate_limit",
+          threshold: `${policy.senderDomainBlockMax}/${policy.senderDomainBlockWindowSeconds}s`,
+          policy,
+        });
+        logDrop({
+          addressId,
+          reason: "sender_domain_rate_limit",
+          senderAddress,
+          senderDomain,
+          extra: {
+            expiresAt: block.expiresAt,
+            blockSeconds: block.blockSeconds,
+            strikes: block.strikes,
+            count: senderDomainBlockCount,
+            distinctSenderCount,
+          },
+        });
+        await releaseClaimIfNeeded();
+        return {
+          allowed: false,
+          dedupeKey: null,
+          reason: "sender_domain_rate_limit",
+          senderAddress,
+          senderDomain,
+        };
+      }
     }
-  }
 
-  if (senderAddressHash) {
-    const senderAddressBlockCount = await incrementWindowCounter({
-      env,
-      addressId,
-      bucket: "sender-address-block",
-      nowSeconds,
-      windowSeconds: policy.senderAddressBlockWindowSeconds,
-      subjectHash: senderAddressHash,
-    });
+    if (senderAddressHash) {
+      const senderAddressBlockCount = await incrementWindowCounter({
+        env,
+        addressId,
+        bucket: "sender-address-block",
+        nowSeconds,
+        windowSeconds: policy.senderAddressBlockWindowSeconds,
+        subjectHash: senderAddressHash,
+      });
 
-    if (senderAddressBlockCount >= policy.senderAddressBlockMax) {
+      if (senderAddressBlockCount >= policy.senderAddressBlockMax) {
+        const block = await activateAbuseBlock({
+          env,
+          addressId,
+          kind: "sender",
+          subjectHash: senderAddressHash,
+          now,
+          reason: "sender_address_rate_limit",
+          threshold: `${policy.senderAddressBlockMax}/${policy.senderAddressBlockWindowSeconds}s`,
+          policy,
+        });
+        logDrop({
+          addressId,
+          reason: "sender_address_rate_limit",
+          senderAddress,
+          senderDomain,
+          extra: {
+            expiresAt: block.expiresAt,
+            blockSeconds: block.blockSeconds,
+            strikes: block.strikes,
+            count: senderAddressBlockCount,
+            distinctSenderCount,
+          },
+        });
+        await releaseClaimIfNeeded();
+        return {
+          allowed: false,
+          dedupeKey: null,
+          reason: "sender_address_rate_limit",
+          senderAddress,
+          senderDomain,
+        };
+      }
+    }
+
+    if (inboxBlockCount >= policy.inboxBlockMax) {
       const block = await activateAbuseBlock({
         env,
         addressId,
-        kind: "sender",
-        subjectHash: senderAddressHash,
+        kind: "inbox",
         now,
-        reason: "sender_address_rate_limit",
-        threshold: `${policy.senderAddressBlockMax}/${policy.senderAddressBlockWindowSeconds}s`,
+        reason: "inbox_rate_limit",
+        threshold: `${policy.inboxBlockMax}/${policy.inboxBlockWindowSeconds}s`,
         policy,
       });
       logDrop({
         addressId,
-        reason: "sender_address_rate_limit",
+        reason: "inbox_rate_limit",
         senderAddress,
         senderDomain,
         extra: {
           expiresAt: block.expiresAt,
           blockSeconds: block.blockSeconds,
           strikes: block.strikes,
-          count: senderAddressBlockCount,
+          count: inboxBlockCount,
           distinctSenderCount,
         },
       });
+      await releaseClaimIfNeeded();
       return {
         allowed: false,
         dedupeKey: null,
-        reason: "sender_address_rate_limit",
+        reason: "inbox_rate_limit",
         senderAddress,
         senderDomain,
       };
     }
-  }
 
-  if (inboxBlockCount >= policy.inboxBlockMax) {
-    const block = await activateAbuseBlock({
-      env,
-      addressId,
-      kind: "inbox",
-      now,
-      reason: "inbox_rate_limit",
-      threshold: `${policy.inboxBlockMax}/${policy.inboxBlockWindowSeconds}s`,
-      policy,
-    });
-    logDrop({
-      addressId,
-      reason: "inbox_rate_limit",
-      senderAddress,
-      senderDomain,
-      extra: {
-        expiresAt: block.expiresAt,
-        blockSeconds: block.blockSeconds,
-        strikes: block.strikes,
-        count: inboxBlockCount,
-        distinctSenderCount,
-      },
-    });
     return {
-      allowed: false,
-      dedupeKey: null,
-      reason: "inbox_rate_limit",
+      allowed: true,
+      dedupeKey,
       senderAddress,
       senderDomain,
     };
+  } catch (error) {
+    await releaseClaimIfNeeded();
+    throw error;
   }
-
-  if (dedupeKey) {
-    await kv.put(dedupeKey, now.toISOString(), {
-      expirationTtl: policy.dedupeWindowSeconds,
-    });
-  }
-
-  return {
-    allowed: true,
-    dedupeKey,
-    senderAddress,
-    senderDomain,
-  };
 };
 
 export const clearInboundDedupeKey = async (
   env: CloudflareBindings,
+  addressId: string,
   dedupeKey: string | null
 ) => {
-  if (!dedupeKey || !env.SUM_KV) return;
-  await env.SUM_KV.delete(dedupeKey);
+  if (!dedupeKey || !env.ABUSE_COUNTERS) return;
+  await releaseAbuseDedupe({
+    env,
+    addressId,
+    dedupeKey,
+  });
 };
 
 export const __private__ = {

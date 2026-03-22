@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { hashForRateLimitKey } from "@/shared/utils/crypto";
 
 const ABUSE_COUNTER_OBJECT_NAME_PREFIX = "email:abuse:counter-service:address";
 const STRIKE_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -22,6 +23,11 @@ type AbuseBlockKind = "domain" | "sender" | "inbox";
 type AbuseBlockPolicy = {
   initialBlockSeconds: number;
   maxBlockSeconds: number;
+};
+
+type AbuseDedupeClaimResult = {
+  claimed: boolean;
+  dedupeKey: string;
 };
 
 const isExpiringRecord = <T>(value: unknown): value is ExpiringRecord<T> =>
@@ -75,6 +81,14 @@ const buildStrikeKey = ({
   subjectHash?: string;
 }) =>
   `${KV_PREFIX}:strikes:${kind}:address:${addressId}${subjectHash ? `:subject:${subjectHash}` : ""}`;
+
+const buildDedupeStorageKey = ({
+  addressId,
+  dedupeHash,
+}: {
+  addressId: string;
+  dedupeHash: string;
+}) => `${KV_PREFIX}:dedupe:address:${addressId}:message:${dedupeHash}`;
 
 export const incrementAbuseCounter = ({
   env,
@@ -166,6 +180,37 @@ export const activateAbuseBlock = ({
     expiresAt: string;
     strikes: number;
   }>;
+
+export const claimAbuseDedupe = ({
+  env,
+  addressId,
+  normalizedMessageId,
+  ttlSeconds,
+}: {
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
+  addressId: string;
+  normalizedMessageId: string;
+  ttlSeconds: number;
+}) =>
+  getAbuseCounterStub(env, addressId).claimAbuseDedupe(
+    addressId,
+    normalizedMessageId,
+    ttlSeconds
+  ) as Promise<AbuseDedupeClaimResult>;
+
+export const releaseAbuseDedupe = ({
+  env,
+  addressId,
+  dedupeKey,
+}: {
+  env: Pick<CloudflareBindings, "ABUSE_COUNTERS">;
+  addressId: string;
+  dedupeKey: string;
+}) =>
+  getAbuseCounterStub(env, addressId).releaseAbuseDedupe(
+    addressId,
+    dedupeKey
+  ) as Promise<void>;
 
 export class InboundAbuseCounterDurableObject extends DurableObject<CloudflareBindings> {
   async increment(key: string, ttlSeconds: number) {
@@ -285,6 +330,49 @@ export class InboundAbuseCounterDurableObject extends DurableObject<CloudflareBi
       expiresAt: payload.expiresAt,
       strikes,
     };
+  }
+
+  async claimAbuseDedupe(
+    addressId: string,
+    normalizedMessageId: string,
+    ttlSeconds: number
+  ): Promise<AbuseDedupeClaimResult> {
+    const storage = this.ctx.storage.kv;
+    const nowMs = Date.now();
+    const dedupeHash = await hashForRateLimitKey(normalizedMessageId);
+    const dedupeKey = buildDedupeStorageKey({
+      addressId,
+      dedupeHash,
+    });
+
+    if (readRecord<string>(storage, dedupeKey, nowMs)) {
+      return {
+        claimed: false,
+        dedupeKey,
+      };
+    }
+
+    const expiresAtMs = nowMs + ttlSeconds * 1000;
+    storage.put(dedupeKey, {
+      value: normalizedMessageId,
+      expiresAtMs,
+    });
+    await this.scheduleCleanupAt(expiresAtMs);
+
+    return {
+      claimed: true,
+      dedupeKey,
+    };
+  }
+
+  async releaseAbuseDedupe(addressId: string, dedupeKey: string) {
+    if (
+      !dedupeKey.startsWith(`${KV_PREFIX}:dedupe:address:${addressId}:message:`)
+    ) {
+      return;
+    }
+
+    this.ctx.storage.kv.delete(dedupeKey);
   }
 
   async alarm() {
