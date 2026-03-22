@@ -1,3 +1,5 @@
+import { hashForRateLimitKey } from "@/shared/utils/crypto";
+
 type ExpiringRecord = {
   expiresAtMs: number;
   value: unknown;
@@ -37,14 +39,6 @@ const buildDedupeStorageKey = ({
   addressId: string;
   dedupeHash: string;
 }) => `${KV_PREFIX}:dedupe:address:${addressId}:message:${dedupeHash}`;
-
-const hashForRateLimitKey = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map(byte => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
 
 class FakeAbuseCounterObject {
   private readonly records = new Map<string, ExpiringRecord>();
