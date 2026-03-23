@@ -54,6 +54,7 @@ import {
   type RecentAddressActivitySortBy,
   updateAddressByIdAndOrganization,
 } from "./repo";
+import { deleteEmailSearchEntriesByAddressId } from "@/modules/emails/repo";
 import { toEmailAddressListItem } from "./dto";
 import type { AppHonoEnv } from "@/app/types";
 
@@ -647,6 +648,7 @@ export const deleteEmailAddress = async ({
     }
   }
 
+  await deleteEmailSearchEntriesByAddressId(db, addressRow.id);
   await deleteAddressByIdAndOrganization(db, addressRow.id, organizationId);
 
   return {
