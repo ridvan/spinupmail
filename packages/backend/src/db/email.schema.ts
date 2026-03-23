@@ -1,5 +1,11 @@
 import { relations, sql } from "drizzle-orm";
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { organizations, users } from "./auth.schema";
 
 export const emailAddresses = sqliteTable(
@@ -66,6 +72,10 @@ export const emails = sqliteTable(
   },
   table => [
     index("emails_address_received_idx").on(table.addressId, table.receivedAt),
+    uniqueIndex("emails_address_message_id_unique").on(
+      table.addressId,
+      table.messageId
+    ),
   ]
 );
 

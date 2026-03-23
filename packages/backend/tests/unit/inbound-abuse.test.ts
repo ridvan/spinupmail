@@ -50,7 +50,7 @@ describe("inbound abuse policy", () => {
     });
   });
 
-  it("drops duplicate message ids for the same inbox", async () => {
+  it("does not silently drop duplicate message ids at the abuse layer", async () => {
     const env = buildEnv();
     await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
       const first = await checkInboundAbuse(
@@ -65,10 +65,7 @@ describe("inbound abuse policy", () => {
       );
 
       expect(first.allowed).toBe(true);
-      expect(second).toMatchObject({
-        allowed: false,
-        reason: "duplicate_message_id",
-      });
+      expect(second.allowed).toBe(true);
     });
   });
 
@@ -115,7 +112,6 @@ describe("inbound abuse policy", () => {
 
     expect(result).toMatchObject({
       allowed: true,
-      dedupeKey: null,
     });
     expect(console.warn).toHaveBeenCalledWith(
       "[email] Bypassing inbound abuse protection because ABUSE_COUNTERS is unavailable in an explicit test/local mode",
@@ -123,9 +119,8 @@ describe("inbound abuse policy", () => {
     );
   });
 
-  it("releases dedupe claims for attempts denied by later rate-limit checks", async () => {
-    const abuseCounters = new FakeAbuseCounterNamespace();
-    const env = buildEnv(abuseCounters);
+  it("still blocks when later rate-limit checks fail", async () => {
+    const env = buildEnv(new FakeAbuseCounterNamespace());
     const blockedMeta = JSON.stringify({
       inboundRatePolicy: {
         senderDomainBlockMax: 100,
@@ -133,9 +128,6 @@ describe("inbound abuse policy", () => {
         inboxBlockMax: 100,
       },
     });
-    const objectId = abuseCounters.idFromName(
-      "email:abuse:counter-service:address:address-1"
-    );
 
     await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
       const blocked = await checkInboundAbuse(
@@ -144,18 +136,11 @@ describe("inbound abuse policy", () => {
           meta: blockedMeta,
         })
       );
-      const dedupeHash = await hashForRateLimitKey("msg-1");
 
       expect(blocked).toMatchObject({
         allowed: false,
         reason: "sender_address_rate_limit",
       });
-      expect(
-        abuseCounters.debugGetValue(
-          objectId,
-          `email:abuse:dedupe:address:address-1:message:${dedupeHash}`
-        )
-      ).toBeNull();
     });
   });
 
@@ -326,28 +311,25 @@ describe("inbound abuse policy", () => {
     });
   });
 
-  it("redacts message ids and sender domains in abuse logs", async () => {
+  it("redacts sender details in abuse logs", async () => {
     const env = buildEnv();
-    await withFixedNow("2026-03-22T10:00:00.000Z", async () => {
-      await checkInboundAbuse(
+    await withFixedNow("2026-03-22T10:00:00.000Z", () =>
+      checkInboundAbuse(
         buildArgs({
           env,
+          meta: JSON.stringify({
+            blockedSenderDomains: ["example.com"],
+          }),
         })
-      );
-      await checkInboundAbuse(
-        buildArgs({
-          env,
-        })
-      );
-    });
+      )
+    );
 
     expect(console.info).toHaveBeenCalledWith(
       "[email] Dropped inbound email due to abuse policy",
       expect.objectContaining({
-        reason: "duplicate_message_id",
+        reason: "blocked_sender_domain",
         senderAddress: expect.not.stringContaining("sender@example.com"),
         senderDomain: expect.not.stringContaining("example.com"),
-        messageId: expect.not.stringContaining("msg-1"),
       })
     );
   });

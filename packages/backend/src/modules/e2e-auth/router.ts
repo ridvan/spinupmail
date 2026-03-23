@@ -6,7 +6,6 @@ import type { AppHonoEnv } from "@/app/types";
 import { createEmailAddress } from "@/modules/email-addresses/service";
 import { findAddressByIdAndOrganization } from "@/modules/emails/repo";
 import {
-  incrementAddressEmailCount,
   insertInboundEmail,
   updateAddressLastReceivedAt,
 } from "@/modules/inbound-email/repo";
@@ -324,8 +323,8 @@ export const createE2EAuthTestRouter = () => {
       rawSize: raw.length,
       rawTruncated: false,
       receivedAt,
+      countAlreadyReserved: false,
     });
-    await incrementAddressEmailCount(db, address.id);
     await updateAddressLastReceivedAt(db, address.id, receivedAt);
 
     return c.json({

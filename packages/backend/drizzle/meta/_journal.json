@@ -29,6 +29,13 @@
       "when": 1773580187805,
       "tag": "0003_needy_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1774302274652,
+      "tag": "0004_smiling_steel_serpent",
+      "breakpoints": true
     }
   ]
 }
