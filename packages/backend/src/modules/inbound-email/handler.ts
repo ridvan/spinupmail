@@ -27,6 +27,7 @@ import {
   decrementAddressEmailCount,
   deleteEmailsForAddress,
   findAddressByRecipient,
+  findInboundEmailByAddressAndMessageId,
   insertInboundEmail,
   reserveInboxSlot,
   resetAddressEmailCount,
@@ -37,7 +38,10 @@ import {
   shouldAcceptSenderDomain,
   validateAddressAvailability,
 } from "./policy";
-import { checkInboundAbuse } from "./abuse";
+import {
+  checkInboundAbusePreflight,
+  recordAcceptedInboundEmailAbuse,
+} from "./abuse";
 
 export const handleIncomingEmail = async (
   message: ForwardableEmailMessage,
@@ -70,6 +74,23 @@ export const handleIncomingEmail = async (
       return;
     }
     const organizationId = addressRow.organizationId!;
+    const messageId = message.headers.get("message-id") ?? undefined;
+
+    if (messageId) {
+      const existingEmail = await findInboundEmailByAddressAndMessageId(
+        db,
+        addressRow.id,
+        messageId
+      );
+
+      if (existingEmail) {
+        console.info("[email] Duplicate inbound delivery skipped", {
+          addressId: addressRow.id,
+          messageId,
+        });
+        return;
+      }
+    }
 
     const senderRaw = message.from ?? message.headers.get("from");
     const senderPolicy = shouldAcceptSenderDomain({
@@ -87,7 +108,7 @@ export const handleIncomingEmail = async (
       return;
     }
 
-    const abuseCheck = await checkInboundAbuse({
+    const abuseCheck = await checkInboundAbusePreflight({
       env,
       addressId: addressRow.id,
       meta: addressRow.meta,
@@ -196,7 +217,7 @@ export const handleIncomingEmail = async (
     const insertResult = await insertInboundEmail(db, {
       id: emailId,
       addressId: addressRow.id,
-      messageId: message.headers.get("message-id") ?? undefined,
+      messageId,
       sender: senderValue,
       from: fromValue,
       to: toValue,
@@ -220,13 +241,27 @@ export const handleIncomingEmail = async (
 
       console.info("[email] Duplicate inbound delivery skipped", {
         addressId: addressRow.id,
-        messageId: message.headers.get("message-id") ?? null,
+        messageId: messageId ?? null,
       });
       return;
     }
 
     reservedAddressId = null;
     reservedOrganizationId = null;
+
+    if ("context" in abuseCheck) {
+      try {
+        await recordAcceptedInboundEmailAbuse({
+          context: abuseCheck.context,
+        });
+      } catch (error) {
+        console.error("[email] Failed to record inbound abuse counters", {
+          addressId: addressRow.id,
+          messageId: messageId ?? null,
+          error,
+        });
+      }
+    }
 
     ctx.waitUntil(
       (async () => {

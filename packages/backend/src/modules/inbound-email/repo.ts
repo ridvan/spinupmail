@@ -1,7 +1,10 @@
 import { and, eq, lt, sql } from "drizzle-orm";
-import { emailAddresses } from "@/db";
+import { emailAddresses, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
-import { buildDeleteEmailSearchEntriesByAddressIdStatement } from "@/modules/emails/repo";
+import {
+  buildDeleteEmailSearchEntriesByAddressIdStatement,
+  buildInsertEmailSearchEntryStatement,
+} from "@/modules/emails/repo";
 
 export const findAddressByRecipient = (db: AppDb, recipient: string) =>
   db
@@ -14,6 +17,21 @@ export const findAddressByRecipient = (db: AppDb, recipient: string) =>
     })
     .from(emailAddresses)
     .where(eq(emailAddresses.address, recipient))
+    .get();
+
+export const findInboundEmailByAddressAndMessageId = (
+  db: AppDb,
+  addressId: string,
+  messageId: string
+) =>
+  db
+    .select({
+      id: emails.id,
+    })
+    .from(emails)
+    .where(
+      and(eq(emails.addressId, addressId), eq(emails.messageId, messageId))
+    )
     .get();
 
 export const insertInboundEmail = async (
@@ -75,50 +93,41 @@ export const insertInboundEmail = async (
       values.receivedAt.getTime()
     );
 
-  const statements = [insertEmailStatement];
+  const insertResults = await db.$client.batch([insertEmailStatement]);
+  const inserted = Number(insertResults[0]?.meta?.changes ?? 0) > 0;
+
+  if (!inserted) {
+    return { inserted: false };
+  }
+
+  const followUpStatements = [
+    buildInsertEmailSearchEntryStatement({
+      db,
+      emailId: values.id,
+      subject: values.subject,
+      sender: values.sender,
+      senderAddress: values.from,
+      bodyText: values.bodyText,
+    }),
+  ];
 
   if (!values.countAlreadyReserved) {
-    statements.push(
+    followUpStatements.unshift(
       db.$client
         .prepare(
           `
             UPDATE email_addresses
             SET email_count = email_count + 1
-            WHERE id = ? AND changes() > 0
+            WHERE id = ?
           `
         )
         .bind(values.addressId)
     );
   }
 
-  statements.push(
-    db.$client
-      .prepare(
-        `
-          INSERT INTO emails_search (
-            subject,
-            sender,
-            sender_address,
-            body_text,
-            email_id
-          )
-          SELECT ?, ?, ?, ?, ?
-          WHERE changes() > 0
-        `
-      )
-      .bind(
-        values.subject ?? "",
-        values.sender ?? "",
-        values.from,
-        values.bodyText ?? "",
-        values.id
-      )
-  );
+  await db.$client.batch(followUpStatements);
 
-  const results = await db.$client.batch(statements);
-  return {
-    inserted: Number(results[0]?.meta?.changes ?? 0) > 0,
-  };
+  return { inserted: true };
 };
 
 export const reserveInboxSlot = ({

@@ -2,6 +2,7 @@ import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 
 const mocks = vi.hoisted(() => ({
   findAddressByRecipient: vi.fn(),
+  findInboundEmailByAddressAndMessageId: vi.fn(),
   reserveInboxSlot: vi.fn(),
   incrementAddressEmailCount: vi.fn(),
   decrementAddressEmailCount: vi.fn(),
@@ -18,7 +19,8 @@ const mocks = vi.hoisted(() => ({
   deleteR2ObjectsByPrefix: vi.fn(),
   validateAddressAvailability: vi.fn(),
   shouldAcceptSenderDomain: vi.fn(),
-  checkInboundAbuse: vi.fn(),
+  checkInboundAbusePreflight: vi.fn(),
+  recordAcceptedInboundEmailAbuse: vi.fn(),
   getDb: vi.fn(),
 }));
 
@@ -28,6 +30,8 @@ vi.mock("@/platform/db/client", () => ({
 
 vi.mock("@/modules/inbound-email/repo", () => ({
   findAddressByRecipient: mocks.findAddressByRecipient,
+  findInboundEmailByAddressAndMessageId:
+    mocks.findInboundEmailByAddressAndMessageId,
   reserveInboxSlot: mocks.reserveInboxSlot,
   incrementAddressEmailCount: mocks.incrementAddressEmailCount,
   decrementAddressEmailCount: mocks.decrementAddressEmailCount,
@@ -59,7 +63,8 @@ vi.mock("@/modules/inbound-email/policy", () => ({
 }));
 
 vi.mock("@/modules/inbound-email/abuse", () => ({
-  checkInboundAbuse: mocks.checkInboundAbuse,
+  checkInboundAbusePreflight: mocks.checkInboundAbusePreflight,
+  recordAcceptedInboundEmailAbuse: mocks.recordAcceptedInboundEmailAbuse,
 }));
 
 const buildMessage = () => {
@@ -115,17 +120,22 @@ describe("inbound email handler", () => {
     mocks.resetAddressEmailCount.mockResolvedValue(undefined);
     mocks.deleteEmailsForAddress.mockResolvedValue(undefined);
     mocks.deleteR2ObjectsByPrefix.mockResolvedValue(undefined);
+    mocks.findInboundEmailByAddressAndMessageId.mockResolvedValue(null);
     mocks.insertInboundEmail.mockResolvedValue({ inserted: true });
     mocks.shouldAcceptSenderDomain.mockReturnValue({
       allowed: true,
       allowedFromDomains: [],
       senderDomain: "example.com",
     });
-    mocks.checkInboundAbuse.mockResolvedValue({
+    mocks.checkInboundAbusePreflight.mockResolvedValue({
       allowed: true,
       senderAddress: "sender@example.com",
       senderDomain: "example.com",
+      context: {
+        addressId: "address-1",
+      },
     });
+    mocks.recordAcceptedInboundEmailAbuse.mockResolvedValue(undefined);
     mocks.validateAddressAvailability.mockReturnValue({ allowed: true });
   });
 
@@ -193,7 +203,7 @@ describe("inbound email handler", () => {
 
     expect(message.setReject).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
-    expect(mocks.checkInboundAbuse).not.toHaveBeenCalled();
+    expect(mocks.checkInboundAbusePreflight).not.toHaveBeenCalled();
   });
 
   it("drops mail rejected by abuse policy before DB writes", async () => {
@@ -206,7 +216,7 @@ describe("inbound email handler", () => {
       meta: null,
       expiresAt: null,
     });
-    mocks.checkInboundAbuse.mockResolvedValue({
+    mocks.checkInboundAbusePreflight.mockResolvedValue({
       allowed: false,
       reason: "sender_domain_rate_limit",
       senderAddress: "sender@example.com",
@@ -237,10 +247,13 @@ describe("inbound email handler", () => {
       expiresAt: null,
     });
     mocks.reserveInboxSlot.mockResolvedValue(false);
-    mocks.checkInboundAbuse.mockResolvedValue({
+    mocks.checkInboundAbusePreflight.mockResolvedValue({
       allowed: true,
       senderAddress: "sender@example.com",
       senderDomain: "example.com",
+      context: {
+        addressId: "address-1",
+      },
     });
 
     await handleIncomingEmail(
@@ -300,10 +313,13 @@ describe("inbound email handler", () => {
       }),
       expiresAt: null,
     });
-    mocks.checkInboundAbuse.mockResolvedValue({
+    mocks.checkInboundAbusePreflight.mockResolvedValue({
       allowed: true,
       senderAddress: "sender@example.com",
       senderDomain: "example.com",
+      context: {
+        addressId: "address-1",
+      },
     });
     mocks.reserveInboxSlot.mockResolvedValue(false);
 
@@ -319,6 +335,67 @@ describe("inbound email handler", () => {
       "Address inbox limit reached"
     );
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+  });
+
+  it("short-circuits already-persisted duplicates before abuse checks or quota reservation", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 1,
+        maxReceivedEmailAction: "rejectNew",
+      }),
+      expiresAt: null,
+    });
+    mocks.findInboundEmailByAddressAndMessageId.mockResolvedValue({
+      id: "email-1",
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(message.setReject).not.toHaveBeenCalled();
+    expect(mocks.checkInboundAbusePreflight).not.toHaveBeenCalled();
+    expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
+    expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+    expect(mocks.recordAcceptedInboundEmailAbuse).not.toHaveBeenCalled();
+  });
+
+  it("does not clean an inbox for an already-persisted duplicate when cleanAll is configured", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 1,
+        maxReceivedEmailAction: "cleanAll",
+      }),
+      expiresAt: null,
+    });
+    mocks.findInboundEmailByAddressAndMessageId.mockResolvedValue({
+      id: "email-1",
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        R2_BUCKET: {} as R2Bucket,
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.deleteR2ObjectsByPrefix).not.toHaveBeenCalled();
+    expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.resetAddressEmailCount).not.toHaveBeenCalled();
+    expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
   });
 
   it("persists accepted email and schedules post-processing", async () => {
@@ -348,13 +425,18 @@ describe("inbound email handler", () => {
         from: "sender@example.com",
       })
     );
+    expect(mocks.recordAcceptedInboundEmailAbuse).toHaveBeenCalledWith({
+      context: {
+        addressId: "address-1",
+      },
+    });
     expect(mocks.persistRawEmailToR2).toHaveBeenCalledTimes(1);
     expect(mocks.persistAttachments).toHaveBeenCalledTimes(1);
     expect(ctx.waitUntil).toHaveBeenCalledTimes(3);
     expect(message.forward).toHaveBeenCalledWith("dest@example.com");
   });
 
-  it("treats duplicate deliveries as already persisted instead of rejecting", async () => {
+  it("rolls back a reserved inbox slot when insert loses a duplicate race", async () => {
     const message = buildMessage();
     const ctx = buildCtx();
     mocks.findAddressByRecipient.mockResolvedValue({
@@ -376,6 +458,7 @@ describe("inbound email handler", () => {
     );
 
     expect(message.setReject).not.toHaveBeenCalled();
+    expect(mocks.recordAcceptedInboundEmailAbuse).not.toHaveBeenCalled();
     expect(mocks.decrementAddressEmailCount).toHaveBeenCalledWith(
       {},
       "address-1"

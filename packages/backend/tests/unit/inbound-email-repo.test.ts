@@ -17,8 +17,11 @@ const createPreparedStatement = (query: string) => {
 };
 
 describe("inbound email repo", () => {
-  it("batches email row and FTS row insertion atomically", async () => {
-    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 1 } }, {}]);
+  it("inserts the email row before running follow-up writes", async () => {
+    const batch = vi
+      .fn()
+      .mockResolvedValueOnce([{ meta: { changes: 1 } }])
+      .mockResolvedValueOnce([{}]);
     const prepare = vi.fn((query: string) => createPreparedStatement(query));
     const db = {
       $client: {
@@ -45,16 +48,28 @@ describe("inbound email repo", () => {
       countAlreadyReserved: true,
     });
 
-    expect(batch).toHaveBeenCalledTimes(1);
-    expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
-    const statements = batch.mock.calls[0]?.[0] as Array<{ query: string }>;
-    expect(statements[0]?.query).toContain("INSERT OR IGNORE INTO emails");
-    expect(statements[1]?.query).toContain("WHERE changes() > 0");
+    expect(batch).toHaveBeenCalledTimes(2);
+    const insertStatements = batch.mock.calls[0]?.[0] as Array<{
+      query: string;
+    }>;
+    const followUpStatements = batch.mock.calls[1]?.[0] as Array<{
+      query: string;
+    }>;
+    expect(insertStatements).toHaveLength(1);
+    expect(insertStatements[0]?.query).toContain(
+      "INSERT OR IGNORE INTO emails"
+    );
+    expect(followUpStatements).toHaveLength(1);
+    expect(followUpStatements[0]?.query).toContain("INSERT INTO emails_search");
+    expect(followUpStatements[0]?.query).not.toContain("WHERE changes() > 0");
     expect(result).toEqual({ inserted: true });
   });
 
-  it("increments address counts in the same batch when no slot was pre-reserved", async () => {
-    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 1 } }, {}, {}]);
+  it("increments address counts after the insert succeeds when no slot was pre-reserved", async () => {
+    const batch = vi
+      .fn()
+      .mockResolvedValueOnce([{ meta: { changes: 1 } }])
+      .mockResolvedValueOnce([{}, {}]);
     const prepare = vi.fn((query: string) => createPreparedStatement(query));
     const db = {
       $client: {
@@ -74,13 +89,16 @@ describe("inbound email repo", () => {
       countAlreadyReserved: false,
     });
 
-    const statements = batch.mock.calls[0]?.[0] as Array<{ query: string }>;
-    expect(statements).toHaveLength(3);
-    expect(statements[1]?.query).toContain("UPDATE email_addresses");
+    expect(batch).toHaveBeenCalledTimes(2);
+    const statements = batch.mock.calls[1]?.[0] as Array<{ query: string }>;
+    expect(statements).toHaveLength(2);
+    expect(statements[0]?.query).toContain("UPDATE email_addresses");
+    expect(statements[1]?.query).toContain("INSERT INTO emails_search");
+    expect(statements[1]?.query).not.toContain("WHERE changes() > 0");
   });
 
   it("returns inserted=false when a matching address/message id already exists", async () => {
-    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 0 } }, {}]);
+    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 0 } }]);
     const prepare = vi.fn((query: string) => createPreparedStatement(query));
     const db = {
       $client: {
@@ -102,6 +120,7 @@ describe("inbound email repo", () => {
     });
 
     expect(result).toEqual({ inserted: false });
+    expect(batch).toHaveBeenCalledTimes(1);
   });
 
   it("deletes matching FTS rows before deleting email rows in one batch", async () => {
