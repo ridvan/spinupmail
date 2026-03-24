@@ -285,7 +285,12 @@ export const capTextForStorage = (
   return undefined;
 };
 
-export const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
+export const extractBodiesFromRaw = async (
+  rawBytes: Uint8Array,
+  options?: {
+    includeAttachments?: boolean;
+  }
+) => {
   try {
     const parser = new PostalMime({ attachmentEncoding: "arraybuffer" });
     const parsed = await parser.parse(rawBytes);
@@ -297,44 +302,47 @@ export const extractBodiesFromRaw = async (rawBytes: Uint8Array) => {
       typeof parsed.text === "string" && parsed.text.trim().length > 0
         ? repairLikelyMisdecodedUtf8(parsed.text)
         : extractTextFromHtml(html);
-    const attachments = (parsed.attachments ?? [])
-      .map((attachment): ParsedEmailAttachment | null => {
-        try {
-          const contentType =
-            typeof attachment.mimeType === "string" &&
-            attachment.mimeType.trim().length > 0
-              ? attachment.mimeType.trim()
-              : "application/octet-stream";
-          const filename = sanitizeFilename(attachment.filename);
-          const bytes = attachmentContentToBytes(
-            attachment.content,
-            attachment.encoding
-          );
-          const size = bytes.byteLength;
-          if (size === 0) return null;
+    const attachments =
+      options?.includeAttachments === false
+        ? []
+        : (parsed.attachments ?? [])
+            .map((attachment): ParsedEmailAttachment | null => {
+              try {
+                const contentType =
+                  typeof attachment.mimeType === "string" &&
+                  attachment.mimeType.trim().length > 0
+                    ? attachment.mimeType.trim()
+                    : "application/octet-stream";
+                const filename = sanitizeFilename(attachment.filename);
+                const bytes = attachmentContentToBytes(
+                  attachment.content,
+                  attachment.encoding
+                );
+                const size = bytes.byteLength;
+                if (size === 0) return null;
 
-          return {
-            filename,
-            contentType,
-            size,
-            bytes,
-            disposition: attachment.disposition,
-            contentId: attachment.contentId ?? null,
-          };
-        } catch (error) {
-          console.warn(
-            "[email] Failed to decode attachment from MIME payload",
-            {
-              filename: attachment.filename,
-              error,
-            }
-          );
-          return null;
-        }
-      })
-      .filter((attachment): attachment is ParsedEmailAttachment =>
-        Boolean(attachment)
-      );
+                return {
+                  filename,
+                  contentType,
+                  size,
+                  bytes,
+                  disposition: attachment.disposition,
+                  contentId: attachment.contentId ?? null,
+                };
+              } catch (error) {
+                console.warn(
+                  "[email] Failed to decode attachment from MIME payload",
+                  {
+                    filename: attachment.filename,
+                    error,
+                  }
+                );
+                return null;
+              }
+            })
+            .filter((attachment): attachment is ParsedEmailAttachment =>
+              Boolean(attachment)
+            );
 
     return { html, text, attachments };
   } catch {

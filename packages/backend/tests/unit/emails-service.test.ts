@@ -124,6 +124,41 @@ describe("emails service", () => {
     });
   });
 
+  it("hides attachment counts when attachments are disabled", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.listEmailsForAddress.mockResolvedValue([
+      {
+        id: "email-1",
+        addressId: "address-1",
+        to: "inbox@example.com",
+        sender: "John Smith <john@example.com>",
+        from: "john@example.com",
+        subject: "Hello",
+        messageId: "message-1",
+        rawSize: 123,
+        rawTruncated: false,
+        receivedAt: new Date("2026-03-09T00:00:00.000Z"),
+        hasHtml: 1,
+        hasText: 0,
+      },
+    ]);
+
+    const result = await listEmails({
+      env: {
+        EMAIL_ATTACHMENTS_ENABLED: "false",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: { addressId: "address-1" },
+    });
+
+    expect(mocks.findAttachmentCountsForEmails).not.toHaveBeenCalled();
+    expect(result.status).toBe(200);
+    expect(result.body.items[0]?.attachmentCount).toBe(0);
+  });
+
   it("falls back to from address for senderLabel when sender is null", async () => {
     mocks.findAddressByIdAndOrganization.mockResolvedValue({
       id: "address-1",
@@ -380,6 +415,23 @@ describe("emails service", () => {
     });
   });
 
+  it("returns 404 when attachments are disabled", async () => {
+    const response = await getEmailAttachment({
+      env: {
+        EMAIL_ATTACHMENTS_ENABLED: "false",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+      attachmentId: "att-1",
+      queryPayload: {},
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: "Attachments are disabled",
+    });
+  });
+
   it("returns 404 when attachment row does not exist", async () => {
     mocks.findAttachmentByIdsAndOrganization.mockResolvedValue(null);
 
@@ -497,6 +549,42 @@ describe("emails service", () => {
       'srcset="/api/emails/email-1/attachments/att-image?inline=1 1x, /api/emails/email-1/attachments/att-bg?inline=1 2x"'
     );
     expect(result.body.html).not.toContain("cid:missing");
+  });
+
+  it("omits attachment metadata and cid rewriting when attachments are disabled", async () => {
+    mocks.findEmailDetailByIdAndOrganization.mockResolvedValue({
+      id: "email-1",
+      addressId: "address-1",
+      address: "inbox@example.com",
+      to: "inbox@example.com",
+      sender: "John Smith <john@example.com>",
+      from: "john@example.com",
+      subject: "Hello",
+      messageId: "message-1",
+      headers: "[]",
+      bodyHtml: '<img src="cid:image-1" />',
+      bodyText: "Hello",
+      raw: null,
+      rawSize: 123,
+      rawTruncated: false,
+      receivedAt: new Date("2026-03-09T00:00:00.000Z"),
+    });
+
+    const result = await getEmailDetail({
+      env: {
+        EMAIL_ATTACHMENTS_ENABLED: "false",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      emailId: "email-1",
+      queryPayload: {},
+    });
+
+    expect(
+      mocks.findEmailAttachmentsByEmailAndOrganization
+    ).not.toHaveBeenCalled();
+    expect(result.status).toBe(200);
+    expect(result.body.attachments).toEqual([]);
+    expect(result.body.html).toContain('src="cid:image-1"');
   });
 
   it("rejects inline rendering for non-image attachments", async () => {

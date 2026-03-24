@@ -7,7 +7,11 @@ import {
   EMAIL_BODY_MAX_BYTES_DEFAULT,
   EMAIL_MAX_BYTES_DEFAULT,
 } from "@/shared/constants";
-import { parseBooleanEnv, parsePositiveNumber } from "@/shared/env";
+import {
+  isEmailAttachmentsEnabled,
+  parseBooleanEnv,
+  parsePositiveNumber,
+} from "@/shared/env";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
 import {
   getMaxReceivedEmailActionFromMeta,
@@ -134,7 +138,10 @@ export const handleIncomingEmail = async (
       message.raw,
       maxBytes
     );
-    const { html, text, attachments } = await extractBodiesFromRaw(rawBytes);
+    const attachmentsEnabled = isEmailAttachmentsEnabled(env);
+    const { html, text, attachments } = await extractBodiesFromRaw(rawBytes, {
+      includeAttachments: attachmentsEnabled,
+    });
     const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
     const bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
     const bodyText = capTextForStorage(text, maxBodyBytes);

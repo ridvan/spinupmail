@@ -83,4 +83,24 @@ describe("organization summary service", () => {
       },
     ]);
   });
+
+  it("zeros attachment summary fields when attachments are disabled", async () => {
+    mocks.findEmailSummary.mockResolvedValue({
+      emailCountRow: [{ count: 12 }],
+      attachmentStatsRows: [{ attachmentCount: 3, attachmentSizeTotal: 4096 }],
+      topDomainsRows: [],
+      busiestInboxesRows: [],
+      dormantInboxesRows: [],
+    });
+
+    const result = await getEmailSummaryStats({
+      env: {
+        EMAIL_ATTACHMENTS_ENABLED: "false",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+    });
+
+    expect(result.attachmentCount).toBe(0);
+    expect(result.attachmentSizeTotal).toBe(0);
+  });
 });

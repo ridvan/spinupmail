@@ -3,7 +3,11 @@ import {
   EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT,
   EMAIL_RAW_R2_CONTENT_TYPE,
 } from "@/shared/constants";
-import { parseBooleanEnv, parsePositiveNumber } from "@/shared/env";
+import {
+  isEmailAttachmentsEnabled,
+  parseBooleanEnv,
+  parsePositiveNumber,
+} from "@/shared/env";
 import { sanitizeFilename } from "@/shared/utils/string";
 import { getRawEmailR2Key } from "@/shared/utils/r2";
 import type { AppDb } from "@/platform/db/client";
@@ -65,6 +69,7 @@ export const persistAttachments = async ({
   userId: string;
 }) => {
   if (attachments.length === 0) return;
+  if (!isEmailAttachmentsEnabled(env)) return;
   if (!env.R2_BUCKET) {
     console.warn(
       `[email] R2_BUCKET not configured. Skipping ${attachments.length} attachment(s) for email ${emailId}.`

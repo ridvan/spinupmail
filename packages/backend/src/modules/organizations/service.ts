@@ -1,3 +1,4 @@
+import { isEmailAttachmentsEnabled } from "@/shared/env";
 import { clampNumber } from "@/shared/utils/dates";
 import { getDb } from "@/platform/db/client";
 import {
@@ -251,12 +252,15 @@ export const getEmailSummaryStats = async ({
     busiestInboxesRows,
     dormantInboxesRows,
   } = await findEmailSummary(db, organizationId, dormantInboxCreatedBefore);
+  const attachmentsEnabled = isEmailAttachmentsEnabled(env);
 
   const totalEmailCount = Number(emailCountRow[0]?.count ?? 0) || 0;
-  const attachmentCount =
-    Number(attachmentStatsRows[0]?.attachmentCount ?? 0) || 0;
-  const attachmentSizeTotal =
-    Number(attachmentStatsRows[0]?.attachmentSizeTotal ?? 0) || 0;
+  const attachmentCount = attachmentsEnabled
+    ? Number(attachmentStatsRows[0]?.attachmentCount ?? 0) || 0
+    : 0;
+  const attachmentSizeTotal = attachmentsEnabled
+    ? Number(attachmentStatsRows[0]?.attachmentSizeTotal ?? 0) || 0
+    : 0;
 
   const topDomains = topDomainsRows
     .filter(row => row.domain && String(row.domain).length > 0)

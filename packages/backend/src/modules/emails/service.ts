@@ -3,7 +3,7 @@ import {
   EMAIL_LIST_LIMIT_MAX,
   EMAIL_RAW_R2_CONTENT_TYPE,
 } from "@/shared/constants";
-import { parseBooleanEnv } from "@/shared/env";
+import { isEmailAttachmentsEnabled, parseBooleanEnv } from "@/shared/env";
 import {
   isSafeInlineImageContentType,
   rewriteEmailHtmlForRendering,
@@ -142,6 +142,7 @@ export const listEmails = async ({
   }
 
   const db = getDb(env);
+  const attachmentsEnabled = isEmailAttachmentsEnabled(env);
   const addressRow = addressIdParam
     ? await findAddressByIdAndOrganization(db, organizationId, addressIdParam)
     : await findAddressByValueAndOrganization(
@@ -191,11 +192,9 @@ export const listEmails = async ({
       });
 
   const emailIds = rows.map(row => row.id);
-  const attachmentCountRows = await findAttachmentCountsForEmails(
-    db,
-    organizationId,
-    emailIds
-  );
+  const attachmentCountRows = attachmentsEnabled
+    ? await findAttachmentCountsForEmails(db, organizationId, emailIds)
+    : [];
 
   const attachmentCountByEmail = new Map<string, number>();
   for (const row of attachmentCountRows) {
@@ -324,6 +323,7 @@ export const getEmailDetail = async ({
   const includeRaw = query.raw === "true" || query.raw === "1";
 
   const db = getDb(env);
+  const attachmentsEnabled = isEmailAttachmentsEnabled(env);
   const row = await findEmailDetailByIdAndOrganization(
     db,
     organizationId,
@@ -337,11 +337,13 @@ export const getEmailDetail = async ({
     };
   }
 
-  const attachmentRows = await findEmailAttachmentsByEmailAndOrganization(
-    db,
-    organizationId,
-    row.id
-  );
+  const attachmentRows = attachmentsEnabled
+    ? await findEmailAttachmentsByEmailAndOrganization(
+        db,
+        organizationId,
+        row.id
+      )
+    : [];
 
   let parsedHeaders: unknown = [];
   if (row.headers) {
@@ -356,9 +358,10 @@ export const getEmailDetail = async ({
   const attachments = attachmentRows.map(attachment =>
     toAttachmentResponse(attachment)
   );
-  const html = row.bodyHtml
-    ? rewriteEmailHtmlForRendering(row.bodyHtml, attachments)
-    : row.bodyHtml;
+  const html =
+    attachmentsEnabled && row.bodyHtml
+      ? rewriteEmailHtmlForRendering(row.bodyHtml, attachments)
+      : row.bodyHtml;
   const sender = parseSenderIdentity(row.sender);
   const base = {
     id: row.id,
@@ -468,6 +471,13 @@ export const getEmailAttachment = async ({
 }) => {
   const query = parseAttachmentQuery(queryPayload);
   const isInlineRequest = query.inline === "true" || query.inline === "1";
+
+  if (!isEmailAttachmentsEnabled(env)) {
+    return new Response(JSON.stringify({ error: "Attachments are disabled" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   if (!env.R2_BUCKET) {
     return new Response(

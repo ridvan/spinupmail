@@ -436,6 +436,38 @@ describe("inbound email handler", () => {
     expect(message.forward).toHaveBeenCalledWith("dest@example.com");
   });
 
+  it("ignores parsed attachments when attachments are disabled", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        EMAIL_ATTACHMENTS_ENABLED: "false",
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.extractBodiesFromRaw).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      {
+        includeAttachments: false,
+      }
+    );
+    expect(mocks.persistAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [],
+      })
+    );
+  });
+
   it("rolls back a reserved inbox slot when insert loses a duplicate race", async () => {
     const message = buildMessage();
     const ctx = buildCtx();

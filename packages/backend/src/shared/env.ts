@@ -125,6 +125,15 @@ export const isE2ETestUtilsEnabled = (
     env?.ENABLE_E2E_TEST_UTILS ?? readProcessEnv("ENABLE_E2E_TEST_UTILS")
   );
 
+export const isEmailAttachmentsEnabled = (
+  env?: Pick<CloudflareBindings, "EMAIL_ATTACHMENTS_ENABLED">
+) =>
+  parseBooleanEnv(
+    env?.EMAIL_ATTACHMENTS_ENABLED ??
+      readProcessEnv("EMAIL_ATTACHMENTS_ENABLED"),
+    true
+  );
+
 export const getE2ETestSecret = (
   env?: Pick<CloudflareBindings, "E2E_TEST_SECRET">
 ) => env?.E2E_TEST_SECRET ?? readProcessEnv("E2E_TEST_SECRET");
