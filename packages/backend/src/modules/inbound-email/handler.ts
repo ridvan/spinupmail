@@ -22,6 +22,11 @@ import {
 } from "@/shared/validation";
 import { toStoredHeadersJson } from "./dto";
 import {
+  logInboundError,
+  logInboundInfo,
+  normalizeInboundRawSize,
+} from "./diagnostics";
+import {
   capTextForStorage,
   extractBodiesFromRaw,
   readRawWithLimit,
@@ -54,6 +59,20 @@ export const handleIncomingEmail = async (
 ) => {
   let reservedAddressId: string | null = null;
   let reservedOrganizationId: string | null = null;
+  let emailId: string | null = null;
+  let addressId: string | null = null;
+  let messageId: string | null = null;
+  let normalizedRawSize: number | null = null;
+  let rawTruncated = false;
+
+  const logFields = (extra: Record<string, unknown> = {}) => ({
+    emailId,
+    addressId,
+    messageId,
+    rawSize: normalizedRawSize,
+    rawTruncated,
+    ...extra,
+  });
 
   try {
     const recipient = normalizeAddress(message.to);
@@ -77,8 +96,10 @@ export const handleIncomingEmail = async (
       message.setReject(availability.reason);
       return;
     }
+    addressId = addressRow.id;
     const organizationId = addressRow.organizationId!;
-    const messageId = message.headers.get("message-id") ?? undefined;
+    messageId = message.headers.get("message-id");
+    emailId = crypto.randomUUID();
 
     if (messageId) {
       const existingEmail = await findInboundEmailByAddressAndMessageId(
@@ -88,10 +109,10 @@ export const handleIncomingEmail = async (
       );
 
       if (existingEmail) {
-        console.info("[email] Duplicate inbound delivery skipped", {
-          addressId: addressRow.id,
-          messageId,
-        });
+        logInboundInfo(
+          "[email] Duplicate inbound delivery skipped",
+          logFields()
+        );
         return;
       }
     }
@@ -103,12 +124,15 @@ export const handleIncomingEmail = async (
     });
 
     if (!senderPolicy.allowed) {
-      console.info("[email] Dropped email from disallowed sender domain", {
-        to: recipient,
-        from: senderRaw ?? "unknown",
-        senderDomain: senderPolicy.senderDomain ?? "unknown",
-        allowedFromDomains: senderPolicy.allowedFromDomains,
-      });
+      logInboundInfo(
+        "[email] Dropped email from disallowed sender domain",
+        logFields({
+          to: recipient,
+          from: senderRaw ?? "unknown",
+          senderDomain: senderPolicy.senderDomain ?? "unknown",
+          allowedFromDomains: senderPolicy.allowedFromDomains,
+        })
+      );
       return;
     }
 
@@ -134,17 +158,65 @@ export const handleIncomingEmail = async (
       parsePositiveNumber(env.EMAIL_BODY_MAX_BYTES) ??
       EMAIL_BODY_MAX_BYTES_DEFAULT;
 
-    const { raw, rawBytes, truncated } = await readRawWithLimit(
-      message.raw,
-      maxBytes
-    );
+    const rawSizeResult = normalizeInboundRawSize(message.rawSize);
+    if (!rawSizeResult.ok) {
+      logInboundError(
+        "[email] Rejected inbound email due to invalid rawSize",
+        logFields({
+          rawSizeType: rawSizeResult.receivedType,
+          rawSizeValue: rawSizeResult.receivedValue,
+          reason: rawSizeResult.reason,
+        })
+      );
+      message.setReject("Temporary processing error");
+      return;
+    }
+
+    normalizedRawSize = rawSizeResult.value;
     const attachmentsEnabled = isEmailAttachmentsEnabled(env);
-    const { html, text, attachments } = await extractBodiesFromRaw(rawBytes, {
-      includeAttachments: attachmentsEnabled,
-    });
-    const sanitizedHtml = html ? sanitizeEmailHtml(html) : undefined;
-    const bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
-    const bodyText = capTextForStorage(text, maxBodyBytes);
+    let raw = "";
+    let rawBytes!: Awaited<ReturnType<typeof readRawWithLimit>>["rawBytes"];
+    let bodyHtml: string | undefined;
+    let bodyText: string | undefined;
+    let attachments: Awaited<
+      ReturnType<typeof extractBodiesFromRaw>
+    >["attachments"] = [];
+
+    try {
+      const readResult = await readRawWithLimit(message.raw, maxBytes);
+      raw = readResult.raw;
+      rawBytes = readResult.rawBytes;
+      rawTruncated = readResult.truncated;
+
+      const parsedBodies = await extractBodiesFromRaw(rawBytes, {
+        includeAttachments: attachmentsEnabled,
+      });
+      const sanitizedHtml = parsedBodies.html
+        ? sanitizeEmailHtml(parsedBodies.html)
+        : undefined;
+
+      bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
+      bodyText = capTextForStorage(parsedBodies.text, maxBodyBytes);
+      attachments = parsedBodies.attachments;
+
+      logInboundInfo(
+        "[email] Parsed inbound email",
+        logFields({
+          rawBytesLength: rawBytes.byteLength,
+          rawLength: raw.length,
+          bodyHtmlLength: bodyHtml?.length ?? 0,
+          bodyTextLength: bodyText?.length ?? 0,
+          attachmentCount: attachments.length,
+        })
+      );
+    } catch (error) {
+      logInboundError(
+        "[email] Failed to parse inbound email",
+        logFields({ error })
+      );
+      message.setReject("Temporary processing error");
+      return;
+    }
 
     const storeHeadersInDb = parseBooleanEnv(
       env.EMAIL_STORE_HEADERS_IN_DB,
@@ -154,21 +226,31 @@ export const handleIncomingEmail = async (
 
     const headersJson = toStoredHeadersJson(message.headers, storeHeadersInDb);
     const receivedAt = new Date();
-    const emailId = crypto.randomUUID();
     const senderHeaderValue = message.headers.get("from");
     const senderValue = parseSenderIdentity(senderHeaderValue)?.formatted;
     const fromValue = message.from ?? "unknown";
     const toValue = message.to || recipient;
 
     let inboxSlotReserved = false;
+    let reservationDecision = "not_required";
     if (maxReceivedEmailCount !== null) {
       inboxSlotReserved = await reserveInboxSlot({
         db,
         addressId: addressRow.id,
         maxReceivedEmailCount,
       });
+      reservationDecision = inboxSlotReserved ? "reserved" : "limit_reached";
 
       if (!inboxSlotReserved && maxReceivedEmailAction === "rejectNew") {
+        reservationDecision = "rejected_limit";
+        logInboundInfo(
+          "[email] Inbound reservation decision",
+          logFields({
+            decision: reservationDecision,
+            maxReceivedEmailCount,
+            maxReceivedEmailAction,
+          })
+        );
         message.setReject("Address inbox limit reached");
         return;
       }
@@ -187,13 +269,12 @@ export const handleIncomingEmail = async (
               }),
             ]);
           } catch (error) {
-            console.error(
+            logInboundError(
               "[email] Failed to clean address files after limit reached",
-              {
+              logFields({
                 organizationId,
-                addressId: addressRow.id,
                 error,
-              }
+              })
             );
             message.setReject("Temporary processing error");
             return;
@@ -210,9 +291,20 @@ export const handleIncomingEmail = async (
           });
           if (inboxSlotReserved) break;
         }
+        reservationDecision = inboxSlotReserved
+          ? "reserved_after_cleanup"
+          : "rejected_after_cleanup";
       }
 
       if (!inboxSlotReserved) {
+        logInboundInfo(
+          "[email] Inbound reservation decision",
+          logFields({
+            decision: reservationDecision,
+            maxReceivedEmailCount,
+            maxReceivedEmailAction,
+          })
+        );
         message.setReject("Address inbox limit reached");
         return;
       }
@@ -221,23 +313,49 @@ export const handleIncomingEmail = async (
       reservedOrganizationId = organizationId;
     }
 
-    const insertResult = await insertInboundEmail(db, {
-      id: emailId,
-      addressId: addressRow.id,
-      messageId,
-      sender: senderValue,
-      from: fromValue,
-      to: toValue,
-      subject: message.headers.get("subject") ?? undefined,
-      headers: headersJson,
-      bodyHtml,
-      bodyText,
-      raw: storeRawInDb ? raw : undefined,
-      rawSize: message.rawSize,
-      rawTruncated: truncated,
-      receivedAt,
-      countAlreadyReserved: inboxSlotReserved,
-    });
+    logInboundInfo(
+      "[email] Inbound reservation decision",
+      logFields({
+        decision: reservationDecision,
+        maxReceivedEmailCount,
+        maxReceivedEmailAction,
+      })
+    );
+
+    logInboundInfo(
+      "[email] Inbound email insert attempt",
+      logFields({
+        storeHeadersInDb,
+        storeRawInDb,
+      })
+    );
+
+    let insertResult: Awaited<ReturnType<typeof insertInboundEmail>>;
+    try {
+      insertResult = await insertInboundEmail(db, {
+        id: emailId,
+        addressId: addressRow.id,
+        messageId: messageId ?? undefined,
+        sender: senderValue,
+        from: fromValue,
+        to: toValue,
+        subject: message.headers.get("subject") ?? undefined,
+        headers: headersJson,
+        bodyHtml,
+        bodyText,
+        raw: storeRawInDb ? raw : undefined,
+        rawSize: normalizedRawSize,
+        rawTruncated,
+        receivedAt,
+        countAlreadyReserved: inboxSlotReserved,
+      });
+    } catch (error) {
+      logInboundError(
+        "[email] Inbound email insert failed",
+        logFields({ error })
+      );
+      throw error;
+    }
 
     if (!insertResult.inserted) {
       if (reservedAddressId) {
@@ -246,12 +364,14 @@ export const handleIncomingEmail = async (
         reservedOrganizationId = null;
       }
 
-      console.info("[email] Duplicate inbound delivery skipped", {
-        addressId: addressRow.id,
-        messageId: messageId ?? null,
-      });
+      logInboundInfo(
+        "[email] Inbound email insert not applied",
+        logFields({ reason: "duplicate" })
+      );
       return;
     }
+
+    logInboundInfo("[email] Inbound email insert succeeded", logFields());
 
     reservedAddressId = null;
     reservedOrganizationId = null;
@@ -262,11 +382,10 @@ export const handleIncomingEmail = async (
           context: abuseCheck.context,
         });
       } catch (error) {
-        console.error("[email] Failed to record inbound abuse counters", {
-          addressId: addressRow.id,
-          messageId: messageId ?? null,
-          error,
-        });
+        logInboundError(
+          "[email] Failed to record inbound abuse counters",
+          logFields({ error })
+        );
       }
     }
 
@@ -298,10 +417,12 @@ export const handleIncomingEmail = async (
     if (forwardTo) {
       ctx.waitUntil(
         message.forward(forwardTo).catch(error => {
-          console.error(
-            `[email] Forward failed for ${recipient} -> ${forwardTo}`,
-            error
-          );
+          logInboundError("[email] Forward failed", {
+            ...logFields(),
+            recipient,
+            forwardTo,
+            error,
+          });
         })
       );
     }
@@ -310,17 +431,17 @@ export const handleIncomingEmail = async (
       try {
         await decrementAddressEmailCount(getDb(env), reservedAddressId);
       } catch (decrementError) {
-        console.error(
+        logInboundError(
           "[email] Failed to rollback address email_count after processing error",
           {
+            ...logFields(),
             organizationId: reservedOrganizationId,
-            addressId: reservedAddressId,
             decrementError,
           }
         );
       }
     }
-    console.error("[email] Unhandled processing error", error);
+    logInboundError("[email] Unhandled processing error", logFields({ error }));
     message.setReject("Temporary processing error");
   }
 };

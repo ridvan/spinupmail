@@ -436,6 +436,57 @@ describe("inbound email handler", () => {
     expect(message.forward).toHaveBeenCalledWith("dest@example.com");
   });
 
+  it("normalizes bigint rawSize values before insert", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    message.rawSize = 100n as never;
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.insertInboundEmail).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        rawSize: 100,
+      })
+    );
+  });
+
+  it("rejects unrepresentable bigint rawSize values before parsing", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    message.rawSize = (BigInt(Number.MAX_SAFE_INTEGER) + 1n) as never;
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(message.setReject).toHaveBeenCalledWith(
+      "Temporary processing error"
+    );
+    expect(mocks.readRawWithLimit).not.toHaveBeenCalled();
+    expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+  });
+
   it("ignores parsed attachments when attachments are disabled", async () => {
     const message = buildMessage();
     const ctx = buildCtx();
