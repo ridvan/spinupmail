@@ -510,6 +510,11 @@ export const InboxView = ({
                 >
                   <p className="truncate text-sm">
                     {email.subject || "No subject"}
+                    {email.isSample ? (
+                      <Badge className="ml-2 align-middle" variant="secondary">
+                        Sample
+                      </Badge>
+                    ) : null}
                   </p>
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-muted-foreground">

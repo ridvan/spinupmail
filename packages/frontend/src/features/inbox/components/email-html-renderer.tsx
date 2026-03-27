@@ -10,6 +10,9 @@ type EmailHtmlRendererProps = {
   onRemoteContentBlockedChange?: ((blocked: boolean) => void) | undefined;
 };
 
+const getResolvedAppTheme = (document: Document) =>
+  document.documentElement.classList.contains("dark") ? "dark" : "light";
+
 export const EmailHtmlRenderer = ({
   html,
   allowRemoteContent = false,
@@ -29,10 +32,40 @@ export const EmailHtmlRenderer = ({
 
     const contentRoot = hostElement.ownerDocument.createElement("div");
     contentRoot.setAttribute("data-email-content-root", "true");
+    contentRoot.setAttribute(
+      "data-spinupmail-theme",
+      getResolvedAppTheme(hostElement.ownerDocument)
+    );
 
     shadowRoot.append(styleElement, contentRoot);
     shadowRootRef.current = shadowRoot;
     contentRootRef.current = contentRoot;
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const hostElement = hostRef.current;
+    const contentRoot = contentRootRef.current;
+    if (!hostElement || !contentRoot) return;
+
+    const rootElement = hostElement.ownerDocument.documentElement;
+    const syncTheme = () => {
+      contentRoot.setAttribute(
+        "data-spinupmail-theme",
+        getResolvedAppTheme(hostElement.ownerDocument)
+      );
+    };
+
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(rootElement, {
+      attributeFilter: ["class"],
+      attributes: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   React.useLayoutEffect(() => {

@@ -192,4 +192,32 @@ describe("EmailHtmlRenderer", () => {
       "2"
     );
   });
+
+  it("mirrors the resolved app theme into the shadow content root", async () => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.classList.add("light");
+
+    render(<EmailHtmlRenderer html="<body><p>Hello</p></body>" />);
+
+    const host = screen.getByTestId("email-html-renderer");
+
+    await waitFor(() => {
+      expect(
+        host.shadowRoot
+          ?.querySelector("[data-email-content-root]")
+          ?.getAttribute("data-spinupmail-theme")
+      ).toBe("light");
+    });
+
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark");
+
+    await waitFor(() => {
+      expect(
+        host.shadowRoot
+          ?.querySelector("[data-email-content-root]")
+          ?.getAttribute("data-spinupmail-theme")
+      ).toBe("dark");
+    });
+  });
 });

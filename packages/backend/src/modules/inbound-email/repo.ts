@@ -50,6 +50,7 @@ export const insertInboundEmail = async (
     raw?: string;
     rawSize: number;
     rawTruncated: boolean;
+    isSample?: boolean;
     receivedAt: Date;
     countAlreadyReserved: boolean;
   }
@@ -71,9 +72,10 @@ export const insertInboundEmail = async (
           raw,
           raw_size,
           raw_truncated,
+          is_sample,
           received_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .bind(
@@ -90,6 +92,7 @@ export const insertInboundEmail = async (
       values.raw ?? null,
       values.rawSize ?? null,
       values.rawTruncated ? 1 : 0,
+      values.isSample ? 1 : 0,
       values.receivedAt.getTime()
     );
 

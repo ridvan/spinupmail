@@ -1,13 +1,46 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import type { AppHonoEnv } from "@/app/types";
+import { requireAuth } from "@/app/middleware/require-auth";
 import {
+  createOrganization,
   getEmailActivityStats,
   getEmailSummaryStats,
   getOrganizationStats,
 } from "./service";
+import { createOrganizationBodySchema } from "./schemas";
 
 export const createOrganizationsRouter = () => {
   const router = new Hono<AppHonoEnv>();
+
+  router.post(
+    "/organizations",
+    requireAuth,
+    zValidator("json", createOrganizationBodySchema, (result, c) => {
+      if (!result.success) {
+        return c.json(
+          { error: "Organization name must be between 2 and 64 characters" },
+          400
+        );
+      }
+      return undefined;
+    }),
+    async c => {
+      const auth = c.get("auth");
+      const session = c.get("session");
+      const payload = c.req.valid("json");
+
+      const result = await createOrganization({
+        env: c.env,
+        auth,
+        headers: c.req.raw.headers,
+        session,
+        payload,
+      });
+
+      return c.json(result.body, result.status);
+    }
+  );
 
   router.get("/organizations/stats", async c => {
     const session = c.get("session");

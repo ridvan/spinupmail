@@ -66,6 +66,9 @@ export const emails = sqliteTable(
     rawTruncated: integer("raw_truncated", { mode: "boolean" })
       .default(false)
       .notNull(),
+    isSample: integer("is_sample", { mode: "boolean" })
+      .default(false)
+      .notNull(),
     receivedAt: integer("received_at", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),

@@ -285,6 +285,7 @@ export const listEmailsForAddress = ({
       messageId: emails.messageId,
       rawSize: emails.rawSize,
       rawTruncated: emails.rawTruncated,
+      isSample: emails.isSample,
       receivedAt: emails.receivedAt,
       hasHtml: sql<number>`case when ${emails.bodyHtml} is null then 0 else 1 end`,
       hasText: sql<number>`case when ${emails.bodyText} is null then 0 else 1 end`,
@@ -324,6 +325,7 @@ export const searchEmailsForAddress = async ({
           emails.message_id AS messageId,
           emails.raw_size AS rawSize,
           emails.raw_truncated AS rawTruncated,
+          emails.is_sample AS isSample,
           emails.received_at AS receivedAtMs,
           CASE WHEN emails.body_html IS NULL THEN 0 ELSE 1 END AS hasHtml,
           CASE WHEN emails.body_text IS NULL THEN 0 ELSE 1 END AS hasText,
@@ -366,6 +368,7 @@ export const searchEmailsForAddress = async ({
       messageId: string | null;
       rawSize: number | null;
       rawTruncated: number | boolean;
+      isSample: number | boolean;
       receivedAtMs: number | null;
       hasHtml: number;
       hasText: number;
@@ -374,6 +377,7 @@ export const searchEmailsForAddress = async ({
   return (result.results ?? []).map(row => ({
     ...row,
     rawTruncated: Boolean(row.rawTruncated),
+    isSample: Boolean(row.isSample),
     receivedAt:
       typeof row.receivedAtMs === "number" ? new Date(row.receivedAtMs) : null,
   }));
@@ -424,6 +428,7 @@ export const findEmailDetailByIdAndOrganization = (
       raw: emails.raw,
       rawSize: emails.rawSize,
       rawTruncated: emails.rawTruncated,
+      isSample: emails.isSample,
       receivedAt: emails.receivedAt,
     })
     .from(emails)

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createOrganization,
   downloadEmailAttachment,
   listAllEmailAddresses,
   listDomains,
@@ -121,6 +122,35 @@ describe("api client helpers", () => {
         "org-1"
       );
     }
+  });
+
+  it("creates organizations through the app-owned backend endpoint", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          organization: {
+            id: "org-1",
+            name: "Acme",
+            slug: "acme",
+            logo: null,
+          },
+          starterAddressId: "address-1",
+          seededSampleEmailCount: 3,
+        }),
+        {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        }
+      )
+    );
+
+    const result = await createOrganization("Acme");
+
+    expect(result.organization.id).toBe("org-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/organizations");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ name: "Acme" }));
   });
 
   it("stops pagination when backend reports unsafe page count", async () => {

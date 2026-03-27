@@ -147,6 +147,7 @@ export type EmailListItem = {
   messageId?: string | null;
   rawSize?: number | null;
   rawTruncated: boolean;
+  isSample: boolean;
   hasHtml: boolean;
   hasText: boolean;
   attachmentCount: number;
@@ -170,10 +171,24 @@ export type EmailDetail = {
   raw?: string | null;
   rawSize?: number | null;
   rawTruncated: boolean;
+  isSample: boolean;
   rawDownloadPath?: string;
   attachments: EmailAttachment[];
   receivedAt: string | null;
   receivedAtMs: number | null;
+};
+
+export type CreatedOrganization = {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+};
+
+export type CreateOrganizationResponse = {
+  organization: CreatedOrganization;
+  starterAddressId: string;
+  seededSampleEmailCount: number;
 };
 
 export type DomainConfig = {
@@ -325,6 +340,12 @@ export const listOrganizationStats = async (options?: {
   );
   return data.items;
 };
+
+export const createOrganization = async (name: string) =>
+  apiFetch<CreateOrganizationResponse>("/api/organizations", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
 
 export type EmailActivityDay = {
   date: string;

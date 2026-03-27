@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { Separator } from "@/components/ui/separator";
@@ -209,9 +210,12 @@ export const EmailPreview = ({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-base font-semibold">
-            {email.subject || "No subject"}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold">
+              {email.subject || "No subject"}
+            </p>
+            {email.isSample ? <Badge variant="secondary">Sample</Badge> : null}
+          </div>
           <p className="text-xs text-muted-foreground">
             Sender: {formatSenderLine(email)}
           </p>

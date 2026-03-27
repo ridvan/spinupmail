@@ -241,6 +241,7 @@ describe("InboxPage", () => {
         headers: {},
         attachments: [],
         rawTruncated: false,
+        isSample: false,
         receivedAt: null,
         receivedAtMs: null,
       },

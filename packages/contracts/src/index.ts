@@ -23,6 +23,7 @@ export const emailListItemSchema = z.object({
   messageId: z.string().nullable().optional(),
   rawSize: z.number().nullable().optional(),
   rawTruncated: z.boolean(),
+  isSample: z.boolean(),
   hasHtml: z.boolean(),
   hasText: z.boolean(),
   attachmentCount: z.number().int().nonnegative(),

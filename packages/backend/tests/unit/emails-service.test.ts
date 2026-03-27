@@ -100,6 +100,7 @@ describe("emails service", () => {
         messageId: "message-1",
         rawSize: 123,
         rawTruncated: false,
+        isSample: false,
         receivedAt: new Date("2026-03-09T00:00:00.000Z"),
         hasHtml: 1,
         hasText: 0,
@@ -120,6 +121,7 @@ describe("emails service", () => {
       from: "john@example.com",
       sender: "John Smith <john@example.com>",
       senderLabel: "John Smith",
+      isSample: false,
       attachmentCount: 2,
     });
   });
@@ -140,6 +142,7 @@ describe("emails service", () => {
         messageId: "message-1",
         rawSize: 123,
         rawTruncated: false,
+        isSample: false,
         receivedAt: new Date("2026-03-09T00:00:00.000Z"),
         hasHtml: 1,
         hasText: 0,
@@ -175,6 +178,7 @@ describe("emails service", () => {
         messageId: null,
         rawSize: 50,
         rawTruncated: false,
+        isSample: false,
         receivedAt: new Date("2026-03-09T00:00:00.000Z"),
         hasHtml: 0,
         hasText: 1,
@@ -210,6 +214,7 @@ describe("emails service", () => {
         messageId: "message-2",
         rawSize: 99,
         rawTruncated: false,
+        isSample: true,
         receivedAt: new Date("2026-03-10T00:00:00.000Z"),
         hasHtml: 1,
         hasText: 1,
@@ -238,6 +243,7 @@ describe("emails service", () => {
       id: "email-2",
       senderLabel: "Jane Smith",
       subject: "Reset your password",
+      isSample: true,
     });
   });
 
@@ -503,6 +509,7 @@ describe("emails service", () => {
       raw: null,
       rawSize: 123,
       rawTruncated: false,
+      isSample: true,
       receivedAt: new Date("2026-03-09T00:00:00.000Z"),
     });
     mocks.findEmailAttachmentsByEmailAndOrganization.mockResolvedValue([
@@ -539,6 +546,7 @@ describe("emails service", () => {
     );
     expect(result.body.sender).toBe("John Smith <john@example.com>");
     expect(result.body.senderLabel).toBe("John Smith");
+    expect(result.body.isSample).toBe(true);
     expect(result.body.html).toContain(
       "/api/emails/email-1/attachments/att-image?inline=1"
     );
@@ -567,6 +575,7 @@ describe("emails service", () => {
       raw: null,
       rawSize: 123,
       rawTruncated: false,
+      isSample: false,
       receivedAt: new Date("2026-03-09T00:00:00.000Z"),
     });
 

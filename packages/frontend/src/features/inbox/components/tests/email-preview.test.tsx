@@ -82,6 +82,7 @@ describe("EmailPreview", () => {
           raw: null,
           rawSize: 10,
           rawTruncated: false,
+          isSample: false,
           rawDownloadPath: undefined,
           attachments: [],
           receivedAt: "2026-03-09T00:00:00.000Z",
@@ -129,6 +130,7 @@ describe("EmailPreview", () => {
           raw: null,
           rawSize: 10,
           rawTruncated: false,
+          isSample: false,
           rawDownloadPath: undefined,
           attachments: [],
           receivedAt: "2026-03-09T00:00:00.000Z",
@@ -160,6 +162,7 @@ describe("EmailPreview", () => {
           raw: null,
           rawSize: 10,
           rawTruncated: false,
+          isSample: false,
           rawDownloadPath: undefined,
           attachments: [],
           receivedAt: "2026-03-09T00:00:00.000Z",
@@ -191,6 +194,7 @@ describe("EmailPreview", () => {
           raw: null,
           rawSize: 10,
           rawTruncated: false,
+          isSample: false,
           rawDownloadPath: undefined,
           attachments: [],
           receivedAt: "2026-03-09T00:00:00.000Z",
@@ -231,6 +235,7 @@ describe("EmailPreview", () => {
           raw: null,
           rawSize: 10,
           rawTruncated: false,
+          isSample: false,
           rawDownloadPath: undefined,
           attachments: [],
           receivedAt: "2026-03-09T00:00:00.000Z",
@@ -276,6 +281,7 @@ describe("EmailPreview", () => {
             raw: null,
             rawSize: 10,
             rawTruncated: false,
+            isSample: false,
             rawDownloadPath: undefined,
             attachments: [
               {
@@ -308,5 +314,34 @@ describe("EmailPreview", () => {
         .getByTestId("email-html-renderer")
         .parentElement?.className.includes("min-h-0")
     ).toBe(true);
+  });
+
+  it("shows a sample badge for starter inbox emails", () => {
+    render(
+      <EmailPreview
+        email={{
+          id: "email-sample",
+          addressId: "address-1",
+          to: "inbox@example.com",
+          from: "sender@example.com",
+          sender: "Spinupmail Team <sender@example.com>",
+          senderLabel: "Spinupmail Team",
+          subject: "Welcome",
+          headers: [],
+          html: null,
+          text: "Hello",
+          raw: null,
+          rawSize: 10,
+          rawTruncated: false,
+          isSample: true,
+          rawDownloadPath: undefined,
+          attachments: [],
+          receivedAt: "2026-03-09T00:00:00.000Z",
+          receivedAtMs: 1741478400000,
+        }}
+      />
+    );
+
+    expect(screen.getByText("Sample")).toBeTruthy();
   });
 });

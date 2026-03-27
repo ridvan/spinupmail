@@ -1,12 +1,18 @@
 import { isEmailAttachmentsEnabled } from "@/shared/env";
+import { createOrganizationBodySchema } from "./schemas";
 import { clampNumber } from "@/shared/utils/dates";
 import { getDb } from "@/platform/db/client";
+import { getAllowedDomains } from "@/shared/env";
 import {
   findEmailActivity,
   findEmailSummary,
   findOrganizationCounts,
   findOrganizationIdsForUser,
 } from "./repo";
+import { seedStarterInbox } from "./starter-inbox";
+import type { AuthInstance, AuthSession } from "@/app/types";
+
+const MAX_ORGANIZATION_CREATE_ATTEMPTS = 6;
 
 const DEFAULT_TIMEZONE = "UTC";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -17,6 +23,185 @@ const DAY_KEY_FORMATTER_LOCALE = "en-US";
 const DORMANT_INBOX_MIN_AGE_MS = DAY_MS;
 
 const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>();
+
+const randomSlugSuffix = () => crypto.randomUUID().split("-")[0];
+
+export const slugifyOrganizationName = (value: string) => {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  if (normalized.length === 0) {
+    return `org-${randomSlugSuffix()}`;
+  }
+
+  return normalized.slice(0, 48);
+};
+
+const isSlugCollisionError = (message: string | undefined) => {
+  if (!message) return false;
+  return /slug|already exists|taken|organization already exists/i.test(message);
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return fallback;
+};
+
+const getErrorStatus = (error: unknown, fallback: number) => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof (error as { status?: unknown }).status === "number"
+  ) {
+    return (error as { status: number }).status;
+  }
+
+  return fallback;
+};
+
+export const createOrganization = async ({
+  env,
+  auth,
+  headers,
+  session,
+  payload,
+}: {
+  env: CloudflareBindings;
+  auth: AuthInstance;
+  headers: Headers;
+  session: AuthSession;
+  payload: unknown;
+}) => {
+  const parsed = createOrganizationBodySchema.safeParse(payload);
+  if (!parsed.success) {
+    return {
+      status: 400 as const,
+      body: { error: "Organization name must be between 2 and 64 characters" },
+    };
+  }
+
+  const name = parsed.data.name.trim();
+  const allowedDomains = getAllowedDomains(env);
+  if (allowedDomains.length === 0) {
+    return {
+      status: 400 as const,
+      body: { error: "EMAIL_DOMAINS is not configured" },
+    };
+  }
+
+  const baseSlug = slugifyOrganizationName(name);
+
+  for (
+    let attempt = 0;
+    attempt < MAX_ORGANIZATION_CREATE_ATTEMPTS;
+    attempt += 1
+  ) {
+    const suffix = attempt === 0 ? "" : `-${randomSlugSuffix().slice(0, 4)}`;
+    const slug = `${baseSlug}${suffix}`.slice(0, 64);
+
+    try {
+      const organization = await auth.api.createOrganization({
+        body: {
+          name,
+          slug,
+        },
+        headers,
+      });
+
+      try {
+        const seeded = await seedStarterInbox({
+          env,
+          organizationId: String(organization.id),
+          userId: session.user.id,
+          organizationName: name,
+        });
+
+        console.info("[organization] Created organization starter inbox", {
+          organizationId: organization.id,
+          starterAddressId: seeded.starterAddressId,
+          seededSampleEmailCount: seeded.seededSampleEmailCount,
+          createdStarterAddress: seeded.createdStarterAddress,
+        });
+
+        return {
+          status: 201 as const,
+          body: {
+            organization: {
+              id: String(organization.id),
+              name: String(organization.name),
+              slug: String(organization.slug),
+              logo:
+                "logo" in organization && typeof organization.logo === "string"
+                  ? organization.logo
+                  : null,
+            },
+            starterAddressId: seeded.starterAddressId,
+            seededSampleEmailCount: seeded.seededSampleEmailCount,
+          },
+        };
+      } catch (error) {
+        console.error("[organization] Starter inbox provisioning failed", {
+          organizationId: organization.id,
+          organizationName: name,
+          error,
+        });
+
+        return {
+          status: 500 as const,
+          body: {
+            error: `Organization created but starter inbox setup failed: ${getErrorMessage(
+              error,
+              "unknown error"
+            )}`,
+          },
+        };
+      }
+    } catch (error) {
+      const message = getErrorMessage(error, "Unable to create organization");
+      if (isSlugCollisionError(message)) {
+        continue;
+      }
+
+      console.error("[organization] Failed to create organization", {
+        organizationName: name,
+        attempt: attempt + 1,
+        error,
+      });
+
+      return {
+        status: getErrorStatus(error, 500) as 400 | 401 | 403 | 409 | 500,
+        body: {
+          error: /EMAIL_DOMAINS|Address limit reached/i.test(message)
+            ? message
+            : "Unable to create organization",
+        },
+      };
+    }
+  }
+
+  return {
+    status: 409 as const,
+    body: { error: "Unable to create organization. Please try again." },
+  };
+};
 
 const getDayKeyFormatter = (timeZone: string) => {
   const cached = dayKeyFormatters.get(timeZone);

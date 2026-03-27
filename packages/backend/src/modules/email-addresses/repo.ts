@@ -214,6 +214,25 @@ export const findAddressByValue = (db: AppDb, address: string) =>
     .where(eq(emailAddresses.address, address))
     .get();
 
+export const findAutoCreatedAddressByOrganization = (
+  db: AppDb,
+  organizationId: string
+) =>
+  db
+    .select({
+      id: emailAddresses.id,
+      address: emailAddresses.address,
+    })
+    .from(emailAddresses)
+    .where(
+      and(
+        eq(emailAddresses.organizationId, organizationId),
+        eq(emailAddresses.autoCreated, true)
+      )
+    )
+    .orderBy(asc(emailAddresses.createdAt))
+    .get();
+
 export const insertAddress = (
   db: AppDb,
   values: {
@@ -225,6 +244,7 @@ export const insertAddress = (
     domain: string;
     meta?: string;
     expiresAt?: Date;
+    autoCreated?: boolean;
   },
   maxAddressesPerOrganization: number
 ) =>
@@ -251,7 +271,7 @@ export const insertAddress = (
         ${values.domain},
         ${values.meta ?? null},
         ${values.expiresAt ? values.expiresAt.getTime() : null},
-        ${0}
+        ${values.autoCreated ? 1 : 0}
       where (
         select count(*)
         from email_addresses
