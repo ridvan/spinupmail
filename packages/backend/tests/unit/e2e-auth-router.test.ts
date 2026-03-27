@@ -1,5 +1,25 @@
+const mocks = vi.hoisted(() => ({
+  getDb: vi.fn(),
+  findAddressByIdAndOrganization: vi.fn(),
+  insertInboundEmail: vi.fn(),
+  updateAddressLastReceivedAt: vi.fn(),
+}));
+
+vi.mock("@/platform/db/client", () => ({
+  getDb: mocks.getDb,
+}));
+
+vi.mock("@/modules/emails/repo", () => ({
+  findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
+}));
+
+vi.mock("@/modules/inbound-email/repo", () => ({
+  insertInboundEmail: mocks.insertInboundEmail,
+  updateAddressLastReceivedAt: mocks.updateAddressLastReceivedAt,
+}));
+
 import { Hono } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestHelpers } from "better-auth/plugins";
 import type { AppHonoEnv } from "@/app/types";
 import { createE2EAuthTestRouter } from "@/modules/e2e-auth/router";
@@ -41,6 +61,17 @@ const createApp = (
 };
 
 describe("e2e auth router", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getDb.mockReturnValue({});
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "qa@spinupmail.com",
+    });
+    mocks.insertInboundEmail.mockResolvedValue({ inserted: true });
+    mocks.updateAddressLastReceivedAt.mockResolvedValue(undefined);
+  });
+
   it("returns 404 when E2E helpers are disabled", async () => {
     const { app, env } = createApp({}, { ENABLE_E2E_TEST_UTILS: "0" });
 
@@ -150,5 +181,48 @@ describe("e2e auth router", () => {
       "user:user-1",
       "user:user-2",
     ]);
+  });
+
+  it("stores seeded raw email size using UTF-8 byte length", async () => {
+    const { app, env } = createApp();
+    const bodyText = "Merhaba 🌍";
+    const sender = "QA Sender <sender@example.com>";
+    const subject = "Unicode sample";
+
+    const response = await app.request(
+      "/api/test/auth/email",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-e2e-test-secret": "top-secret",
+        },
+        body: JSON.stringify({
+          organizationId: "org-1",
+          addressId: "address-1",
+          sender,
+          from: "sender@example.com",
+          subject,
+          bodyText,
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const raw = [
+      `From: ${sender}`,
+      "To: qa@spinupmail.com",
+      `Subject: ${subject}`,
+      "",
+      bodyText,
+    ].join("\r\n");
+    expect(mocks.insertInboundEmail).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        raw,
+        rawSize: new TextEncoder().encode(raw).length,
+      })
+    );
   });
 });

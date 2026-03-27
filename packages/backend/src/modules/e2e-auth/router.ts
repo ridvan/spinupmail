@@ -320,7 +320,7 @@ export const createE2EAuthTestRouter = () => {
       bodyHtml: payload.bodyHtml,
       bodyText,
       raw,
-      rawSize: raw.length,
+      rawSize: new TextEncoder().encode(raw).length,
       rawTruncated: false,
       receivedAt,
       countAlreadyReserved: false,

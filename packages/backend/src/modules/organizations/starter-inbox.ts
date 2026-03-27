@@ -14,6 +14,7 @@ import {
 } from "@/modules/email-addresses/repo";
 import {
   insertInboundEmail,
+  listSampleEmailsForAddress,
   updateAddressLastReceivedAt,
 } from "@/modules/inbound-email/repo";
 
@@ -62,6 +63,7 @@ const STARTER_EMAIL_DARK_BADGE_BG_COLOR = "#f5f1ea";
 const STARTER_EMAIL_DARK_BADGE_TEXT_COLOR = "#171717";
 const STARTER_EMAIL_DARK_PILL_BG_COLOR = "#2b251f";
 const STARTER_EMAIL_DARK_FOOTER_COLOR = "#978e82";
+const RAW_TEXT_ENCODER = new TextEncoder();
 
 /**
  * Escape plain-text values before embedding them into HTML templates.
@@ -424,6 +426,87 @@ const buildSampleEmails = ({
   ];
 };
 
+const getRawSize = (raw: string) => RAW_TEXT_ENCODER.encode(raw).length;
+
+const ensureStarterSampleEmails = async ({
+  db,
+  addressId,
+  address,
+  organizationName,
+  existingSampleEmails,
+}: {
+  db: ReturnType<typeof getDb>;
+  addressId: string;
+  address: string;
+  organizationName: string;
+  existingSampleEmails: Array<{
+    subject: string | null;
+    receivedAt: Date;
+  }>;
+}) => {
+  const samples = buildSampleEmails({
+    organizationName,
+    address,
+    now: Date.now(),
+  });
+  const existingSubjects = new Set(
+    existingSampleEmails.flatMap(email =>
+      typeof email.subject === "string" ? [email.subject] : []
+    )
+  );
+  const missingSamples = samples.filter(
+    sample => !existingSubjects.has(sample.subject)
+  );
+
+  for (const sample of missingSamples) {
+    const emailId = crypto.randomUUID();
+    const raw = buildSampleEmailRaw({
+      emailId,
+      to: address,
+      subject: sample.subject,
+      bodyText: sample.bodyText,
+      bodyHtml: sample.bodyHtml,
+    });
+
+    await insertInboundEmail(db, {
+      id: emailId,
+      addressId,
+      messageId: `<${emailId}@spinupmail-sample.local>`,
+      sender: SAMPLE_SENDER,
+      from: SAMPLE_FROM,
+      to: address,
+      subject: sample.subject,
+      bodyHtml: sample.bodyHtml,
+      bodyText: sample.bodyText,
+      raw,
+      rawSize: getRawSize(raw),
+      rawTruncated: false,
+      receivedAt: sample.receivedAt,
+      countAlreadyReserved: false,
+      isSample: true,
+    });
+  }
+
+  const latestReceivedAt = [
+    ...existingSampleEmails,
+    ...missingSamples,
+  ].reduce<Date | null>(
+    (latest, sample) =>
+      latest === null || sample.receivedAt.getTime() > latest.getTime()
+        ? sample.receivedAt
+        : latest,
+    null
+  );
+
+  if (latestReceivedAt) {
+    await updateAddressLastReceivedAt(db, addressId, latestReceivedAt);
+  }
+
+  return {
+    seededSampleEmailCount: missingSamples.length,
+  };
+};
+
 type SeedStarterInboxResult = {
   starterAddressId: string;
   starterAddress: string;
@@ -455,10 +538,22 @@ export const seedStarterInbox = async ({
   );
 
   if (existingStarter) {
+    const existingSampleEmails = await listSampleEmailsForAddress(
+      db,
+      existingStarter.id
+    );
+    const { seededSampleEmailCount } = await ensureStarterSampleEmails({
+      db,
+      addressId: existingStarter.id,
+      address: existingStarter.address,
+      organizationName,
+      existingSampleEmails,
+    });
+
     return {
       starterAddressId: existingStarter.id,
       starterAddress: existingStarter.address,
-      seededSampleEmailCount: 0,
+      seededSampleEmailCount,
       createdStarterAddress: false,
     };
   }
@@ -512,57 +607,18 @@ export const seedStarterInbox = async ({
     throw new Error("Unable to create starter inbox address");
   }
 
-  const samples = buildSampleEmails({
-    organizationName,
+  const { seededSampleEmailCount } = await ensureStarterSampleEmails({
+    db,
+    addressId: starterAddress.id,
     address: starterAddress.address,
-    now: Date.now(),
+    organizationName,
+    existingSampleEmails: [],
   });
-
-  for (const sample of samples) {
-    const emailId = crypto.randomUUID();
-    const raw = buildSampleEmailRaw({
-      emailId,
-      to: starterAddress.address,
-      subject: sample.subject,
-      bodyText: sample.bodyText,
-      bodyHtml: sample.bodyHtml,
-    });
-
-    await insertInboundEmail(db, {
-      id: emailId,
-      addressId: starterAddress.id,
-      messageId: `<${emailId}@spinupmail-sample.local>`,
-      sender: SAMPLE_SENDER,
-      from: SAMPLE_FROM,
-      to: starterAddress.address,
-      subject: sample.subject,
-      bodyHtml: sample.bodyHtml,
-      bodyText: sample.bodyText,
-      raw,
-      rawSize: raw.length,
-      rawTruncated: false,
-      receivedAt: sample.receivedAt,
-      countAlreadyReserved: false,
-      isSample: true,
-    });
-  }
-
-  const latestReceivedAt = samples.reduce<Date | null>(
-    (latest, sample) =>
-      latest === null || sample.receivedAt.getTime() > latest.getTime()
-        ? sample.receivedAt
-        : latest,
-    null
-  );
-
-  if (latestReceivedAt) {
-    await updateAddressLastReceivedAt(db, starterAddress.id, latestReceivedAt);
-  }
 
   return {
     starterAddressId: starterAddress.id,
     starterAddress: starterAddress.address,
-    seededSampleEmailCount: samples.length,
+    seededSampleEmailCount,
     createdStarterAddress: true,
   };
 };

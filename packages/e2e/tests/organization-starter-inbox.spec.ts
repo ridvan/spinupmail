@@ -8,13 +8,15 @@ test.describe("organization starter inbox", () => {
     authSeed,
     page,
   }) => {
+    const organizationName = `Starter Inbox Org ${Date.now().toString(36)}`;
+
     await authSeed.signInWithSeededSession({
       email: uniqueEmail("starter-inbox"),
       name: "Starter Inbox User",
     });
 
     await page.goto("/onboarding/organization");
-    await page.getByLabel("Organization name").fill("Starter Inbox Org");
+    await page.getByLabel("Organization name").fill(organizationName);
     await page.getByRole("button", { name: "Create organization" }).click();
 
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/`);

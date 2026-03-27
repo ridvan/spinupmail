@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
   findAutoCreatedAddressByOrganization: vi.fn(),
   insertAddress: vi.fn(),
+  listSampleEmailsForAddress: vi.fn(),
   insertInboundEmail: vi.fn(),
   updateAddressLastReceivedAt: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("@/modules/email-addresses/repo", () => ({
 }));
 
 vi.mock("@/modules/inbound-email/repo", () => ({
+  listSampleEmailsForAddress: mocks.listSampleEmailsForAddress,
   insertInboundEmail: mocks.insertInboundEmail,
   updateAddressLastReceivedAt: mocks.updateAddressLastReceivedAt,
 }));
@@ -31,6 +33,7 @@ describe("starter inbox provisioning", () => {
     mocks.getDb.mockReturnValue({});
     mocks.findAutoCreatedAddressByOrganization.mockResolvedValue(null);
     mocks.insertAddress.mockResolvedValue(true);
+    mocks.listSampleEmailsForAddress.mockResolvedValue([]);
     mocks.insertInboundEmail.mockResolvedValue({ inserted: true });
     mocks.updateAddressLastReceivedAt.mockResolvedValue(undefined);
   });
@@ -78,6 +81,9 @@ describe("starter inbox provisioning", () => {
     const firstEmail = mocks.insertInboundEmail.mock.calls[0]?.[1];
     expect(firstEmail?.bodyHtml).toContain("<!doctype html>");
     expect(firstEmail?.bodyHtml).toContain('[data-spinupmail-theme="dark"]');
+    expect(firstEmail?.rawSize).toBe(
+      new TextEncoder().encode(firstEmail?.raw ?? "").length
+    );
     expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledTimes(1);
     expect(result.starterAddressId).toBe("addr-uuid");
     expect(result.seededSampleEmailCount).toBe(3);
@@ -101,17 +107,20 @@ describe("starter inbox provisioning", () => {
       env: { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings,
       organizationId: "org-1",
       userId: "user-1",
-      organizationName: 'Acme <Launch> & "Ship"',
+      organizationName: 'Acme Örg <Launch> & "Ship"',
     });
 
     const firstEmail = mocks.insertInboundEmail.mock.calls[0]?.[1];
 
     expect(firstEmail?.bodyHtml).toContain(
-      "Welcome to Acme &lt;Launch&gt; &amp; &quot;Ship&quot;"
+      "Welcome to Acme Örg &lt;Launch&gt; &amp; &quot;Ship&quot;"
     );
     expect(firstEmail?.bodyHtml).toContain("amber-harbor-suf@");
     expect(firstEmail?.bodyHtml).not.toContain(
-      'Welcome to Acme <Launch> & "Ship"'
+      'Welcome to Acme Örg <Launch> & "Ship"'
+    );
+    expect(firstEmail?.rawSize).toBe(
+      new TextEncoder().encode(firstEmail?.raw ?? "").length
     );
 
     randomSpy.mockRestore();
@@ -147,11 +156,26 @@ describe("starter inbox provisioning", () => {
     uuidSpy.mockRestore();
   });
 
-  it("skips seeding when an auto-created address already exists", async () => {
+  it("reuses fully seeded auto-created addresses without inserting duplicates", async () => {
+    const latestReceivedAt = new Date("2026-01-01T00:02:00.000Z");
     mocks.findAutoCreatedAddressByOrganization.mockResolvedValue({
       id: "address-1",
       address: "starter@spinupmail.com",
     });
+    mocks.listSampleEmailsForAddress.mockResolvedValue([
+      {
+        subject: "Welcome to Spinupmail",
+        receivedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        subject: "Send your first test email",
+        receivedAt: latestReceivedAt,
+      },
+      {
+        subject: "What to explore next",
+        receivedAt: new Date("2026-01-01T00:01:00.000Z"),
+      },
+    ]);
 
     const result = await seedStarterInbox({
       env: { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings,
@@ -162,12 +186,55 @@ describe("starter inbox provisioning", () => {
 
     expect(mocks.insertAddress).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+    expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledWith(
+      {},
+      "address-1",
+      latestReceivedAt
+    );
     expect(result).toEqual({
       starterAddressId: "address-1",
       starterAddress: "starter@spinupmail.com",
       seededSampleEmailCount: 0,
       createdStarterAddress: false,
     });
+  });
+
+  it("backfills missing sample emails for an existing auto-created address", async () => {
+    const uuidSpy = vi
+      .spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("sample-2")
+      .mockReturnValueOnce("sample-3");
+    const existingReceivedAt = new Date("2026-01-01T00:00:00.000Z");
+
+    mocks.findAutoCreatedAddressByOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "starter@spinupmail.com",
+    });
+    mocks.listSampleEmailsForAddress.mockResolvedValue([
+      {
+        subject: "Welcome to Spinupmail",
+        receivedAt: existingReceivedAt,
+      },
+    ]);
+
+    const result = await seedStarterInbox({
+      env: { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings,
+      organizationId: "org-1",
+      userId: "user-1",
+      organizationName: "Acme Org",
+    });
+
+    expect(mocks.insertAddress).not.toHaveBeenCalled();
+    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(2);
+    expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      starterAddressId: "address-1",
+      starterAddress: "starter@spinupmail.com",
+      seededSampleEmailCount: 2,
+      createdStarterAddress: false,
+    });
+
+    uuidSpy.mockRestore();
   });
 
   it("fails cleanly when EMAIL_DOMAINS is missing", async () => {

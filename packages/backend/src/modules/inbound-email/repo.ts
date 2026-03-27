@@ -34,6 +34,15 @@ export const findInboundEmailByAddressAndMessageId = (
     )
     .get();
 
+export const listSampleEmailsForAddress = (db: AppDb, addressId: string) =>
+  db
+    .select({
+      subject: emails.subject,
+      receivedAt: emails.receivedAt,
+    })
+    .from(emails)
+    .where(and(eq(emails.addressId, addressId), eq(emails.isSample, true)));
+
 export const insertInboundEmail = async (
   db: AppDb,
   values: {
