@@ -105,8 +105,74 @@ describe("organizations router", () => {
     );
 
     expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toContain(
+      "Organization created but starter inbox setup failed for organization org-1: seed failed."
+    );
+    expect(body.error).toContain("Retry inbox setup.");
+    expect(body.error).toContain("contact support with organization ID org-1.");
+  });
+
+  it("retries organization creation on explicit slug collisions", async () => {
+    const createOrganization = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error(
+          'duplicate key value violates unique constraint "organizations_slug_key"'
+        )
+      )
+      .mockResolvedValueOnce({
+        id: "org-1",
+        name: "Acme Org",
+        slug: "acme-org",
+        logo: null,
+      });
+    const app = buildApp({ createOrganization });
+
+    const response = await app.request(
+      "/api/organizations",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Acme Org" }),
+      },
+      { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings
+    );
+
+    expect(response.status).toBe(201);
+    expect(createOrganization).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry on vague slug errors", async () => {
+    const createOrganization = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Slug validation service unavailable"))
+      .mockResolvedValueOnce({
+        id: "org-1",
+        name: "Acme Org",
+        slug: "acme-org",
+        logo: null,
+      });
+    const app = buildApp({ createOrganization });
+
+    const response = await app.request(
+      "/api/organizations",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ name: "Acme Org" }),
+      },
+      { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings
+    );
+
+    expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      error: "Organization created but starter inbox setup failed: seed failed",
+      error: "Unable to create organization",
     });
+    expect(createOrganization).toHaveBeenCalledTimes(1);
   });
 });

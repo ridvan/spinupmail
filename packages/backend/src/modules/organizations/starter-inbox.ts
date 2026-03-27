@@ -63,6 +63,14 @@ const STARTER_EMAIL_DARK_BADGE_TEXT_COLOR = "#171717";
 const STARTER_EMAIL_DARK_PILL_BG_COLOR = "#2b251f";
 const STARTER_EMAIL_DARK_FOOTER_COLOR = "#978e82";
 
+/**
+ * Escape plain-text values before embedding them into HTML templates.
+ * This is for values like organization names or email addresses, not rich or
+ * untrusted HTML input. Keep the ampersand replacement first to avoid
+ * double-escaping later replacements.
+ *
+ * Example: escapeHtml('Acme & <QA>') => 'Acme &amp; &lt;QA&gt;'
+ */
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -539,14 +547,17 @@ export const seedStarterInbox = async ({
     });
   }
 
-  const latestReceivedAt = samples.reduce(
+  const latestReceivedAt = samples.reduce<Date | null>(
     (latest, sample) =>
-      sample.receivedAt.getTime() > latest.getTime()
+      latest === null || sample.receivedAt.getTime() > latest.getTime()
         ? sample.receivedAt
         : latest,
-    samples[0]!.receivedAt
+    null
   );
-  await updateAddressLastReceivedAt(db, starterAddress.id, latestReceivedAt);
+
+  if (latestReceivedAt) {
+    await updateAddressLastReceivedAt(db, starterAddress.id, latestReceivedAt);
+  }
 
   return {
     starterAddressId: starterAddress.id,

@@ -20,7 +20,7 @@ test.describe("organization starter inbox", () => {
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/`);
 
     await page.goto("/inbox");
-    await expect(page.getByText("Sample").first()).toBeVisible();
+    await expect(page.getByText("Sample", { exact: true })).toHaveCount(3);
     await expect(
       page.getByText(
         "No emails received yet. Send an email to this address to test things out."

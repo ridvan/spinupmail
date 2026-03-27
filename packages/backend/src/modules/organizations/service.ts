@@ -42,9 +42,18 @@ export const slugifyOrganizationName = (value: string) => {
   return normalized.slice(0, 48);
 };
 
+const SLUG_COLLISION_PATTERNS = [
+  /\bslug (?:already exists|is taken)\b/i,
+  /\borganization already exists\b/i,
+  /\borganizations_slug_key\b/i,
+  /\bduplicate key\b[\s\S]{0,80}\bslug\b/i,
+  /\bunique constraint\b[\s\S]{0,80}\bslug\b/i,
+  /\bunique violation\b[\s\S]{0,80}\bslug\b/i,
+];
+
 const isSlugCollisionError = (message: string | undefined) => {
   if (!message) return false;
-  return /slug|already exists|taken|organization already exists/i.test(message);
+  return SLUG_COLLISION_PATTERNS.some(pattern => pattern.test(message));
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -158,19 +167,26 @@ export const createOrganization = async ({
           },
         };
       } catch (error) {
-        console.error("[organization] Starter inbox provisioning failed", {
-          organizationId: organization.id,
-          organizationName: name,
-          error,
-        });
+        const organizationId = String(organization.id);
+        const supportGuidance = `Retry inbox setup. If it keeps failing, contact support with organization ID ${organizationId}.`;
+
+        console.error(
+          "[organization] Starter inbox provisioning failed. Retry inbox setup or contact support with the organization ID.",
+          {
+            organizationId,
+            organizationName: name,
+            nextStep: supportGuidance,
+            error,
+          }
+        );
 
         return {
           status: 500 as const,
           body: {
-            error: `Organization created but starter inbox setup failed: ${getErrorMessage(
+            error: `Organization created but starter inbox setup failed for organization ${organizationId}: ${getErrorMessage(
               error,
               "unknown error"
-            )}`,
+            )}. ${supportGuidance}`,
           },
         };
       }

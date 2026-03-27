@@ -194,30 +194,36 @@ describe("EmailHtmlRenderer", () => {
   });
 
   it("mirrors the resolved app theme into the shadow content root", async () => {
-    document.documentElement.classList.remove("dark");
-    document.documentElement.classList.add("light");
+    const originalClassName = document.documentElement.className;
 
-    render(<EmailHtmlRenderer html="<body><p>Hello</p></body>" />);
+    try {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
 
-    const host = screen.getByTestId("email-html-renderer");
+      render(<EmailHtmlRenderer html="<body><p>Hello</p></body>" />);
 
-    await waitFor(() => {
-      expect(
-        host.shadowRoot
-          ?.querySelector("[data-email-content-root]")
-          ?.getAttribute("data-spinupmail-theme")
-      ).toBe("light");
-    });
+      const host = screen.getByTestId("email-html-renderer");
 
-    document.documentElement.classList.remove("light");
-    document.documentElement.classList.add("dark");
+      await waitFor(() => {
+        expect(
+          host.shadowRoot
+            ?.querySelector("[data-email-content-root]")
+            ?.getAttribute("data-spinupmail-theme")
+        ).toBe("light");
+      });
 
-    await waitFor(() => {
-      expect(
-        host.shadowRoot
-          ?.querySelector("[data-email-content-root]")
-          ?.getAttribute("data-spinupmail-theme")
-      ).toBe("dark");
-    });
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+
+      await waitFor(() => {
+        expect(
+          host.shadowRoot
+            ?.querySelector("[data-email-content-root]")
+            ?.getAttribute("data-spinupmail-theme")
+        ).toBe("dark");
+      });
+    } finally {
+      document.documentElement.className = originalClassName;
+    }
   });
 });
