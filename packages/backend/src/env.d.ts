@@ -11,6 +11,7 @@ declare global {
     ENABLE_E2E_TEST_UTILS?: string;
     E2E_TEST_SECRET?: string;
     EMAIL_ATTACHMENTS_ENABLED?: string;
+    EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION?: string;
     EMAIL_FORWARD_TO?: string;
     EMAIL_STORE_HEADERS_IN_DB?: string;
     EMAIL_STORE_RAW_IN_DB?: string;

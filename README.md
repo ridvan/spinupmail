@@ -91,6 +91,7 @@ Edit `packages/backend/wrangler.toml` with:
   - `[vars].EMAIL_BODY_MAX_BYTES`
   - `[vars].EMAIL_FORWARD_TO`
   - `[vars].EMAIL_ATTACHMENT_MAX_BYTES`
+  - `[vars].EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` (default: `104857600`)
   - `[vars].EMAIL_ATTACHMENTS_ENABLED` (default: `true`)
   - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
   - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
@@ -221,6 +222,7 @@ AUTH_RATE_LIMIT_MAX = "100"
 AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW = "3600"
 AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX = "2"
 EMAIL_ATTACHMENTS_ENABLED = "true"
+EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION = "104857600"
 ```
 
 ### 2) Email Routing rules
@@ -333,6 +335,7 @@ Limits:
 - `EMAIL_MAX_BYTES`: max raw email bytes read/parsed by Worker (default `524288`).
 - `EMAIL_BODY_MAX_BYTES`: max HTML/text bytes stored per email row in D1 (`524288` default). Oversized bodies are dropped to avoid DB write failures.
 - `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2 (default `10485760`).
+- `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION`: max total attachment storage across all emails in one organization (default `104857600`, or 100 MB).
 - `EMAIL_ATTACHMENTS_ENABLED`: when `false`, inbound attachments are ignored and attachment UI/API surfaces are disabled (`true` by default).
 - `EMAIL_STORE_HEADERS_IN_DB`: persist full header JSON in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_DB`: persist full raw MIME in D1 (`false` by default).

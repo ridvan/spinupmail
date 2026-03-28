@@ -1,9 +1,13 @@
-import { emailAttachments } from "@/db";
+import {
+  getOrganizationAttachmentStorageUsage,
+  insertEmailAttachmentIfOrganizationQuotaAllows,
+} from "@/modules/inbound-email/repo";
 import {
   EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT,
   EMAIL_RAW_R2_CONTENT_TYPE,
 } from "@/shared/constants";
 import {
+  getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
   parseBooleanEnv,
   parsePositiveNumber,
@@ -80,11 +84,25 @@ export const persistAttachments = async ({
   const maxAttachmentBytes =
     parsePositiveNumber(env.EMAIL_ATTACHMENT_MAX_BYTES) ??
     EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT;
+  const maxOrganizationAttachmentStorageBytes =
+    getMaxTotalAttachmentStoragePerOrganization(env);
+  let organizationAttachmentStorageBytes =
+    await getOrganizationAttachmentStorageUsage(db, organizationId);
 
   for (const attachment of attachments) {
     if (attachment.size > maxAttachmentBytes) {
       console.warn(
         `[email] Skipping attachment ${attachment.filename} (${attachment.size} bytes) because it exceeds limit ${maxAttachmentBytes}.`
+      );
+      continue;
+    }
+
+    if (
+      organizationAttachmentStorageBytes + attachment.size >
+      maxOrganizationAttachmentStorageBytes
+    ) {
+      console.warn(
+        `[email] Skipping attachment ${attachment.filename} (${attachment.size} bytes) because organization ${organizationId} would exceed total attachment storage limit ${maxOrganizationAttachmentStorageBytes}.`
       );
       continue;
     }
@@ -102,9 +120,9 @@ export const persistAttachments = async ({
       });
       uploaded = true;
 
-      await db
-        .insert(emailAttachments)
-        .values({
+      const insertResult = await insertEmailAttachmentIfOrganizationQuotaAllows(
+        db,
+        {
           id: attachmentId,
           emailId,
           organizationId,
@@ -116,8 +134,20 @@ export const persistAttachments = async ({
           r2Key,
           disposition: attachment.disposition,
           contentId: attachment.contentId,
-        })
-        .run();
+          maxOrganizationAttachmentStorageBytes,
+        }
+      );
+
+      if (!insertResult.inserted) {
+        await env.R2_BUCKET.delete(r2Key);
+        uploaded = false;
+        console.warn(
+          `[email] Skipping attachment ${attachment.filename} (${attachment.size} bytes) because organization ${organizationId} reached total attachment storage limit ${maxOrganizationAttachmentStorageBytes}.`
+        );
+        continue;
+      }
+
+      organizationAttachmentStorageBytes += attachment.size;
     } catch (error) {
       if (uploaded) {
         try {

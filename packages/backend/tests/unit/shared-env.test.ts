@@ -3,6 +3,7 @@ import {
   getAuthAllowedEmailDomain,
   getAuthRateLimitConfig,
   getAllowedDomains,
+  getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
   getMaxAddressesPerOrganization,
   normalizeDomain,
@@ -74,6 +75,32 @@ describe("shared env helpers", () => {
       } as CloudflareBindings)
     ).toBe(100);
     expect(getMaxAddressesPerOrganization({} as CloudflareBindings)).toBe(100);
+  });
+
+  it("parses max total attachment storage per organization and falls back to default", () => {
+    expect(
+      getMaxTotalAttachmentStoragePerOrganization({
+        EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION: "209715200",
+      } as CloudflareBindings)
+    ).toBe(209715200);
+    expect(
+      getMaxTotalAttachmentStoragePerOrganization({
+        EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION: "1.5",
+      } as CloudflareBindings)
+    ).toBe(104857600);
+    expect(
+      getMaxTotalAttachmentStoragePerOrganization({
+        EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION: "0",
+      } as CloudflareBindings)
+    ).toBe(104857600);
+    expect(
+      getMaxTotalAttachmentStoragePerOrganization({
+        EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION: "invalid",
+      } as CloudflareBindings)
+    ).toBe(104857600);
+    expect(
+      getMaxTotalAttachmentStoragePerOrganization({} as CloudflareBindings)
+    ).toBe(104857600);
   });
 
   it("parses boolean-like env values with fallback", () => {

@@ -1,3 +1,5 @@
+import { EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION_DEFAULT } from "@/shared/constants";
+
 export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
@@ -61,6 +63,16 @@ export const parsePositiveInteger = (value: string | null | undefined) => {
   if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
   return parsed;
 };
+
+export const getMaxTotalAttachmentStoragePerOrganization = (
+  env?: Pick<
+    CloudflareBindings,
+    "EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION"
+  >
+) =>
+  parsePositiveInteger(
+    env?.EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION?.trim()
+  ) ?? EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION_DEFAULT;
 
 export const parseBooleanEnv = (
   value: string | null | undefined,

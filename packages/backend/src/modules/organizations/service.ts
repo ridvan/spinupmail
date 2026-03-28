@@ -1,4 +1,7 @@
-import { isEmailAttachmentsEnabled } from "@/shared/env";
+import {
+  getMaxTotalAttachmentStoragePerOrganization,
+  isEmailAttachmentsEnabled,
+} from "@/shared/env";
 import { createOrganizationBodySchema } from "./schemas";
 import { clampNumber } from "@/shared/utils/dates";
 import { getDb } from "@/platform/db/client";
@@ -454,6 +457,7 @@ export const getEmailSummaryStats = async ({
     dormantInboxesRows,
   } = await findEmailSummary(db, organizationId, dormantInboxCreatedBefore);
   const attachmentsEnabled = isEmailAttachmentsEnabled(env);
+  const attachmentSizeLimit = getMaxTotalAttachmentStoragePerOrganization(env);
 
   const totalEmailCount = Number(emailCountRow[0]?.count ?? 0) || 0;
   const attachmentCount = attachmentsEnabled
@@ -491,6 +495,7 @@ export const getEmailSummaryStats = async ({
     totalEmailCount,
     attachmentCount,
     attachmentSizeTotal,
+    attachmentSizeLimit,
     topDomains,
     busiestInboxes,
     dormantInboxes,

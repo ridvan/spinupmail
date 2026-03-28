@@ -379,6 +379,7 @@ export type EmailSummary = {
   totalEmailCount: number;
   attachmentCount: number;
   attachmentSizeTotal: number;
+  attachmentSizeLimit: number;
   topDomains: { domain: string; count: number }[];
   busiestInboxes: { addressId: string; address: string; count: number }[];
   dormantInboxes: {

@@ -1,5 +1,5 @@
 import { and, eq, lt, sql } from "drizzle-orm";
-import { emailAddresses, emails } from "@/db";
+import { emailAddresses, emailAttachments, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 import {
   buildDeleteEmailSearchEntriesByAddressIdStatement,
@@ -33,6 +33,88 @@ export const findInboundEmailByAddressAndMessageId = (
       and(eq(emails.addressId, addressId), eq(emails.messageId, messageId))
     )
     .get();
+
+export const getOrganizationAttachmentStorageUsage = async (
+  db: AppDb,
+  organizationId: string
+) => {
+  const row = await db
+    .select({
+      totalBytes: sql<number>`coalesce(sum(${emailAttachments.size}), 0)`,
+    })
+    .from(emailAttachments)
+    .where(eq(emailAttachments.organizationId, organizationId))
+    .get();
+
+  return Number(row?.totalBytes ?? 0);
+};
+
+export const insertEmailAttachmentIfOrganizationQuotaAllows = async (
+  db: AppDb,
+  values: {
+    id: string;
+    emailId: string;
+    organizationId: string;
+    addressId: string;
+    userId: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    r2Key: string;
+    disposition?: string | null;
+    contentId?: string | null;
+    maxOrganizationAttachmentStorageBytes: number;
+  }
+) => {
+  const statement = db.$client
+    .prepare(
+      `
+        INSERT INTO email_attachments (
+          id,
+          email_id,
+          organization_id,
+          address_id,
+          user_id,
+          filename,
+          content_type,
+          size,
+          r2_key,
+          disposition,
+          content_id
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE coalesce(
+          (
+            SELECT sum(size)
+            FROM email_attachments
+            WHERE organization_id = ?
+          ),
+          0
+        ) + ? <= ?
+      `
+    )
+    .bind(
+      values.id,
+      values.emailId,
+      values.organizationId,
+      values.addressId,
+      values.userId,
+      values.filename,
+      values.contentType,
+      values.size,
+      values.r2Key,
+      values.disposition ?? null,
+      values.contentId ?? null,
+      values.organizationId,
+      values.size,
+      values.maxOrganizationAttachmentStorageBytes
+    );
+
+  const insertResults = await db.$client.batch([statement]);
+  const inserted = Number(insertResults[0]?.meta?.changes ?? 0) > 0;
+
+  return { inserted };
+};
 
 export const listSampleEmailsForAddress = (db: AppDb, addressId: string) =>
   db

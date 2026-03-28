@@ -82,6 +82,7 @@ describe("organization summary service", () => {
         createdAt: "2026-03-21T12:00:00.000Z",
       },
     ]);
+    expect(result.attachmentSizeLimit).toBe(104857600);
   });
 
   it("zeros attachment summary fields when attachments are disabled", async () => {
@@ -102,5 +103,25 @@ describe("organization summary service", () => {
 
     expect(result.attachmentCount).toBe(0);
     expect(result.attachmentSizeTotal).toBe(0);
+    expect(result.attachmentSizeLimit).toBe(104857600);
+  });
+
+  it("returns the configured attachment storage limit", async () => {
+    mocks.findEmailSummary.mockResolvedValue({
+      emailCountRow: [{ count: 12 }],
+      attachmentStatsRows: [{ attachmentCount: 3, attachmentSizeTotal: 4096 }],
+      topDomainsRows: [],
+      busiestInboxesRows: [],
+      dormantInboxesRows: [],
+    });
+
+    const result = await getEmailSummaryStats({
+      env: {
+        EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION: "209715200",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+    });
+
+    expect(result.attachmentSizeLimit).toBe(209715200);
   });
 });
