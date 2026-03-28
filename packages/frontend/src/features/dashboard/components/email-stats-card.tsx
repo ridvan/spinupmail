@@ -25,12 +25,40 @@ import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 import { cn } from "@/lib/utils";
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
+
+const formatBytes = (bytes: number | bigint) => {
+  const normalizedBytes =
+    typeof bytes === "bigint" ? bytes : BigInt(Math.trunc(bytes));
+
+  if (normalizedBytes <= 0n) return "0 B";
+
+  let unitIndex = 0;
+  let whole = normalizedBytes;
+  let remainder = 0n;
+
+  while (whole >= 1024n && unitIndex < BYTE_UNITS.length - 1) {
+    remainder = whole % 1024n;
+    whole /= 1024n;
+    unitIndex += 1;
+  }
+
+  if (unitIndex === 0 || remainder === 0n) {
+    return `${whole} ${BYTE_UNITS[unitIndex]}`;
+  }
+
+  const roundedTenth = Number((remainder * 10n + 512n) / 1024n);
+
+  if (roundedTenth === 10) {
+    whole += 1n;
+    if (whole === 1024n && unitIndex < BYTE_UNITS.length - 1) {
+      whole = 1n;
+      unitIndex += 1;
+    }
+    return `${whole} ${BYTE_UNITS[unitIndex]}`;
+  }
+
+  return `${whole}.${roundedTenth} ${BYTE_UNITS[unitIndex]}`;
 };
 
 const getAddressLocalPart = (address: string) =>

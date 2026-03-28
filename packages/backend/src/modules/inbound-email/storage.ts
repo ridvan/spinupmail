@@ -86,8 +86,17 @@ export const persistAttachments = async ({
     EMAIL_ATTACHMENT_MAX_BYTES_DEFAULT;
   const maxOrganizationAttachmentStorageBytes =
     getMaxTotalAttachmentStoragePerOrganization(env);
-  let organizationAttachmentStorageBytes =
-    await getOrganizationAttachmentStorageUsage(db, organizationId);
+  let organizationAttachmentStorageBytes: number | null;
+  try {
+    organizationAttachmentStorageBytes =
+      await getOrganizationAttachmentStorageUsage(db, organizationId);
+  } catch (error) {
+    organizationAttachmentStorageBytes = null;
+    console.warn(
+      `[email] Failed to load attachment storage usage for organization ${organizationId}. Falling back to insert-time quota enforcement.`,
+      error
+    );
+  }
 
   for (const attachment of attachments) {
     if (attachment.size > maxAttachmentBytes) {
@@ -98,8 +107,9 @@ export const persistAttachments = async ({
     }
 
     if (
+      organizationAttachmentStorageBytes !== null &&
       organizationAttachmentStorageBytes + attachment.size >
-      maxOrganizationAttachmentStorageBytes
+        maxOrganizationAttachmentStorageBytes
     ) {
       console.warn(
         `[email] Skipping attachment ${attachment.filename} (${attachment.size} bytes) because organization ${organizationId} would exceed total attachment storage limit ${maxOrganizationAttachmentStorageBytes}.`
@@ -147,7 +157,9 @@ export const persistAttachments = async ({
         continue;
       }
 
-      organizationAttachmentStorageBytes += attachment.size;
+      if (organizationAttachmentStorageBytes !== null) {
+        organizationAttachmentStorageBytes += attachment.size;
+      }
     } catch (error) {
       if (uploaded) {
         try {

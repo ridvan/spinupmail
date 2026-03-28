@@ -103,7 +103,7 @@ describe("organization summary service", () => {
 
     expect(result.attachmentCount).toBe(0);
     expect(result.attachmentSizeTotal).toBe(0);
-    expect(result.attachmentSizeLimit).toBe(104857600);
+    expect(result.attachmentSizeLimit).toBe(0);
   });
 
   it("returns the configured attachment storage limit", async () => {

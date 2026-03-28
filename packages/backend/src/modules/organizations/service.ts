@@ -457,7 +457,9 @@ export const getEmailSummaryStats = async ({
     dormantInboxesRows,
   } = await findEmailSummary(db, organizationId, dormantInboxCreatedBefore);
   const attachmentsEnabled = isEmailAttachmentsEnabled(env);
-  const attachmentSizeLimit = getMaxTotalAttachmentStoragePerOrganization(env);
+  const attachmentSizeLimit = attachmentsEnabled
+    ? getMaxTotalAttachmentStoragePerOrganization(env)
+    : 0;
 
   const totalEmailCount = Number(emailCountRow[0]?.count ?? 0) || 0;
   const attachmentCount = attachmentsEnabled

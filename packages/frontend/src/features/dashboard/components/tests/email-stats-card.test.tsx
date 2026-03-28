@@ -105,4 +105,26 @@ describe("EmailStatsCard", () => {
         .getAttribute("aria-valuenow")
     ).toBe("100");
   });
+
+  it("formats attachment usage values larger than a gigabyte", () => {
+    mockedUseTimezone.mockReturnValue({
+      effectiveTimeZone: "UTC",
+    } as ReturnType<typeof useTimezone>);
+    mockedUseEmailSummaryQuery.mockReturnValue(
+      createEmailSummaryQueryResult({
+        attachmentSizeTotal: 1099511627776,
+        attachmentSizeLimit: 2 * 1099511627776,
+      })
+    );
+
+    renderCard();
+
+    expect(screen.getByText("1 TB")).toBeTruthy();
+    expect(screen.getByText("of 2 TB")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("progressbar", { name: "Attachment storage usage" })
+        .getAttribute("aria-valuenow")
+    ).toBe("50");
+  });
 });
