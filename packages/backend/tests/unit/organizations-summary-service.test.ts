@@ -17,7 +17,11 @@ vi.mock("@/modules/organizations/repo", () => ({
   findOrganizationIdsForUser: mocks.findOrganizationIdsForUser,
 }));
 
-import { getEmailSummaryStats } from "@/modules/organizations/service";
+import {
+  getEmailActivityStats,
+  getEmailSummaryStats,
+  getOrganizationStats,
+} from "@/modules/organizations/service";
 
 describe("organization summary service", () => {
   beforeEach(() => {
@@ -83,6 +87,95 @@ describe("organization summary service", () => {
       },
     ]);
     expect(result.attachmentSizeLimit).toBe(104857600);
+  });
+
+  it("returns organization stats in membership order with zero-filled counts", async () => {
+    mocks.findOrganizationIdsForUser.mockResolvedValue(["org-2", "org-1"]);
+    mocks.findOrganizationCounts.mockResolvedValue({
+      memberCountRows: [{ organizationId: "org-1", count: 4 }],
+      addressCountRows: [{ organizationId: "org-2", count: 7 }],
+      emailCountRows: [
+        { organizationId: "org-1", count: 15 },
+        { organizationId: "org-2", count: 2 },
+      ],
+    });
+
+    const result = await getOrganizationStats(
+      {} as CloudflareBindings,
+      "user-1"
+    );
+
+    expect(mocks.findOrganizationIdsForUser).toHaveBeenCalledWith({}, "user-1");
+    expect(mocks.findOrganizationCounts).toHaveBeenCalledWith({}, [
+      "org-2",
+      "org-1",
+    ]);
+    expect(result).toEqual({
+      items: [
+        {
+          organizationId: "org-2",
+          memberCount: 0,
+          addressCount: 7,
+          emailCount: 2,
+        },
+        {
+          organizationId: "org-1",
+          memberCount: 4,
+          addressCount: 0,
+          emailCount: 15,
+        },
+      ],
+    });
+  });
+
+  it("returns an empty list when the user has no organizations", async () => {
+    mocks.findOrganizationIdsForUser.mockResolvedValue([]);
+
+    const result = await getOrganizationStats(
+      {} as CloudflareBindings,
+      "user-1"
+    );
+
+    expect(mocks.findOrganizationCounts).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [] });
+  });
+
+  it("builds timezone-aware daily email activity from repo rows", async () => {
+    vi.setSystemTime(new Date("2026-03-22T12:00:00.000Z"));
+    mocks.findEmailActivity.mockResolvedValue([
+      {
+        minuteStartMs: Date.parse("2026-03-21T23:30:00.000Z"),
+        count: 1,
+      },
+      {
+        minuteStartMs: Date.parse("2026-03-22T09:30:00.000Z"),
+        count: 4,
+      },
+    ]);
+
+    const result = await getEmailActivityStats({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      daysRaw: "2",
+      timezoneRaw: "America/Los_Angeles",
+    });
+
+    expect(mocks.findEmailActivity).toHaveBeenCalledWith(
+      {},
+      "org-1",
+      new Date("2026-03-18T12:00:00.000Z"),
+      new Date("2026-03-22T12:01:00.000Z")
+    );
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        timezone: "America/Los_Angeles",
+        daily: [
+          { date: "2026-03-21", count: 1 },
+          { date: "2026-03-22", count: 4 },
+        ],
+      },
+    });
   });
 
   it("zeros attachment summary fields when attachments are disabled", async () => {

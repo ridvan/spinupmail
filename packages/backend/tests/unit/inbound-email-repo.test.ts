@@ -1,7 +1,13 @@
+import { SQLiteDialect } from "drizzle-orm/sqlite-core";
 import {
+  getOrganizationAttachmentStorageUsage,
+  insertEmailAttachmentIfOrganizationQuotaAllows,
   deleteEmailsForAddress,
   insertInboundEmail,
+  reserveInboxSlot,
 } from "@/modules/inbound-email/repo";
+
+const dialect = new SQLiteDialect();
 
 const createPreparedStatement = (query: string) => {
   const statement = {
@@ -15,6 +21,9 @@ const createPreparedStatement = (query: string) => {
 
   return statement;
 };
+
+const renderSql = (fragment: unknown) =>
+  dialect.sqlToQuery(fragment as Parameters<typeof dialect.sqlToQuery>[0]);
 
 describe("inbound email repo", () => {
   it("inserts the email row before running follow-up writes", async () => {
@@ -141,5 +150,110 @@ describe("inbound email repo", () => {
     expect(statements[1]?.query).toContain(
       "DELETE FROM emails WHERE address_id = ?"
     );
+  });
+
+  it("returns zero organization attachment usage when the aggregate is null", async () => {
+    const chain = {
+      from: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      get: vi.fn().mockResolvedValue({
+        totalBytes: null,
+      }),
+    };
+    const db = {
+      select: vi.fn(() => chain),
+    } as unknown as Parameters<typeof getOrganizationAttachmentStorageUsage>[0];
+
+    await expect(
+      getOrganizationAttachmentStorageUsage(db, "org-1")
+    ).resolves.toBe(0);
+  });
+
+  it("returns inserted=false when the attachment quota guard prevents an insert", async () => {
+    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 0 } }]);
+    const prepare = vi.fn((query: string) => createPreparedStatement(query));
+    const db = {
+      $client: {
+        batch,
+        prepare,
+      },
+    } as unknown as Parameters<
+      typeof insertEmailAttachmentIfOrganizationQuotaAllows
+    >[0];
+
+    await expect(
+      insertEmailAttachmentIfOrganizationQuotaAllows(db, {
+        id: "attachment-1",
+        emailId: "email-1",
+        organizationId: "org-1",
+        addressId: "address-1",
+        userId: "user-1",
+        filename: "invoice.pdf",
+        contentType: "application/pdf",
+        size: 2048,
+        r2Key: "attachments/org-1/address-1/email-1/attachment-1",
+        maxOrganizationAttachmentStorageBytes: 1024,
+      })
+    ).resolves.toEqual({
+      inserted: false,
+    });
+
+    const statement = batch.mock.calls[0]?.[0]?.[0] as {
+      query: string;
+      values: unknown[];
+    };
+    expect(statement.query).toContain("INSERT INTO email_attachments");
+    expect(statement.query).toContain("SELECT sum(size)");
+    expect(statement.values).toEqual([
+      "attachment-1",
+      "email-1",
+      "org-1",
+      "address-1",
+      "user-1",
+      "invoice.pdf",
+      "application/pdf",
+      2048,
+      "attachments/org-1/address-1/email-1/attachment-1",
+      null,
+      null,
+      "org-1",
+      2048,
+      1024,
+    ]);
+  });
+
+  it("returns whether inbox reservation updated a row under the email-count cap", async () => {
+    const state: {
+      where?: unknown;
+    } = {};
+    const run = vi.fn().mockResolvedValue({
+      meta: {
+        changes: 1,
+      },
+    });
+    const chain = {
+      set: vi.fn(() => chain),
+      where: vi.fn((value: unknown) => {
+        state.where = value;
+        return chain;
+      }),
+      run,
+    };
+    const db = {
+      update: vi.fn(() => chain),
+    } as unknown as Parameters<typeof reserveInboxSlot>[0]["db"];
+
+    await expect(
+      reserveInboxSlot({
+        db,
+        addressId: "address-1",
+        maxReceivedEmailCount: 10,
+      })
+    ).resolves.toBe(true);
+
+    const where = renderSql(state.where);
+    expect(where.sql).toContain('"email_addresses"."id" = ?');
+    expect(where.sql).toContain('"email_addresses"."email_count" < ?');
+    expect(where.params).toEqual(["address-1", 10]);
   });
 });
