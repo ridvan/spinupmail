@@ -79,6 +79,7 @@ describe("organizations router", () => {
       },
       starterAddressId: "address-1",
       seededSampleEmailCount: 3,
+      starterInboxProvisioned: true,
     });
     expect(mocks.seedStarterInbox).toHaveBeenCalledWith({
       env: { EMAIL_DOMAINS: "spinupmail.com" },
@@ -104,13 +105,24 @@ describe("organizations router", () => {
       { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(201);
     const body = await response.json();
-    expect(body.error).toContain(
-      "Organization created but starter inbox setup failed for organization org-1: seed failed."
+    expect(body.organization).toEqual({
+      id: "org-1",
+      name: "Acme Org",
+      slug: "acme-org",
+      logo: null,
+    });
+    expect(body.starterAddressId).toBeNull();
+    expect(body.seededSampleEmailCount).toBe(0);
+    expect(body.starterInboxProvisioned).toBe(false);
+    expect(body.warning).toContain(
+      "Starter inbox setup failed for organization org-1: seed failed."
     );
-    expect(body.error).toContain("Retry inbox setup.");
-    expect(body.error).toContain("contact support with organization ID org-1.");
+    expect(body.warning).toContain("Starter inbox setup can be retried later.");
+    expect(body.warning).toContain(
+      "contact support with organization ID org-1."
+    );
   });
 
   it("retries organization creation on explicit slug collisions", async () => {

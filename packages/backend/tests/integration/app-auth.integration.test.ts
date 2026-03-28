@@ -144,4 +144,27 @@ describe("app auth middleware integration", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "forbidden" });
   });
+
+  it("does not expose E2E auth routes in the default app", async () => {
+    const app = createApp({
+      createAuthFactory: createAuthFactory({ session: null }),
+    });
+
+    const response = await app.request(
+      "/api/test/auth/session",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-e2e-test-secret": "top-secret",
+        },
+        body: JSON.stringify({}),
+      },
+      testBindings,
+      executionCtx as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "not found" });
+  });
 });

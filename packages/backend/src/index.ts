@@ -17,6 +17,7 @@ import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 
 type AppFactoryOptions = {
   createAuthFactory?: typeof createAuth;
+  includeE2ETestRoutes?: boolean;
 };
 
 type WorkerHandlerOptions = AppFactoryOptions & {
@@ -29,7 +30,9 @@ export const createApp = (options: AppFactoryOptions = {}) => {
   registerCorsMiddleware(app);
   registerAuthInitializationMiddleware(app, options.createAuthFactory);
 
-  app.route("/api", createE2EAuthTestRouter());
+  if (options.includeE2ETestRoutes) {
+    app.route("/api", createE2EAuthTestRouter());
+  }
   app.route("/api", createAuthHttpRouter());
 
   app.use("/api/domains", requireAuth);

@@ -187,8 +187,10 @@ export type CreatedOrganization = {
 
 export type CreateOrganizationResponse = {
   organization: CreatedOrganization;
-  starterAddressId: string;
+  starterAddressId: string | null;
   seededSampleEmailCount: number;
+  starterInboxProvisioned?: boolean;
+  warning?: string;
 };
 
 export type DomainConfig = {

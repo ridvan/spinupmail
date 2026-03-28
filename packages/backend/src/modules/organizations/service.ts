@@ -121,6 +121,20 @@ export const createOrganization = async ({
 
   const baseSlug = slugifyOrganizationName(name);
 
+  const toOrganizationBody = (organization: {
+    id: string | number;
+    name: string | number;
+    slug: string | number;
+    logo?: unknown;
+  }) => ({
+    organization: {
+      id: String(organization.id),
+      name: String(organization.name),
+      slug: String(organization.slug),
+      logo: typeof organization.logo === "string" ? organization.logo : null,
+    },
+  });
+
   for (
     let attempt = 0;
     attempt < MAX_ORGANIZATION_CREATE_ATTEMPTS;
@@ -156,25 +170,18 @@ export const createOrganization = async ({
         return {
           status: 201 as const,
           body: {
-            organization: {
-              id: String(organization.id),
-              name: String(organization.name),
-              slug: String(organization.slug),
-              logo:
-                "logo" in organization && typeof organization.logo === "string"
-                  ? organization.logo
-                  : null,
-            },
+            ...toOrganizationBody(organization),
             starterAddressId: seeded.starterAddressId,
             seededSampleEmailCount: seeded.seededSampleEmailCount,
+            starterInboxProvisioned: true,
           },
         };
       } catch (error) {
         const organizationId = String(organization.id);
-        const supportGuidance = `Retry inbox setup. If it keeps failing, contact support with organization ID ${organizationId}.`;
+        const supportGuidance = `Starter inbox setup can be retried later. If it keeps failing, contact support with organization ID ${organizationId}.`;
 
         console.error(
-          "[organization] Starter inbox provisioning failed. Retry inbox setup or contact support with the organization ID.",
+          "[organization] Starter inbox provisioning failed after organization creation.",
           {
             organizationId,
             organizationName: name,
@@ -184,9 +191,13 @@ export const createOrganization = async ({
         );
 
         return {
-          status: 500 as const,
+          status: 201 as const,
           body: {
-            error: `Organization created but starter inbox setup failed for organization ${organizationId}: ${getErrorMessage(
+            ...toOrganizationBody(organization),
+            starterAddressId: null,
+            seededSampleEmailCount: 0,
+            starterInboxProvisioned: false,
+            warning: `Starter inbox setup failed for organization ${organizationId}: ${getErrorMessage(
               error,
               "unknown error"
             )}. ${supportGuidance}`,

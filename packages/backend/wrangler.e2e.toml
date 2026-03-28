@@ -1,5 +1,5 @@
 name = "spinupmail-e2e"
-main = "src/index.ts"
+main = "src/index.e2e.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
