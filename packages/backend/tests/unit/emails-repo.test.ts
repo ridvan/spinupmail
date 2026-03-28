@@ -46,11 +46,15 @@ const createSelectChain = () => {
     where?: unknown;
     orderBy?: unknown[];
     groupBy?: unknown[];
+    innerJoinOns?: unknown[];
   } = {};
 
   const chain = {
     from: vi.fn(() => chain),
-    innerJoin: vi.fn(() => chain),
+    innerJoin: vi.fn((_: unknown, on: unknown) => {
+      state.innerJoinOns = [...(state.innerJoinOns ?? []), on];
+      return chain;
+    }),
     where: vi.fn((value: unknown) => {
       state.where = value;
       return chain;
@@ -242,6 +246,7 @@ describe("emails repo", () => {
 
     expect(statement.query).toContain("WHERE email_id IN (?, ?)");
     expect(statement.values).toEqual(["email-1", "email-2"]);
+    expect(statement.run).toHaveBeenCalledTimes(1);
   });
 
   it("returns no search results for punctuation-only queries without touching the database", async () => {
@@ -461,9 +466,25 @@ describe("emails repo", () => {
       "email-1"
     );
 
-    expect(renderSql(detail.state.where).params).toEqual(["email-1"]);
-    expect(renderSql(raw.state.where).params).toEqual(["email-1"]);
-    expect(renderSql(del.state.where).params).toEqual(["email-1"]);
+    const detailJoin = renderSql(detail.state.innerJoinOns?.[0]);
+    const rawJoin = renderSql(raw.state.innerJoinOns?.[0]);
+    const deleteJoin = renderSql(del.state.innerJoinOns?.[0]);
+
+    expect(detailJoin.sql).toContain('"email_addresses"."organization_id" = ?');
+    expect([
+      ...detailJoin.params,
+      ...renderSql(detail.state.where).params,
+    ]).toEqual(["org-1", "email-1"]);
+    expect(rawJoin.sql).toContain('"email_addresses"."organization_id" = ?');
+    expect([...rawJoin.params, ...renderSql(raw.state.where).params]).toEqual([
+      "org-1",
+      "email-1",
+    ]);
+    expect(deleteJoin.sql).toContain('"email_addresses"."organization_id" = ?');
+    expect([
+      ...deleteJoin.params,
+      ...renderSql(del.state.where).params,
+    ]).toEqual(["org-1", "email-1"]);
   });
 
   it("orders attachment lists by creation time and scopes attachment queries", () => {

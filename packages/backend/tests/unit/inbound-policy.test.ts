@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   shouldAcceptSenderDomain,
   validateAddressAvailability,
 } from "@/modules/inbound-email/policy";
 
 describe("inbound email policy", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("rejects expired addresses at the current-time boundary", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-01T12:00:00.000Z"));

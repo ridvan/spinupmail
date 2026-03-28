@@ -256,4 +256,39 @@ describe("inbound email repo", () => {
     expect(where.sql).toContain('"email_addresses"."email_count" < ?');
     expect(where.params).toEqual(["address-1", 10]);
   });
+
+  it("returns false when inbox reservation does not update a row under the email-count cap", async () => {
+    const state: {
+      where?: unknown;
+    } = {};
+    const run = vi.fn().mockResolvedValue({
+      meta: {
+        changes: 0,
+      },
+    });
+    const chain = {
+      set: vi.fn(() => chain),
+      where: vi.fn((value: unknown) => {
+        state.where = value;
+        return chain;
+      }),
+      run,
+    };
+    const db = {
+      update: vi.fn(() => chain),
+    } as unknown as Parameters<typeof reserveInboxSlot>[0]["db"];
+
+    await expect(
+      reserveInboxSlot({
+        db,
+        addressId: "address-1",
+        maxReceivedEmailCount: 10,
+      })
+    ).resolves.toBe(false);
+
+    const where = renderSql(state.where);
+    expect(where.sql).toContain('"email_addresses"."id" = ?');
+    expect(where.sql).toContain('"email_addresses"."email_count" < ?');
+    expect(where.params).toEqual(["address-1", 10]);
+  });
 });

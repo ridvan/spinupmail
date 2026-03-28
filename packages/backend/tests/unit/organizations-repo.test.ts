@@ -101,13 +101,13 @@ describe("organizations repo", () => {
     expect(emailQuery.state.groupBy).toHaveLength(1);
   });
 
-  it("builds minute-bucketed email activity with a half-open time window", () => {
+  it("builds minute-bucketed email activity with a half-open time window", async () => {
     const query = createPromiseLikeChain([]);
     const db = {
       select: vi.fn(() => query.chain),
     } as unknown as Parameters<typeof findEmailActivity>[0];
 
-    findEmailActivity(
+    await findEmailActivity(
       db,
       "org-1",
       new Date("2026-03-28T10:00:00.000Z"),

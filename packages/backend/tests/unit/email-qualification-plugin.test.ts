@@ -1,39 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEmailQualificationPlugin } from "@/platform/auth/email-qualification-plugin";
 
-const mocks = vi.hoisted(() => ({
-  assertAllowedAuthEmailDomain: vi.fn(),
-  getInvalidAuthEmailError: vi.fn(() => ({
-    body: {
-      message: "Enter a valid email address",
-      code: "INVALID_EMAIL",
-    },
-  })),
-  qualifyEmailAddress: vi.fn(),
-}));
-
-class MockAPIError extends Error {
-  status: string;
-  body: {
-    message: string;
-    code: string;
-  };
-
-  constructor(
-    status: string,
-    body: {
-      message: string;
-      code: string;
-    }
-  ) {
-    super(body.message);
-    this.status = status;
-    this.body = body;
-  }
-}
-
-vi.mock("better-auth/api", () => ({
-  APIError: class extends Error {
+const { mocks, MockAPIError } = vi.hoisted(() => {
+  class MockAPIError extends Error {
     status: string;
     body: {
       message: string;
@@ -51,7 +20,25 @@ vi.mock("better-auth/api", () => ({
       this.status = status;
       this.body = body;
     }
-  },
+  }
+
+  return {
+    MockAPIError,
+    mocks: {
+      assertAllowedAuthEmailDomain: vi.fn(),
+      getInvalidAuthEmailError: vi.fn(() => ({
+        body: {
+          message: "Enter a valid email address",
+          code: "INVALID_EMAIL",
+        },
+      })),
+      qualifyEmailAddress: vi.fn(),
+    },
+  };
+});
+
+vi.mock("better-auth/api", () => ({
+  APIError: MockAPIError,
   createAuthMiddleware: <T>(handler: T) => handler,
 }));
 
