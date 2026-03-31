@@ -51,11 +51,27 @@ describe("createResendVerificationEmailSender", () => {
     });
   });
 
-  it("limits signup verification emails to 2 per hour and skips overflow", async () => {
+  it("limits signup verification emails to 4 per hour and skips overflow", async () => {
     await withFixedNow("2026-02-19T16:00:00.000Z", async () => {
       const sender = createResendVerificationEmailSender(buildEnv());
       const request = buildRequest("203.0.113.9");
 
+      await sender(
+        {
+          user: { email: "signup@example.com" },
+          url: "https://app.example.com/verify",
+          token: createVerificationToken("email-verification"),
+        },
+        request
+      );
+      await sender(
+        {
+          user: { email: "signup@example.com" },
+          url: "https://app.example.com/verify",
+          token: createVerificationToken("email-verification"),
+        },
+        request
+      );
       await sender(
         {
           user: { email: "signup@example.com" },
@@ -84,7 +100,7 @@ describe("createResendVerificationEmailSender", () => {
         )
       ).resolves.toBeUndefined();
 
-      expect(sendEmailMock).toHaveBeenCalledTimes(2);
+      expect(sendEmailMock).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -210,7 +226,7 @@ describe("createResendVerificationEmailSender", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("limits reset-password emails to 2 per hour and logs overflow", async () => {
+  it("limits reset-password emails to 4 per hour and logs overflow", async () => {
     await withFixedNow("2026-02-19T16:10:00.000Z", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const sender = createResendResetPasswordEmailSender(buildEnv());
@@ -232,25 +248,42 @@ describe("createResendVerificationEmailSender", () => {
         },
         request
       );
+      await sender(
+        {
+          user: { email: "reset@example.com" },
+          url: "https://app.example.com/reset-password",
+          token: "reset-token-3",
+        },
+        request
+      );
+      await sender(
+        {
+          user: { email: "reset@example.com" },
+          url: "https://app.example.com/reset-password",
+          token: "reset-token-4",
+        },
+        request
+      );
 
       await expect(
         sender(
           {
             user: { email: "reset@example.com" },
             url: "https://app.example.com/reset-password",
-            token: "reset-token-3",
+            token: "reset-token-5",
           },
           request
         )
       ).resolves.toBeUndefined();
 
-      expect(sendEmailMock).toHaveBeenCalledTimes(2);
+      expect(sendEmailMock).toHaveBeenCalledTimes(4);
       expect(warnSpy).toHaveBeenCalledWith(
         "[auth] Reset password email skipped due to hourly limit",
         expect.objectContaining({
           reason: "recipient-hourly-limit",
         })
       );
+      warnSpy.mockRestore();
     });
   });
 });

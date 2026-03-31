@@ -1,6 +1,6 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { LockKeyhole } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { useSendPasswordSetupEmailMutation } from "@/features/auth/hooks/use-auth-mutations";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient } from "@/lib/auth";
@@ -32,6 +33,15 @@ const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
+type LinkedAccountSummary = {
+  providerId?: string | null;
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
 export const ChangePasswordPanel = ({
   withCard = true,
   wrapperId,
@@ -46,6 +56,34 @@ export const ChangePasswordPanel = ({
   contentClassName?: string;
 }) => {
   const { user, refreshSession } = useAuth();
+  const userEmail =
+    typeof user?.email === "string" && user.email.length > 0
+      ? user.email
+      : "your account email";
+  const linkedAccountsQuery = useQuery({
+    queryKey: ["auth", "accounts", user?.id],
+    enabled: Boolean(user),
+    queryFn: async () => {
+      const result = await authClient.listAccounts();
+
+      if (result.error) {
+        throw new Error(
+          result.error.message || "Unable to load linked sign-in methods"
+        );
+      }
+
+      return (result.data ?? []) as LinkedAccountSummary[];
+    },
+  });
+  const sendPasswordSetupEmailMutation = useSendPasswordSetupEmailMutation();
+  const hasCredentialAccount = (linkedAccountsQuery.data ?? []).some(
+    account => account.providerId === "credential"
+  );
+  const isCheckingPasswordState =
+    Boolean(user) && linkedAccountsQuery.isPending;
+  const hasPasswordStateError = Boolean(user) && linkedAccountsQuery.isError;
+  const shouldShowPasswordSetup =
+    Boolean(user) && linkedAccountsQuery.isSuccess && !hasCredentialAccount;
 
   const changePasswordMutation = useMutation({
     mutationFn: async (payload: {
@@ -114,177 +152,243 @@ export const ChangePasswordPanel = ({
         </CardTitle>
       </CardHeader>
       <CardContent className={cn("pt-3", contentClassName)}>
-        <form.Subscribe
-          selector={state => ({
-            canSubmit: state.canSubmit,
-            isSubmitting: state.isSubmitting,
-          })}
-        >
-          {({ canSubmit, isSubmitting }) => (
-            <form
-              className="space-y-5"
-              noValidate
-              onSubmit={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                void form.handleSubmit();
-              }}
-            >
-              <form.Field
-                name="currentPassword"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
+        {isCheckingPasswordState ? (
+          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
+            Checking how this account signs in...
+          </div>
+        ) : null}
 
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel
-                        htmlFor={field.name}
-                        className="text-muted-foreground"
-                      >
-                        Current password
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        type="password"
-                        autoComplete="current-password"
-                        value={field.state.value}
-                        aria-invalid={isInvalid}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
+        {hasPasswordStateError ? (
+          <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm">
+            <p className="text-muted-foreground">
+              We couldn&apos;t load your linked sign-in methods. Try again
+              before updating your password.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void linkedAccountsQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {shouldShowPasswordSetup ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
+              <p>
+                This account doesn&apos;t have a password yet. We&apos;ll send a
+                secure setup link to{" "}
+                <span className="text-foreground">{userEmail}</span> so you can
+                add one without needing a current password.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                disabled={!user || sendPasswordSetupEmailMutation.isPending}
+                onClick={async () => {
+                  const setupLinkPromise =
+                    sendPasswordSetupEmailMutation.mutateAsync();
+
+                  await toast.promise(setupLinkPromise, {
+                    loading: "Sending setup link...",
+                    success: `Password setup link sent to ${userEmail}.`,
+                    error: error =>
+                      getErrorMessage(
+                        error,
+                        "Unable to send password setup email"
+                      ),
+                  });
+                }}
+              >
+                {sendPasswordSetupEmailMutation.isPending
+                  ? "Sending..."
+                  : "Email password setup link"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {!isCheckingPasswordState &&
+        !hasPasswordStateError &&
+        !shouldShowPasswordSetup ? (
+          <form.Subscribe
+            selector={state => ({
+              canSubmit: state.canSubmit,
+              isSubmitting: state.isSubmitting,
+            })}
+          >
+            {({ canSubmit, isSubmitting }) => (
+              <form
+                className="space-y-5"
+                noValidate
+                onSubmit={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void form.handleSubmit();
+                }}
+              >
+                <form.Field
+                  name="currentPassword"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel
+                          htmlFor={field.name}
+                          className="text-muted-foreground"
+                        >
+                          Current password
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type="password"
+                          autoComplete="current-password"
+                          value={field.state.value}
+                          aria-invalid={isInvalid}
+                          onBlur={field.handleBlur}
+                          onChange={event =>
+                            field.handleChange(event.target.value)
+                          }
+                          disabled={!user || changePasswordMutation.isPending}
+                          required
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+
+                <form.Field
+                  name="newPassword"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel
+                          htmlFor={field.name}
+                          className="text-muted-foreground"
+                        >
+                          New password
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type="password"
+                          autoComplete="new-password"
+                          value={field.state.value}
+                          aria-invalid={isInvalid}
+                          onBlur={field.handleBlur}
+                          onChange={event =>
+                            field.handleChange(event.target.value)
+                          }
+                          disabled={!user || changePasswordMutation.isPending}
+                          required
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+
+                <form.Field
+                  name="confirmPassword"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel
+                          htmlFor={field.name}
+                          className="text-muted-foreground"
+                        >
+                          Confirm new password
+                        </FieldLabel>
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type="password"
+                          autoComplete="new-password"
+                          value={field.state.value}
+                          aria-invalid={isInvalid}
+                          onBlur={field.handleBlur}
+                          onChange={event =>
+                            field.handleChange(event.target.value)
+                          }
+                          disabled={!user || changePasswordMutation.isPending}
+                          required
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+
+                <form.Field
+                  name="revokeOtherSessions"
+                  children={field => (
+                    <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+                      <Checkbox
+                        checked={field.state.value}
+                        onCheckedChange={checked =>
+                          field.handleChange(Boolean(checked))
                         }
                         disabled={!user || changePasswordMutation.isPending}
-                        required
                       />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
-              <form.Field
-                name="newPassword"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel
-                        htmlFor={field.name}
-                        className="text-muted-foreground"
-                      >
-                        New password
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        type="password"
-                        autoComplete="new-password"
-                        value={field.state.value}
-                        aria-invalid={isInvalid}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
-                        }
-                        disabled={!user || changePasswordMutation.isPending}
-                        required
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
-              <form.Field
-                name="confirmPassword"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel
-                        htmlFor={field.name}
-                        className="text-muted-foreground"
-                      >
-                        Confirm new password
-                      </FieldLabel>
-                      <Input
-                        id={field.name}
-                        name={field.name}
-                        type="password"
-                        autoComplete="new-password"
-                        value={field.state.value}
-                        aria-invalid={isInvalid}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
-                        }
-                        disabled={!user || changePasswordMutation.isPending}
-                        required
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-
-              <form.Field
-                name="revokeOtherSessions"
-                children={field => (
-                  <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
-                    <Checkbox
-                      checked={field.state.value}
-                      onCheckedChange={checked =>
-                        field.handleChange(Boolean(checked))
-                      }
-                      disabled={!user || changePasswordMutation.isPending}
-                    />
-                    <span className="space-y-0.5">
-                      <span className="block font-medium">
-                        Sign out other sessions
+                      <span className="space-y-0.5">
+                        <span className="block font-medium">
+                          Sign out other sessions
+                        </span>
+                        <span className="block text-muted-foreground">
+                          Recommended if you changed your password for security.
+                        </span>
                       </span>
-                      <span className="block text-muted-foreground">
-                        Recommended if you changed your password for security.
-                      </span>
-                    </span>
-                  </label>
-                )}
-              />
+                    </label>
+                  )}
+                />
 
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={
-                    !user ||
-                    changePasswordMutation.isPending ||
-                    isSubmitting ||
-                    !canSubmit
-                  }
-                >
-                  {changePasswordMutation.isPending
-                    ? "Updating..."
-                    : "Update password"}
-                </Button>
-              </div>
-            </form>
-          )}
-        </form.Subscribe>
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={
+                      !user ||
+                      changePasswordMutation.isPending ||
+                      isSubmitting ||
+                      !canSubmit
+                    }
+                  >
+                    {changePasswordMutation.isPending
+                      ? "Updating..."
+                      : "Update password"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </form.Subscribe>
+        ) : null}
       </CardContent>
     </>
   );

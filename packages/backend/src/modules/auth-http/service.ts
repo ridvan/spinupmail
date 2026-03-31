@@ -8,13 +8,23 @@ import { hashForRateLimitKey } from "@/shared/utils/crypto";
 import { isValidEmail, normalizeAddress } from "@/shared/validation";
 import type { AppHonoEnv } from "@/app/types";
 import {
+  requestPasswordSetupLinkSchema,
   resendVerificationSchema,
+  type RequestPasswordSetupLinkInput,
   type ResendVerificationInput,
 } from "./schemas";
 import type { Context } from "hono";
 
 const parseResendBody = (payload: unknown): ResendVerificationInput => {
   const parsed = resendVerificationSchema.safeParse(payload);
+  if (!parsed.success) return {};
+  return parsed.data;
+};
+
+const parsePasswordSetupBody = (
+  payload: unknown
+): RequestPasswordSetupLinkInput => {
+  const parsed = requestPasswordSetupLinkSchema.safeParse(payload);
   if (!parsed.success) return {};
   return parsed.data;
 };
@@ -105,4 +115,42 @@ export const resendVerificationEmail = async (
     status: true,
     cooldownSeconds: AUTH_VERIFICATION_RESEND_COOLDOWN_SECONDS,
   });
+};
+
+export const requestPasswordSetupLink = async (
+  c: Context<AppHonoEnv>,
+  payload: unknown
+) => {
+  const body = parsePasswordSetupBody(payload);
+  const callbackURL =
+    typeof body.callbackURL === "string" && body.callbackURL.trim().length > 0
+      ? body.callbackURL.trim()
+      : undefined;
+  const session = c.get("session");
+  const email = normalizeAddress(
+    typeof session.user.email === "string" ? session.user.email : ""
+  );
+
+  if (!email || !isValidEmail(email)) {
+    c.status(400);
+    return c.json({ error: "valid email is required" });
+  }
+
+  const auth = c.get("auth");
+
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email,
+        ...(callbackURL ? { redirectTo: callbackURL } : {}),
+      },
+      headers: c.req.raw.headers,
+    });
+  } catch (error) {
+    console.error("[auth] Failed to send password setup email", error);
+    c.status(500);
+    return c.json({ error: "unable to send password setup email" });
+  }
+
+  return c.json({ status: true });
 };

@@ -8,3 +8,13 @@ export const resendVerificationSchema = z
   .passthrough();
 
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+export const requestPasswordSetupLinkSchema = z
+  .object({
+    callbackURL: z.string().optional(),
+  })
+  .passthrough();
+
+export type RequestPasswordSetupLinkInput = z.infer<
+  typeof requestPasswordSetupLinkSchema
+>;

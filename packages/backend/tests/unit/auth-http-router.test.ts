@@ -3,13 +3,19 @@ import { Hono } from "hono";
 import { createAuthHttpRouter } from "@/modules/auth-http/router";
 import type { AppHonoEnv } from "@/app/types";
 
-const buildApp = (handler: (request: Request) => Promise<Response>) => {
+const buildApp = ({
+  handler,
+  api,
+}: {
+  handler?: (request: Request) => Promise<Response>;
+  api?: Record<string, unknown>;
+} = {}) => {
   const app = new Hono<AppHonoEnv>();
 
   app.use("*", async (c, next) => {
     c.set("auth", {
-      handler,
-      api: {},
+      handler: handler ?? (async () => new Response(null, { status: 404 })),
+      api: api ?? {},
     } as AppHonoEnv["Variables"]["auth"]);
     await next();
   });
@@ -34,7 +40,7 @@ describe("auth http router", () => {
         },
       };
     });
-    const app = buildApp(handler);
+    const app = buildApp({ handler });
 
     const response = await app.request("/api/auth/sign-up/email", {
       method: "POST",
@@ -53,5 +59,45 @@ describe("auth http router", () => {
       code: "USER_ALREADY_EXISTS",
       message: "An account already exists for this email",
     });
+  });
+
+  it("sends password setup links for authenticated users", async () => {
+    const getSession = vi.fn(async () => ({
+      session: { id: "session-1", userId: "user-1" },
+      user: {
+        id: "user-1",
+        email: "foo@example.com",
+        emailVerified: true,
+      },
+    }));
+    const requestPasswordReset = vi.fn(async () => ({ status: true }));
+    const app = buildApp({
+      api: {
+        getSession,
+        requestPasswordReset,
+      },
+    });
+
+    const response = await app.request("/api/auth/password-setup-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        callbackURL: "https://app.example.com/reset-password",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: true });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          email: "foo@example.com",
+          redirectTo: "https://app.example.com/reset-password",
+        },
+      })
+    );
   });
 });

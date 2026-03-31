@@ -252,6 +252,37 @@ export const useRequestPasswordResetMutation = () => {
   });
 };
 
+export const useSendPasswordSetupEmailMutation = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`${API_BASE}/api/auth/password-setup-link`, {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          callbackURL: getResetPasswordRedirectURL(),
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        status?: boolean;
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new AuthMutationError(
+          payload?.error || "Unable to send password setup email"
+        );
+      }
+
+      return payload;
+    },
+  });
+};
+
 export const useResetPasswordMutation = () => {
   return useMutation({
     mutationFn: async (values: { token: string; newPassword: string }) => {

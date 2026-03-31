@@ -1,9 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { AppHonoEnv } from "@/app/types";
+import { requireAuth } from "@/app/middleware/require-auth";
 import { handleAuthRequest } from "./handler";
-import { resendVerificationSchema } from "./schemas";
-import { resendVerificationEmail } from "./service";
+import {
+  requestPasswordSetupLinkSchema,
+  resendVerificationSchema,
+} from "./schemas";
+import { requestPasswordSetupLink, resendVerificationEmail } from "./service";
 
 export const createAuthHttpRouter = () => {
   const router = new Hono<AppHonoEnv>();
@@ -19,6 +23,21 @@ export const createAuthHttpRouter = () => {
     async c => {
       const payload = c.req.valid("json");
       return resendVerificationEmail(c, payload);
+    }
+  );
+
+  router.post(
+    "/auth/password-setup-link",
+    requireAuth,
+    zValidator("json", requestPasswordSetupLinkSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: "invalid password setup request" }, 400);
+      }
+      return undefined;
+    }),
+    async c => {
+      const payload = c.req.valid("json");
+      return requestPasswordSetupLink(c, payload);
     }
   );
 
