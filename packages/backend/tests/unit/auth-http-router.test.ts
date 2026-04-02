@@ -99,7 +99,13 @@ describe("auth http router", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: true });
     expect(getSession).toHaveBeenCalledTimes(1);
-    expect(requestPasswordReset).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          redirectTo: "https://app.example.com/reset-password",
+        }),
+      })
+    );
   });
 
   it("returns 500 when password setup email delivery fails", async () => {
@@ -153,6 +159,38 @@ describe("auth http router", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: "invalid password setup request",
+    });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when the authenticated session email is invalid", async () => {
+    const getSession = vi.fn(async () => ({
+      ...createVerifiedSession(),
+      user: {
+        ...createVerifiedSession().user,
+        email: "not-an-email",
+      },
+    }));
+    const requestPasswordReset = vi.fn(async () => ({ status: true }));
+    const app = buildApp({
+      api: {
+        getSession,
+        requestPasswordReset,
+      },
+    });
+
+    const response = await app.request("/api/auth/password-setup-link", {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify({
+        callbackURL: "https://app.example.com/reset-password",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "valid email is required",
     });
     expect(getSession).toHaveBeenCalledTimes(1);
     expect(requestPasswordReset).not.toHaveBeenCalled();

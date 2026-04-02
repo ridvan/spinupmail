@@ -38,6 +38,9 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
 export const ChangePasswordPanel = ({
   withCard = true,
   wrapperId,
@@ -52,10 +55,11 @@ export const ChangePasswordPanel = ({
   contentClassName?: string;
 }) => {
   const { user, refreshSession } = useAuth();
-  const hasValidUserEmail =
-    typeof user?.email === "string" && user.email.length > 0;
+  const trimmedUserEmail =
+    typeof user?.email === "string" ? user.email.trim() : "";
+  const hasValidUserEmail = isValidEmail(trimmedUserEmail);
   const userEmail = hasValidUserEmail
-    ? user.email
+    ? trimmedUserEmail
     : "an account without a verified email";
   const linkedAccountsQuery = useQuery({
     queryKey: ["auth", "accounts", user?.id],
