@@ -9,6 +9,57 @@ import {
 } from "./schemas";
 import { requestPasswordSetupLink, resendVerificationEmail } from "./service";
 
+const toAllowedOrigin = (value: string | undefined) => {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+};
+
+const isAllowedPasswordSetupCallbackURL = (
+  c: {
+    req: {
+      header(name: string): string | undefined;
+    };
+    env?: {
+      CORS_ORIGIN?: string;
+      BETTER_AUTH_BASE_URL?: string;
+    };
+  },
+  callbackURL: string
+) => {
+  const callbackOrigin = toAllowedOrigin(callbackURL);
+  if (!callbackOrigin) return false;
+
+  const allowedOrigins = new Set<string>();
+  const env = c.env;
+  const requestOrigin = toAllowedOrigin(c.req.header("origin"));
+  if (requestOrigin) {
+    allowedOrigins.add(requestOrigin);
+  }
+
+  for (const origin of env?.CORS_ORIGIN?.split(",") ?? []) {
+    const allowedOrigin = toAllowedOrigin(origin.trim());
+    if (allowedOrigin) {
+      allowedOrigins.add(allowedOrigin);
+    }
+  }
+
+  const authOrigin = toAllowedOrigin(env?.BETTER_AUTH_BASE_URL?.trim());
+  if (authOrigin) {
+    allowedOrigins.add(authOrigin);
+  }
+
+  return allowedOrigins.has(callbackOrigin);
+};
+
 export const createAuthHttpRouter = () => {
   const router = new Hono<AppHonoEnv>();
 
@@ -31,6 +82,12 @@ export const createAuthHttpRouter = () => {
     requireAuth,
     zValidator("json", requestPasswordSetupLinkSchema, (result, c) => {
       if (!result.success) {
+        return c.json({ error: "invalid password setup request" }, 400);
+      }
+      if (
+        result.data.callbackURL &&
+        !isAllowedPasswordSetupCallbackURL(c, result.data.callbackURL)
+      ) {
         return c.json({ error: "invalid password setup request" }, 400);
       }
       return undefined;

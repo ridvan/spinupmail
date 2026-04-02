@@ -33,10 +33,6 @@ const changePasswordSchema = z
     path: ["confirmPassword"],
   });
 
-type LinkedAccountSummary = {
-  providerId?: string | null;
-};
-
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
@@ -56,10 +52,11 @@ export const ChangePasswordPanel = ({
   contentClassName?: string;
 }) => {
   const { user, refreshSession } = useAuth();
-  const userEmail =
-    typeof user?.email === "string" && user.email.length > 0
-      ? user.email
-      : "your account email";
+  const hasValidUserEmail =
+    typeof user?.email === "string" && user.email.length > 0;
+  const userEmail = hasValidUserEmail
+    ? user.email
+    : "an account without a verified email";
   const linkedAccountsQuery = useQuery({
     queryKey: ["auth", "accounts", user?.id],
     enabled: Boolean(user),
@@ -72,7 +69,7 @@ export const ChangePasswordPanel = ({
         );
       }
 
-      return (result.data ?? []) as LinkedAccountSummary[];
+      return result.data ?? [];
     },
   });
   const sendPasswordSetupEmailMutation = useSendPasswordSetupEmailMutation();
@@ -85,7 +82,11 @@ export const ChangePasswordPanel = ({
   const shouldShowPasswordSetup =
     Boolean(user) && linkedAccountsQuery.isSuccess && !hasCredentialAccount;
   const shouldShowChangePasswordForm =
-    !user || (linkedAccountsQuery.isSuccess && hasCredentialAccount);
+    Boolean(user) && linkedAccountsQuery.isSuccess && hasCredentialAccount;
+  const canSendPasswordSetupLink =
+    Boolean(user) &&
+    hasValidUserEmail &&
+    !sendPasswordSetupEmailMutation.isPending;
 
   const changePasswordMutation = useMutation({
     mutationFn: async (payload: {
@@ -183,19 +184,29 @@ export const ChangePasswordPanel = ({
         {shouldShowPasswordSetup ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
-              <p>
-                This account doesn&apos;t have a password yet. We&apos;ll send a
-                secure setup link to{" "}
-                <span className="text-foreground">{userEmail}</span> so you can
-                add one without needing a current password.
-              </p>
+              {hasValidUserEmail ? (
+                <p>
+                  This account doesn&apos;t have a password yet. We&apos;ll send
+                  a secure setup link to{" "}
+                  <span className="text-foreground">{userEmail}</span> so you
+                  can add one without needing a current password.
+                </p>
+              ) : (
+                <p>
+                  This account doesn&apos;t have a password yet, but it&apos;s
+                  currently linked to{" "}
+                  <span className="text-foreground">{userEmail}</span>. Add and
+                  verify an email address before setting a password.
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end">
               <Button
                 type="button"
-                disabled={!user || sendPasswordSetupEmailMutation.isPending}
+                disabled={!canSendPasswordSetupLink}
                 onClick={async () => {
+                  if (!canSendPasswordSetupLink) return;
                   const setupLinkPromise =
                     sendPasswordSetupEmailMutation.mutateAsync();
 
@@ -210,9 +221,11 @@ export const ChangePasswordPanel = ({
                   });
                 }}
               >
-                {sendPasswordSetupEmailMutation.isPending
-                  ? "Sending..."
-                  : "Email password setup link"}
+                {!hasValidUserEmail
+                  ? "Verified email required"
+                  : sendPasswordSetupEmailMutation.isPending
+                    ? "Sending..."
+                    : "Email password setup link"}
               </Button>
             </div>
           </div>
