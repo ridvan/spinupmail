@@ -94,6 +94,8 @@ const HOST_STYLES = `
     display: block;
     color: inherit;
     height: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   *, *::before, *::after {
@@ -102,16 +104,23 @@ const HOST_STYLES = `
 
   [data-email-content-root] {
     min-height: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 0.75rem;
   }
 
+  html,
   body {
     margin: 0;
+    max-width: 100%;
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   img {
+    display: block;
     height: auto;
     max-width: 100%;
   }

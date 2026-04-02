@@ -76,6 +76,30 @@ describe("EmailHtmlRenderer", () => {
     expect(rendererStyles).toContain("padding: 0.75rem");
   });
 
+  it("caps rendered email content width inside the preview container", async () => {
+    render(
+      <EmailHtmlRenderer
+        html={'<table width="1200"><tr><td>Hello</td></tr></table>'}
+      />
+    );
+
+    const host = screen.getByTestId("email-html-renderer");
+
+    await waitFor(() => {
+      expect(
+        host.shadowRoot?.querySelector("[data-email-content-root]")
+      ).toBeTruthy();
+    });
+
+    const rendererStyles =
+      host.shadowRoot?.querySelector("style")?.textContent ?? "";
+
+    expect(rendererStyles).toContain(":host");
+    expect(rendererStyles).toContain("max-width: 100%");
+    expect(rendererStyles).toContain("min-width: 0");
+    expect(rendererStyles).toContain("overflow-x: auto");
+  });
+
   it("blocks remote assets by default and restores them when enabled", async () => {
     const onRemoteContentBlockedChange = vi.fn();
     const { rerender } = render(

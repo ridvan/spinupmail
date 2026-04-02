@@ -85,7 +85,7 @@ export const EmailHtmlRenderer = ({
 
   return (
     <div
-      className="h-full w-full"
+      className="h-full min-w-0 w-full max-w-full"
       data-testid="email-html-renderer"
       ref={hostRef}
     />

@@ -207,22 +207,24 @@ export const EmailPreview = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-base font-semibold">
+            <p className="truncate text-base font-semibold">
               {email.subject || "No subject"}
             </p>
             {email.isSample ? <Badge variant="secondary">Sample</Badge> : null}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             Sender: {formatSenderLine(email)}
           </p>
-          <p className="text-xs text-muted-foreground">From: {email.from}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            From: {email.from}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-3">
+          <p className="text-right text-xs text-muted-foreground">
             {formatDate(email.receivedAt, effectiveTimeZone)}
           </p>
           <TooltipProvider delay={120}>
@@ -256,11 +258,11 @@ export const EmailPreview = ({
       <Separator />
 
       {email.html ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           {activeRemoteContentState.remoteContentBlocked &&
           !activeRemoteContentState.allowRemoteContent ? (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
-              <p className="text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+              <p className="min-w-0 text-xs text-muted-foreground">
                 Remote images and CSS backgrounds are blocked until you load
                 them for this email.
               </p>
@@ -276,7 +278,7 @@ export const EmailPreview = ({
             </div>
           ) : null}
           <div
-            className={`relative min-h-0 flex-1 overflow-auto rounded-md border border-border/70 bg-background ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
+            className={`relative min-h-0 min-w-0 flex-1 overflow-auto rounded-md border border-border/70 bg-background ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
           >
             <EmailHtmlRenderer
               allowRemoteContent={activeRemoteContentState.allowRemoteContent}
