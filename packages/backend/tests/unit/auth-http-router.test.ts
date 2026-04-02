@@ -100,4 +100,83 @@ describe("auth http router", () => {
       })
     );
   });
+
+  it("returns 500 when password setup email delivery fails", async () => {
+    const getSession = vi.fn(async () => ({
+      session: { id: "session-1", userId: "user-1" },
+      user: {
+        id: "user-1",
+        email: "foo@example.com",
+        emailVerified: true,
+      },
+    }));
+    const requestPasswordReset = vi.fn(async () => {
+      throw new Error("delivery failed");
+    });
+    const app = buildApp({
+      api: {
+        getSession,
+        requestPasswordReset,
+      },
+    });
+
+    const response = await app.request("/api/auth/password-setup-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        callbackURL: "https://app.example.com/reset-password",
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "unable to send password setup email",
+    });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          email: "foo@example.com",
+          redirectTo: "https://app.example.com/reset-password",
+        },
+      })
+    );
+  });
+
+  it("returns 400 for invalid password setup requests", async () => {
+    const getSession = vi.fn(async () => ({
+      session: { id: "session-1", userId: "user-1" },
+      user: {
+        id: "user-1",
+        email: "foo@example.com",
+        emailVerified: true,
+      },
+    }));
+    const requestPasswordReset = vi.fn(async () => ({ status: true }));
+    const app = buildApp({
+      api: {
+        getSession,
+        requestPasswordReset,
+      },
+    });
+
+    const response = await app.request("/api/auth/password-setup-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        callbackURL: 123,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid password setup request",
+    });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).not.toHaveBeenCalled();
+  });
 });

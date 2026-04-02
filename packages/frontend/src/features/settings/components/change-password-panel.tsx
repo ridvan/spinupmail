@@ -84,6 +84,8 @@ export const ChangePasswordPanel = ({
   const hasPasswordStateError = Boolean(user) && linkedAccountsQuery.isError;
   const shouldShowPasswordSetup =
     Boolean(user) && linkedAccountsQuery.isSuccess && !hasCredentialAccount;
+  const shouldShowChangePasswordForm =
+    !user || (linkedAccountsQuery.isSuccess && hasCredentialAccount);
 
   const changePasswordMutation = useMutation({
     mutationFn: async (payload: {
@@ -122,8 +124,7 @@ export const ChangePasswordPanel = ({
       await toast.promise(savePromise, {
         loading: "Updating password...",
         success: "Password updated.",
-        error: error =>
-          error instanceof Error ? error.message : "Unable to update password",
+        error: error => getErrorMessage(error, "Unable to update password"),
       });
 
       form.reset({
@@ -159,7 +160,10 @@ export const ChangePasswordPanel = ({
         ) : null}
 
         {hasPasswordStateError ? (
-          <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm">
+          <div
+            role="alert"
+            className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm"
+          >
             <p className="text-muted-foreground">
               We couldn&apos;t load your linked sign-in methods. Try again
               before updating your password.
@@ -214,9 +218,7 @@ export const ChangePasswordPanel = ({
           </div>
         ) : null}
 
-        {!isCheckingPasswordState &&
-        !hasPasswordStateError &&
-        !shouldShowPasswordSetup ? (
+        {shouldShowChangePasswordForm ? (
           <form.Subscribe
             selector={state => ({
               canSubmit: state.canSubmit,
