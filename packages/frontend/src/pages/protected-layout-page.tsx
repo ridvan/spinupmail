@@ -77,22 +77,22 @@ export const ProtectedLayoutPage = () => {
       <AppSidebar onSignOut={handleSignOut} user={user} />
       <SidebarInset>
         <header className="sticky top-0 z-20 border-b border-border/65 bg-sidebar px-4 md:px-6 lg:px-8">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="mx-auto flex h-16 min-w-0 w-full max-w-7xl items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
               <HeaderSidebarTrigger />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium">{pageTitle}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <AppCommandMenu onSignOut={handleSignOut} />
               <ModeToggle />
             </div>
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col px-4 py-6 md:px-6 lg:px-8">
-          <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-4 py-6 md:px-6 lg:px-8">
+          <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-7xl flex-1 flex-col">
             {signOutError ? (
               <p className="mb-4 text-sm text-destructive">{signOutError}</p>
             ) : null}

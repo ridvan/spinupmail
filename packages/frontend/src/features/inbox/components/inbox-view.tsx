@@ -240,7 +240,7 @@ export const InboxView = ({
   }, [addressCommandOpen]);
 
   return (
-    <div className="flex min-h-0 max-h-[750px] flex-1 flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10 md:flex-row">
+    <div className="flex min-h-0 min-w-0 max-h-[750px] w-full flex-1 flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10 md:flex-row">
       {/* Left panel: Address selector + Email list */}
       <div className="flex w-full shrink-0 flex-col bg-card/40 md:w-[380px]">
         {/* Address selector */}
@@ -532,7 +532,7 @@ export const InboxView = ({
       </div>
 
       {/* Right panel: Email preview */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto border-t border-border/70 bg-card/20 md:border-l md:border-t-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto border-t border-border/70 bg-card/20 md:border-l md:border-t-0">
         {previewEmailLoading ? (
           <div className="space-y-3 p-5">
             <div className="flex items-start justify-between gap-3">
@@ -556,7 +556,7 @@ export const InboxView = ({
             <Skeleton className="h-96 w-full rounded-md bg-muted/60" />
           </div>
         ) : previewEmail ? (
-          <div className="flex min-h-full min-w-0 flex-1 flex-col p-5">
+          <div className="flex min-h-full min-w-0 flex-1 flex-col overflow-x-hidden p-5">
             <EmailPreview email={previewEmail} />
           </div>
         ) : (

@@ -91,6 +91,7 @@ const BLOCKED_CSS_PROPERTIES = new Set(["behavior", "-moz-binding"]);
 const REMOTE_CONTENT_ATTRIBUTES = ["background", "poster", "src"] as const;
 const HOST_STYLES = `
   :host {
+    contain: inline-size;
     display: block;
     color: inherit;
     height: 100%;
@@ -106,15 +107,15 @@ const HOST_STYLES = `
     min-height: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
     padding: 0.75rem;
+    width: 100%;
   }
 
   html,
   body {
     margin: 0;
     max-width: 100%;
+    min-width: 0;
     overflow-wrap: anywhere;
     word-break: break-word;
   }

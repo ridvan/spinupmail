@@ -95,9 +95,10 @@ describe("EmailHtmlRenderer", () => {
       host.shadowRoot?.querySelector("style")?.textContent ?? "";
 
     expect(rendererStyles).toContain(":host");
+    expect(rendererStyles).toContain("contain: inline-size");
     expect(rendererStyles).toContain("max-width: 100%");
     expect(rendererStyles).toContain("min-width: 0");
-    expect(rendererStyles).toContain("overflow-x: auto");
+    expect(rendererStyles).toContain("width: 100%");
   });
 
   it("blocks remote assets by default and restores them when enabled", async () => {
