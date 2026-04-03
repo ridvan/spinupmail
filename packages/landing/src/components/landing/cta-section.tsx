@@ -15,7 +15,7 @@ export function CtaSection() {
   const docsRender = landingLinks.docs.startsWith("http") ? (
     <a href={landingLinks.docs} target="_blank" rel="noreferrer" />
   ) : (
-    <Link to="/docs/$slug" params={{ slug: "quickstart" }} />
+    <Link to="/docs/$slug" params={{ slug: "installation" }} />
   );
 
   return (
@@ -62,7 +62,7 @@ export function CtaSection() {
                     })}
               >
                 <Button size="lg" nativeButton={false} render={docsRender}>
-                  Start Quickstart
+                  Open Installation
                   <HugeiconsIcon
                     icon={ArrowRight01Icon}
                     data-icon="inline-end"

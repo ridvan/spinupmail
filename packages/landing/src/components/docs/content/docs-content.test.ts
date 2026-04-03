@@ -4,7 +4,7 @@ import { buildDocToc, docPages, getDocPageBySlug } from "./docs-content";
 describe("docs-content", () => {
   it("contains all required documentation slugs", () => {
     const requiredSlugs = [
-      "quickstart",
+      "installation",
       "api-overview",
       "api-domains",
       "api-organizations",

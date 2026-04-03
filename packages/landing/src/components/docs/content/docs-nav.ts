@@ -5,7 +5,7 @@ export const docsNavGroups: Array<DocNavGroup> = [
     id: "get-started",
     title: "Get Started",
     description: "Install and first run.",
-    slugs: ["quickstart"],
+    slugs: ["installation"],
   },
   {
     id: "api-reference",

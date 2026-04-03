@@ -128,7 +128,7 @@ function ResultIcon({ href }: { href: string }) {
   }
 
   const iconBySlug = {
-    quickstart: Rocket01Icon,
+    installation: Rocket01Icon,
     "api-overview": BookOpen01Icon,
     "api-domains": LayoutIcon,
     "api-organizations": UserMultiple02Icon,

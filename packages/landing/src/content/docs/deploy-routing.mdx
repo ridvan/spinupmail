@@ -1,37 +1,101 @@
 ---
 title: Deploy and Routing
-description: Deploy backend and frontend, then route API traffic to Worker.
-summary: Run backend Worker and frontend Pages as separate deploy units, then route `/api/*`.
+description: Deploy the backend Worker and frontend Pages app, then connect custom domains and email routing.
+summary: Ship the API and UI as separate Cloudflare deploy units and wire a dedicated API subdomain plus inbound email routing.
 groupId: configuration
 keywords:
   - deploy
   - workers
   - pages
   - routing
-  - api
+  - custom domains
+  - email routing
 ---
 
-## Deploy backend Worker
+Spinupmail deploys as two Cloudflare applications: a Worker for the API and
+email handler, and a Pages project for the frontend. The README also treats
+routing as a separate step, which is the right mental model: deploying the code
+is not the same as wiring traffic to it.
+
+## Deploy the backend Worker
+
+From the repository root, deploy the Worker with:
 
 ```bash
 pnpm -C packages/backend deploy
 ```
 
-## Deploy frontend Pages
+If you want automatic deployments in Cloudflare, connect the Worker to your Git
+repository with these settings from the README:
 
-Set Pages root directory to `packages/frontend` and output directory to `dist`.
+| Setting | Value |
+| --- | --- |
+| Root directory | `packages/backend` |
+| Build command | Leave empty |
+| Deploy command | `pnpm run deploy` |
+| Non-production branch builds | Optional |
 
-```env
-VITE_AUTH_BASE_URL=/api/auth
-VITE_API_BASE_URL=/api
+After the Worker is live, add a custom API domain in the Worker dashboard, for
+example `api.spinupmail.com`.
+
+## Deploy the frontend Pages project
+
+Deploy the UI as a Cloudflare Pages project, not as a Worker.
+
+| Setting | Value |
+| --- | --- |
+| Root directory | `packages/frontend` |
+| Framework preset | `None` |
+| Build command | `pnpm run build` |
+| Output directory | `dist` |
+
+Set the required frontend environment variables in Pages:
+
+```dotenv
+VITE_AUTH_BASE_URL=https://api.spinupmail.com/api/auth
+VITE_API_BASE_URL=https://api.spinupmail.com
 VITE_TURNSTILE_SITE_KEY=<site-key>
 ```
 
-## Route API paths to Worker
+For local development, the same values usually point to `http://localhost:8787`
+instead.
 
-Configure route mapping such as `spinupmail.com/api/*` -> `spinupmail` Worker.
+After the first Pages deploy succeeds, attach your frontend custom domain, such
+as `app.spinupmail.com`, from the Pages dashboard.
+
+## Choose your API routing topology
+
+Spinupmail works best with a dedicated API hostname such as
+`api.spinupmail.com`. A same-host setup where the Worker handles `/api/*` is
+still possible, but it should be treated as a fallback.
+
+| Topology | When to use it | Example values |
+| --- | --- | --- |
+| Dedicated API domain | Default and recommended for production | `VITE_API_BASE_URL=https://api.spinupmail.com`, `VITE_AUTH_BASE_URL=https://api.spinupmail.com/api/auth` |
+| Same host with `/api/*` routing | Optional fallback when you intentionally want one public host | `VITE_API_BASE_URL=/api`, `VITE_AUTH_BASE_URL=/api/auth` |
 
 <Callout tone="success" title="Recommended topology">
-  Keep frontend and API on the same host with path-based routing for simpler
-  auth and CORS.
+  Use a dedicated API subdomain first. It keeps the frontend and API routing
+  explicit and matches the rest of the production examples in this docs set.
+</Callout>
+
+If you choose the same-host fallback, configure a route like
+`your-domain.com/api/*` to the Worker so the frontend can call the API with
+relative URLs.
+
+## Configure inbound email routing
+
+Inbound email requires one extra Cloudflare dashboard step even after the
+Worker is deployed.
+
+1. Open Cloudflare Email Routing for each inbound domain.
+2. Onboard the domain if needed.
+3. Create a catch-all routing rule.
+4. Set the action to send mail to your deployed Worker.
+
+Repeat that rule for every domain listed in `EMAIL_DOMAINS`.
+
+<Callout tone="warning" title="Deploying the Worker is not enough">
+  Real email will not reach Spinupmail until Cloudflare Email Routing is
+  configured and pointed at the deployed Worker.
 </Callout>

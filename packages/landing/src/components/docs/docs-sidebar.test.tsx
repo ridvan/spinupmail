@@ -22,9 +22,9 @@ vi.mock("@tanstack/react-router", async () => {
 
 describe("DocsSidebar", () => {
   it("marks the current page and allows section toggling", () => {
-    render(<DocsSidebar currentSlug="quickstart" />);
+    render(<DocsSidebar currentSlug="installation" />);
 
-    const current = screen.getByRole("link", { name: "Quickstart" });
+    const current = screen.getByRole("link", { name: "Installation" });
     expect(current.getAttribute("aria-current")).toBe("page");
 
     const configurationToggle = screen.getByRole("button", {
@@ -39,7 +39,7 @@ describe("DocsSidebar", () => {
 
   it("calls onNavigate when a link is selected", () => {
     const onNavigate = vi.fn();
-    render(<DocsSidebar currentSlug="quickstart" onNavigate={onNavigate} />);
+    render(<DocsSidebar currentSlug="installation" onNavigate={onNavigate} />);
 
     fireEvent.click(screen.getByRole("link", { name: "Overview" }));
 

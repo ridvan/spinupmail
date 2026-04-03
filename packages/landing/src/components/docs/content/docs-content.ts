@@ -55,17 +55,81 @@ type DocIndexItem = {
 };
 
 const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
-  quickstart: {
+  installation: {
     headings: [
       { id: "prerequisites", title: "Prerequisites", level: 2 },
-      { id: "install-and-run", title: "Install and run", level: 2 },
-      { id: "first-successful-flow", title: "First successful flow", level: 2 },
-      { id: "first-api-check", title: "First API check", level: 3 },
+      {
+        id: "install-dependencies",
+        title: "Install dependencies",
+        level: 2,
+      },
+      {
+        id: "configure-cloudflare-resources",
+        title: "Configure Cloudflare resources",
+        level: 2,
+      },
+      { id: "create-d1-database", title: "Create D1 database", level: 3 },
+      { id: "create-kv-namespace", title: "Create KV namespace", level: 3 },
+      { id: "create-r2-bucket", title: "Create R2 bucket", level: 3 },
+      { id: "durable-objects", title: "Durable objects", level: 3 },
+      {
+        id: "backend-environment-variables-and-secrets",
+        title: "Backend environment variables and secrets",
+        level: 2,
+      },
+      {
+        id: "creating-turnstile-key",
+        title: "Creating Turnstile key",
+        level: 3,
+      },
+      {
+        id: "add-domain-to-resend-and-get-api-key",
+        title: "Add domain to Resend and get API key",
+        level: 3,
+      },
+      { id: "google-oauth-setup", title: "Google OAuth setup", level: 3 },
+      {
+        id: "database-migrations",
+        title: "Database migrations",
+        level: 2,
+      },
+      {
+        id: "deploy-the-backend-worker",
+        title: "Deploy the backend worker",
+        level: 2,
+      },
+      {
+        id: "configure-email-routing",
+        title: "Configure email routing",
+        level: 2,
+      },
+      {
+        id: "configure-custom-domain-for-worker-api",
+        title: "Configure custom domain for Worker API",
+        level: 2,
+      },
+      { id: "worker-config", title: "Worker config", level: 3 },
+      { id: "ui-behavior", title: "UI behavior", level: 3 },
+      { id: "deploy-the-frontend", title: "Deploy the frontend", level: 2 },
+      {
+        id: "local-environment-variables",
+        title: "Local environment variables",
+        level: 3,
+      },
+      {
+        id: "set-up-frontend-custom-domain",
+        title: "Set up frontend custom domain",
+        level: 2,
+      },
+      { id: "api-usage", title: "API usage", level: 2 },
+      { id: "local-development", title: "Local development", level: 2 },
+      { id: "local-email-testing", title: "Local email testing", level: 2 },
+      { id: "notes", title: "Notes", level: 2 },
     ],
     searchText:
-      "Cloudflare domain nameservers Email Routing pnpm local development setup sign up create organization temporary address",
+      "Spinupmail installation Cloudflare Email Routing Workers Pages pnpm D1 KV R2 secrets migrations deploy API subdomain custom domain local development",
     codeText:
-      "pnpm install pnpm -C packages/backend dev pnpm -C packages/frontend dev X-API-Key X-Org-Id",
+      "pnpm install pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments pnpm exec wrangler secret put pnpm -C packages/backend db:migrate:dev pnpm -C packages/backend deploy VITE_AUTH_BASE_URL VITE_API_BASE_URL VITE_TURNSTILE_SITE_KEY pnpm -C packages/backend dev pnpm -C packages/frontend dev",
   },
   "api-overview": {
     headings: [
@@ -96,7 +160,7 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "API overview base URL session cookie API key X-Org-Id health check Better Auth product API reference",
+      "API overview base URL dedicated API domain session cookie API key X-Org-Id health check Better Auth product API reference",
     codeText:
       "GET /health X-API-Key X-Org-Id /api/domains /api/organizations/stats /api/email-addresses /api/emails",
   },
@@ -115,6 +179,11 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
   "api-organizations": {
     headings: [
       {
+        id: "create-organization",
+        title: "Create organization",
+        level: 2,
+      },
+      {
         id: "list-organization-stats",
         title: "List organization stats",
         level: 2,
@@ -131,9 +200,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "organization stats email activity summary X-Org-Id timezone daily count attachment totals busiest inboxes",
+      "organizations create organization stats email activity summary X-Org-Id timezone daily count attachment totals busiest inboxes starter inbox",
     codeText:
-      "GET /api/organizations/stats GET /api/organizations/stats/email-activity GET /api/organizations/stats/email-summary invalid timezone",
+      "POST /api/organizations GET /api/organizations/stats GET /api/organizations/stats/email-activity GET /api/organizations/stats/email-summary invalid timezone",
   },
   "api-email-addresses": {
     headings: [
@@ -153,6 +222,11 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
         level: 2,
       },
       {
+        id: "get-an-email-address",
+        title: "Get an email address",
+        level: 2,
+      },
+      {
         id: "update-an-email-address",
         title: "Update an email address",
         level: 2,
@@ -164,9 +238,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "email addresses allowedFromDomains maxReceivedEmailCount maxReceivedEmailAction ttl localPart acceptedRiskNotice recent activity cursor",
+      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction ttl localPart acceptedRiskNotice recent activity cursor search",
     codeText:
-      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id",
+      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id",
   },
   "api-emails": {
     headings: [
@@ -197,65 +271,128 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "emails address or addressId required raw source not available attachment content not found raw download path",
+      "emails address or addressId required search raw source not available attachment content not found raw download path senderLabel inline attachment",
     codeText:
-      "GET /api/emails GET /api/emails/:id GET /api/emails/:id/raw GET /api/emails/:id/attachments/:attachmentId DELETE /api/emails/:id",
+      "GET /api/emails search GET /api/emails/:id GET /api/emails/:id/raw GET /api/emails/:id/attachments/:attachmentId inline DELETE /api/emails/:id",
   },
   "cloudflare-resources": {
     headings: [
-      { id: "create-d1-kv-and-r2", title: "Create D1, KV, and R2", level: 2 },
       {
-        id: "configure-worker-bindings",
-        title: "Configure Worker bindings",
+        id: "provision-the-required-resources",
+        title: "Provision the required resources",
         level: 2,
       },
       {
-        id: "domain-configuration-strategy",
-        title: "Domain configuration strategy",
+        id: "copy-the-backend-wrangler-config",
+        title: "Copy the backend Wrangler config",
+        level: 2,
+      },
+      {
+        id: "fill-the-worker-variables",
+        title: "Fill the Worker variables",
+        level: 2,
+      },
+      {
+        id: "required-variables",
+        title: "Required variables",
+        level: 3,
+      },
+      {
+        id: "common-optional-variables",
+        title: "Common optional variables",
+        level: 3,
+      },
+      {
+        id: "domain-strategy-and-routing-prep",
+        title: "Domain strategy and routing prep",
         level: 2,
       },
     ],
     searchText:
-      "Cloudflare resources D1 KV R2 wrangler bindings EMAIL_DOMAINS AUTH_ALLOWED_EMAIL_DOMAIN",
+      "Cloudflare resources D1 KV R2 Durable Objects wrangler bindings EMAIL_DOMAINS RESEND_FROM_EMAIL AUTH_ALLOWED_EMAIL_DOMAIN preview bucket",
     codeText:
-      "wrangler d1 create wrangler kv namespace create wrangler r2 bucket create wrangler.toml",
+      "pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments spinupmail-attachments-preview wrangler.toml.example durable_objects ABUSE_COUNTERS",
   },
   "auth-secrets": {
     headings: [
       {
-        id: "required-worker-secrets",
-        title: "Required Worker secrets",
+        id: "set-the-production-worker-secrets",
+        title: "Set the production Worker secrets",
         level: 2,
       },
       {
-        id: "set-better-auth-base-url",
-        title: "Set Better Auth Base URL",
+        id: "add-local-development-secrets",
+        title: "Add local development secrets",
         level: 2,
       },
       {
-        id: "google-oauth-callback-setup",
-        title: "Google OAuth callback setup",
+        id: "configure-turnstile-and-resend",
+        title: "Configure Turnstile and Resend",
+        level: 2,
+      },
+      {
+        id: "turnstile",
+        title: "Turnstile",
+        level: 3,
+      },
+      {
+        id: "resend",
+        title: "Resend",
+        level: 3,
+      },
+      {
+        id: "configure-google-oauth-callbacks",
+        title: "Configure Google OAuth callbacks",
+        level: 2,
+      },
+      {
+        id: "authorized-javascript-origins",
+        title: "Authorized JavaScript origins",
+        level: 3,
+      },
+      {
+        id: "authorized-redirect-uris",
+        title: "Authorized redirect URIs",
+        level: 3,
+      },
+      {
+        id: "optional-auth-domain-restriction",
+        title: "Optional auth domain restriction",
         level: 2,
       },
     ],
     searchText:
-      "Better Auth Google OAuth Resend Turnstile secrets CORS_ORIGIN callback",
+      "Better Auth Google OAuth Resend Turnstile secrets CORS_ORIGIN BETTER_AUTH_BASE_URL callbacks trusted origins dedicated API domain local dev",
     codeText:
-      "BETTER_AUTH_SECRET BETTER_AUTH_BASE_URL GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY",
+      "BETTER_AUTH_SECRET BETTER_AUTH_BASE_URL CORS_ORIGIN GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY VITE_TURNSTILE_SITE_KEY",
   },
   "deploy-routing": {
     headings: [
-      { id: "deploy-backend-worker", title: "Deploy backend Worker", level: 2 },
-      { id: "deploy-frontend-pages", title: "Deploy frontend Pages", level: 2 },
       {
-        id: "route-api-paths-to-worker",
-        title: "Route API paths to Worker",
+        id: "deploy-the-backend-worker",
+        title: "Deploy the backend Worker",
+        level: 2,
+      },
+      {
+        id: "deploy-the-frontend-pages-project",
+        title: "Deploy the frontend Pages project",
+        level: 2,
+      },
+      {
+        id: "choose-your-api-routing-topology",
+        title: "Choose your API routing topology",
+        level: 2,
+      },
+      {
+        id: "configure-inbound-email-routing",
+        title: "Configure inbound email routing",
         level: 2,
       },
     ],
-    searchText: "deploy Worker Pages same host path based routing api",
+    searchText:
+      "deploy Worker Pages custom domains dedicated API domain same host path based routing api email routing catch-all",
     codeText:
-      "pnpm -C packages/backend deploy VITE_AUTH_BASE_URL VITE_API_BASE_URL",
+      "pnpm -C packages/backend deploy VITE_AUTH_BASE_URL VITE_API_BASE_URL VITE_TURNSTILE_SITE_KEY api.spinupmail.com /api/*",
   },
   "inbound-pipeline": {
     headings: [
@@ -295,13 +432,37 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
   },
   "limits-security": {
     headings: [
-      { id: "size-limits", title: "Size limits", level: 2 },
-      { id: "storage-toggles", title: "Storage toggles", level: 2 },
-      { id: "access-boundaries", title: "Access boundaries", level: 2 },
+      { id: "product-caps", title: "Product caps", level: 2 },
+      {
+        id: "email-and-attachment-limits",
+        title: "Email and attachment limits",
+        level: 2,
+      },
+      {
+        id: "storage-and-raw-email-toggles",
+        title: "Storage and raw email toggles",
+        level: 2,
+      },
+      {
+        id: "auth-and-api-rate-limits",
+        title: "Auth and API rate limits",
+        level: 2,
+      },
+      {
+        id: "verification-resend-throttling",
+        title: "Verification resend throttling",
+        level: 3,
+      },
+      {
+        id: "retrieval-boundaries",
+        title: "Retrieval boundaries",
+        level: 2,
+      },
     ],
-    searchText: "limits security attachment raw mime headers org membership",
+    searchText:
+      "limits security organizations members addresses attachments raw email rate limiting verification resend X-Org-Id",
     codeText:
-      "EMAIL_MAX_BYTES EMAIL_BODY_MAX_BYTES EMAIL_ATTACHMENT_MAX_BYTES EMAIL_STORE_HEADERS_IN_DB EMAIL_STORE_RAW_IN_DB EMAIL_STORE_RAW_IN_R2",
+      "MAX_ADDRESSES_PER_ORGANIZATION EMAIL_MAX_BYTES EMAIL_BODY_MAX_BYTES EMAIL_ATTACHMENT_MAX_BYTES EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION EMAIL_ATTACHMENTS_ENABLED API_KEY_RATE_LIMIT_WINDOW API_KEY_RATE_LIMIT_MAX AUTH_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX EMAIL_STORE_HEADERS_IN_DB EMAIL_STORE_RAW_IN_DB EMAIL_STORE_RAW_IN_R2",
   },
 };
 

@@ -24,7 +24,7 @@ const groupIconById = {
 } as const;
 
 const pageIconBySlug = {
-  quickstart: Rocket01Icon,
+  installation: Rocket01Icon,
   "api-overview": BookOpen01Icon,
   "api-domains": DatabaseIcon,
   "api-organizations": UserMultiple02Icon,

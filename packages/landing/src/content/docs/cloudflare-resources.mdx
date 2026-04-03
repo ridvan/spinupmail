@@ -1,45 +1,133 @@
 ---
 title: Cloudflare Resources
-description: Create D1, KV, and R2 resources and wire backend bindings.
-summary: Provision Cloudflare dependencies for Spinupmail backend and attachment storage.
+description: Provision the Cloudflare resources Spinupmail expects and wire them into the backend Worker.
+summary: Create D1, KV, R2, and Durable Object bindings, then fill `wrangler.toml` with the right values.
 groupId: configuration
 keywords:
   - cloudflare
   - d1
   - kv
   - r2
+  - durable objects
   - wrangler
 ---
 
-## Create D1, KV, and R2
+Spinupmail depends on a small set of Cloudflare primitives: D1 for relational
+storage, KV for supporting state, R2 for attachments, and a Durable Object
+namespace for abuse tracking. The README is the source of truth here: create
+the resources first, then copy their IDs and names into the backend Worker
+config.
+
+## Provision the required resources
+
+Run the setup commands from `packages/backend`.
 
 ```bash
+cd packages/backend
 pnpm exec wrangler d1 create SUM_DB
 pnpm exec wrangler kv namespace create SUM_KV
 pnpm exec wrangler r2 bucket create spinupmail-attachments
 pnpm exec wrangler r2 bucket create spinupmail-attachments-preview
 ```
 
-## Configure Worker bindings
+Record the values each command returns. You will need them when you edit
+`wrangler.toml`.
 
-Copy and edit the backend wrangler config.
+| Resource | Create command | Save these values |
+| --- | --- | --- |
+| D1 database | `pnpm exec wrangler d1 create SUM_DB` | `binding`, `database_name`, `database_id` |
+| KV namespace | `pnpm exec wrangler kv namespace create SUM_KV` | `binding`, `id` |
+| R2 bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments` | `bucket_name` |
+| R2 preview bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments-preview` | `bucket_name` |
+
+<Callout tone="info" title="Durable Objects do not need a separate create step">
+  The Durable Object binding and migration already exist in the example
+  Wrangler config. Cloudflare creates the namespace when you deploy the Worker,
+  and individual instances are created on first use.
+</Callout>
+
+## Copy the backend Wrangler config
+
+Start from the example config instead of building the file by hand.
 
 ```bash
 cp packages/backend/wrangler.toml.example packages/backend/wrangler.toml
 ```
 
+Then update the generated file with the resource values you just created.
+
 ```toml
-[vars]
-EMAIL_DOMAINS = "spinupmail.com,spinuptestdomain.com"
-MAX_ADDRESSES_PER_ORGANIZATION = "100"
-EMAIL_ATTACHMENT_MAX_BYTES = "10485760"
+[[d1_databases]]
+binding = "SUM_DB"
+database_name = "SUM_DB"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "SUM_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "spinupmail-attachments"
+preview_bucket_name = "spinupmail-attachments-preview"
 ```
 
-<Callout tone="warning" title="Routing rules are per-domain">
-  If you use multiple inbound domains, configure Email Routing rules for each
-  domain.
+The example config already includes the Durable Object binding and migration:
+
+```toml
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["InboundAbuseCounterDurableObject"]
+
+[[durable_objects.bindings]]
+name = "ABUSE_COUNTERS"
+class_name = "InboundAbuseCounterDurableObject"
+```
+
+## Fill the Worker variables
+
+Some runtime configuration lives in `[vars]` instead of secrets. These values
+control routing, email limits, and optional product behavior.
+
+### Required variables
+
+| Variable | Purpose |
+| --- | --- |
+| `EMAIL_DOMAINS` | Comma-separated inbound domains handled by Email Routing, such as `spinupmail.com` or `spinupmail.com,spinupmail.dev` |
+| `RESEND_FROM_EMAIL` | Verified sender used for Better Auth verification and password-reset email |
+
+### Common optional variables
+
+| Variable | Default or usage |
+| --- | --- |
+| `AUTH_ALLOWED_EMAIL_DOMAIN` | Restricts sign-up and sign-in to one email domain for internal deployments |
+| `EMAIL_MAX_BYTES` | Max raw email bytes parsed by the Worker |
+| `EMAIL_BODY_MAX_BYTES` | Max HTML and text body bytes persisted in D1 |
+| `EMAIL_FORWARD_TO` | Optional forward target |
+| `EMAIL_ATTACHMENT_MAX_BYTES` | Max size per attachment uploaded to R2 |
+| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | Total attachment quota per organization, default `104857600` |
+| `EMAIL_ATTACHMENTS_ENABLED` | Toggle attachment processing, default `true` |
+| `MAX_ADDRESSES_PER_ORGANIZATION` | Address cap per org, default `100` |
+| `API_KEY_RATE_LIMIT_WINDOW` and `API_KEY_RATE_LIMIT_MAX` | Rate limit window and max for `x-api-key` traffic |
+| `AUTH_RATE_LIMIT_WINDOW` and `AUTH_RATE_LIMIT_MAX` | Better Auth global rate limiting |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | Change-email rate limiting |
+| `EMAIL_STORE_HEADERS_IN_DB` | Persist full headers in D1 |
+| `EMAIL_STORE_RAW_IN_DB` | Persist raw MIME in D1 |
+| `EMAIL_STORE_RAW_IN_R2` | Persist raw MIME in private R2 for debugging |
+
+## Domain strategy and routing prep
+
+`EMAIL_DOMAINS` is the inbound source of truth. If you configure multiple
+domains, Spinupmail treats them as valid receiving domains and the UI will show
+a domain selector during address creation. If you configure only one domain,
+the app uses it automatically.
+
+<Callout tone="warning" title="Routing rules are per domain">
+  Cloudflare Email Routing rules are not shared across domains. Every domain in
+  `EMAIL_DOMAINS` needs its own catch-all rule that sends mail to the Worker.
 </Callout>
 
-## Domain configuration strategy
-
-Use `EMAIL_DOMAINS` as the source of truth for inbound domains. If you want auth restricted to one company domain, also set `AUTH_ALLOWED_EMAIL_DOMAIN`.
+If you want Spinupmail to operate as an internal tool, also set
+`AUTH_ALLOWED_EMAIL_DOMAIN`. That keeps email/password auth and Google OAuth
+aligned with one company domain while still letting `EMAIL_DOMAINS` define
+where inbound mail is received.

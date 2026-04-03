@@ -11,11 +11,18 @@ keywords:
   - health
 ---
 
-Spinupmail exposes a product API under `/api/*` for domain discovery, organization metrics, inbox lifecycle operations, and message retrieval. This reference documents that integration-facing surface only. Generic Better Auth routes under `/api/auth/*` are intentionally not expanded here.
+Spinupmail exposes a product API for domain discovery, organization metrics,
+inbox lifecycle operations, and message retrieval. In production, the docs
+assume you expose that API from a dedicated hostname such as
+`https://api.spinupmail.com`, with product endpoints under `/api/*`. This
+reference documents that integration-facing surface only. Generic Better Auth
+routes under `/api/auth/*` are intentionally not expanded here.
 
 ## Base URL and authentication
 
-Use your deployed Worker route as the API base URL, for example `https://api.spinupmail.com/api`.
+Use your dedicated API hostname as the API base URL, for example
+`https://api.spinupmail.com`. Product endpoints are then called under `/api`,
+such as `https://api.spinupmail.com/api/email-addresses`.
 
 Product endpoints accept either of these auth modes:
 

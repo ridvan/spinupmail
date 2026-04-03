@@ -8,6 +8,7 @@ import {
   buildDocToc,
   getDocPageBySlug,
 } from "@/components/docs/content/docs-content";
+import { docsNavGroups } from "@/components/docs/content/docs-nav";
 
 export const Route = createFileRoute("/docs")({
   head: () => ({
@@ -31,7 +32,14 @@ function DocsRoute() {
     ? pathname.split("/").filter(Boolean)[1]
     : undefined;
   const page = slug ? getDocPageBySlug(slug) : undefined;
-  const headings = page ? buildDocToc(page) : [];
+  const headings = page
+    ? buildDocToc(page)
+    : docsNavGroups.map(group => ({
+        id: group.id,
+        title: group.title,
+        level: 2 as const,
+        href: `#${group.id}`,
+      }));
 
   return (
     <DocsLayout currentSlug={slug} headings={headings}>

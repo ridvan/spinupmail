@@ -1,37 +1,114 @@
 ---
 title: Limits and Security
-description: Operational limits, storage flags, and access protections.
-summary: Tune storage behavior and size limits while preserving org-safe access boundaries.
+description: Current product caps, storage limits, and auth protections enforced by Spinupmail.
+summary: Review the live defaults for organizations, addresses, attachments, rate limiting, and org-scoped access control.
 groupId: operations
 keywords:
   - limits
   - security
+  - rate limiting
   - attachments
   - raw
   - headers
 ---
 
-## Size limits
+This page collects the current limits reflected in the README and backend
+defaults. Some of these values are fixed product caps, while others are runtime
+settings you can override in `wrangler.toml`.
 
-- `EMAIL_MAX_BYTES`: max raw email bytes parsed by worker
-- `EMAIL_BODY_MAX_BYTES`: max body bytes persisted in D1
-- `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2
+## Product caps
 
-## Storage toggles
+These limits are part of the current Spinupmail product behavior.
 
-- `EMAIL_STORE_HEADERS_IN_DB`
-- `EMAIL_STORE_RAW_IN_DB`
-- `EMAIL_STORE_RAW_IN_R2`
+| Limit | Current value |
+| --- | --- |
+| Organizations per user | `3`, configurable in backend auth setup |
+| Members per organization | `10`, configurable in backend auth setup |
+| Addresses per organization | `100` by default, configurable with `MAX_ADDRESSES_PER_ORGANIZATION` |
 
-<Callout tone="warning" title="Default-safe mode">
-  Raw MIME storage is disabled by default to reduce risk and storage overhead.
+If an organization reaches its address cap, new address creation is blocked
+until the limit is raised or existing addresses are removed.
+
+The organization and membership caps are currently set in the Better Auth
+organization plugin configuration rather than exposed as `wrangler.toml`
+variables.
+
+## Email and attachment limits
+
+These settings control how much inbound mail Spinupmail accepts and stores.
+
+| Variable | Default |
+| --- | --- |
+| `EMAIL_MAX_BYTES` | `524288` bytes for the raw inbound message |
+| `EMAIL_BODY_MAX_BYTES` | `524288` bytes persisted per email body in D1 |
+| `EMAIL_ATTACHMENT_MAX_BYTES` | `10485760` bytes per attachment |
+| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | `104857600` bytes total per organization |
+| `EMAIL_ATTACHMENTS_ENABLED` | `true` |
+
+Oversized message bodies are dropped before D1 persistence to avoid write
+failures. Oversized attachments are skipped, and new attachments are also
+skipped once an organization would exceed its total attachment quota.
+
+<Callout tone="warning" title="Attachment quota is enforced at org scope">
+  The total attachment storage limit applies across all inboxes in the same
+  organization, not per address and not per email.
 </Callout>
 
-## Access boundaries
+## Storage and raw email toggles
 
-Attachment and raw downloads require org membership via session auth or API key + `X-Org-Id`.
+The default posture is intentionally conservative.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `EMAIL_STORE_HEADERS_IN_DB` | `false` | Persist full header JSON in D1 |
+| `EMAIL_STORE_RAW_IN_DB` | `false` | Persist raw MIME in D1 |
+| `EMAIL_STORE_RAW_IN_R2` | `false` | Persist raw MIME in private R2 |
+
+<Callout tone="warning" title="Default-safe mode">
+  Raw MIME storage is disabled by default to reduce storage overhead and avoid
+  retaining more sensitive message data than the product needs for normal
+  operation.
+</Callout>
+
+## Auth and API rate limits
+
+Spinupmail applies both Better Auth throttling and API key throttling.
+
+| Control | Current default |
+| --- | --- |
+| `API_KEY_RATE_LIMIT_WINDOW` | `60` seconds |
+| `API_KEY_RATE_LIMIT_MAX` | `120` requests |
+| `AUTH_RATE_LIMIT_WINDOW` | `60` seconds |
+| `AUTH_RATE_LIMIT_MAX` | Optional override, otherwise Better Auth default |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` | `3600` seconds |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | `2` |
+
+API key throttling also covers Better Auth runtime checks on `/get-session` and
+`/organization/get-full-organization`, not just the application endpoints.
+
+### Verification resend throttling
+
+Email verification resend is also guarded by backend constants:
+
+| Control | Current value |
+| --- | --- |
+| Cooldown between resend attempts | `60` seconds |
+| IP window | `300` seconds |
+| Max resend attempts per IP window | `5` |
+
+## Retrieval boundaries
+
+Attachments and raw-email downloads are never public. Access requires
+organization membership:
+
+- Session-based requests use the active organization in the current user
+  session.
+- API key requests must include `X-Org-Id`.
+- Attachment downloads use `GET /api/emails/:id/attachments/:attachmentId`.
+- Raw downloads use `GET /api/emails/:id/raw` when raw storage is enabled.
 
 <Callout tone="success" title="Defense in depth">
-  Both inbound policy checks and org-scoped retrieval are required for
-  production-safe operation.
+  Spinupmail combines inbound validation, storage toggles, rate limits, and
+  organization-scoped retrieval so a single misconfiguration does not turn the
+  mailbox surface into public storage.
 </Callout>

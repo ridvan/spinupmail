@@ -1,0 +1,399 @@
+---
+title: Installation
+description: Install Spinupmail, configure Cloudflare, and deploy the backend and frontend.
+summary: Full installation steps from the README, from Cloudflare setup to local development.
+groupId: get-started
+keywords:
+  - installation
+  - pnpm
+  - cloudflare
+  - email routing
+  - deployment
+---
+
+Spinupmail is a Cloudflare Email Routing + Workers app for creating disposable
+addresses, storing inbound email, and reading messages in the UI or over the
+API.
+
+## Prerequisites
+
+- A Cloudflare account with a domain using Cloudflare nameservers
+- Cloudflare Email Routing enabled for the domain
+- `pnpm` installed locally
+
+## Install dependencies
+
+From the repo root:
+
+```bash
+pnpm install
+```
+
+## Configure Cloudflare resources
+
+Open the backend folder first:
+
+```bash
+cd packages/backend
+```
+
+### Create D1 database
+
+```bash
+pnpm exec wrangler d1 create SUM_DB
+```
+
+Save the returned `binding`, `database_name`, and `database_id`.
+
+### Create KV namespace
+
+```bash
+pnpm exec wrangler kv namespace create SUM_KV
+```
+
+Save the returned `binding` and `id`.
+
+### Create R2 bucket
+
+```bash
+pnpm exec wrangler r2 bucket create spinupmail-attachments
+```
+
+Save the returned `bucket_name`. In `packages/backend/wrangler.toml`, keep the
+Worker binding as `R2_BUCKET` and set `bucket_name` to your real Cloudflare
+bucket name.
+
+### Durable objects
+
+This project already includes the Durable Object binding and migration in
+`packages/backend/wrangler.toml.example`.
+
+You do not need to run a separate create command for Durable Objects. Cloudflare
+creates the namespace when you deploy the Worker with that migration.
+
+Update `packages/backend/wrangler.toml` with your values:
+
+- `[[d1_databases]].database_id`
+- `[[kv_namespaces]].id`
+- `[[r2_buckets]].bucket_name`
+- `[[r2_buckets]].preview_bucket_name`
+- `[vars].EMAIL_DOMAINS`
+- `[vars].RESEND_FROM_EMAIL`
+
+Optional vars from the README:
+
+- `AUTH_ALLOWED_EMAIL_DOMAIN`
+- `EMAIL_MAX_BYTES`
+- `EMAIL_BODY_MAX_BYTES`
+- `EMAIL_FORWARD_TO`
+- `EMAIL_ATTACHMENT_MAX_BYTES`
+- `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION`
+- `EMAIL_ATTACHMENTS_ENABLED`
+- `MAX_ADDRESSES_PER_ORGANIZATION`
+- `API_KEY_RATE_LIMIT_WINDOW`
+- `API_KEY_RATE_LIMIT_MAX`
+- `AUTH_RATE_LIMIT_WINDOW`
+- `AUTH_RATE_LIMIT_MAX`
+- `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW`
+- `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX`
+- `EMAIL_STORE_HEADERS_IN_DB`
+- `EMAIL_STORE_RAW_IN_DB`
+- `EMAIL_STORE_RAW_IN_R2`
+
+For local development, create `packages/backend/.dev.vars`:
+
+```env
+BETTER_AUTH_BASE_URL="http://localhost:8787/api/auth"
+BETTER_AUTH_SECRET=""
+CORS_ORIGIN="http://localhost:5173,http://127.0.0.1:5173"
+RESEND_API_KEY=""
+TURNSTILE_SECRET_KEY=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+```
+
+## Backend environment variables and secrets
+
+Set production secrets from `packages/backend`:
+
+```bash
+pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
+pnpm exec wrangler secret put BETTER_AUTH_SECRET
+pnpm exec wrangler secret put CORS_ORIGIN
+pnpm exec wrangler secret put RESEND_API_KEY
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+Use values like these:
+
+- `BETTER_AUTH_BASE_URL = https://api.<your-domain>/api/auth`
+- `GOOGLE_CLIENT_ID = <google oauth web client id>`
+- `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
+- `RESEND_API_KEY = re_...`
+- `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
+- `RESEND_FROM_EMAIL` should be set in `wrangler.toml` under `[vars]`
+
+### Creating Turnstile key
+
+1. Open the Cloudflare dashboard.
+2. Open **Turnstile**.
+3. Click **Add widget**.
+4. Add your frontend hostnames, such as `localhost`, `127.0.0.1`, and your production frontend domain.
+5. Keep the widget in **Managed** mode.
+6. Create the widget and copy the site key and secret key.
+7. Save the secret key with:
+
+```bash
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
+```
+
+8. Set the frontend env value:
+   - Cloudflare Pages: `VITE_TURNSTILE_SITE_KEY=<your site key>`
+   - Local dev: `packages/frontend/.env`
+
+Use the secret key only on the backend. Use the site key only in the frontend.
+
+### Add domain to Resend and get API key
+
+1. Sign in to [Resend](https://resend.com/).
+2. Add your sending domain.
+3. Add the required DNS records in Cloudflare.
+4. Wait until the domain is verified in Resend.
+5. Create an API key with permission to send email.
+6. Save it with:
+
+```bash
+pnpm exec wrangler secret put RESEND_API_KEY
+```
+
+7. Set `[vars].RESEND_FROM_EMAIL` in `packages/backend/wrangler.toml` to a
+   verified sender, for example
+   `Spinupmail <verify@mail.your-domain.com>`.
+8. Add `RESEND_API_KEY=...` to `packages/backend/.dev.vars` for local use.
+
+### Google OAuth setup
+
+1. Create a Google Cloud project.
+2. Open **APIs & Services** -> **OAuth consent screen**.
+3. Set up the consent screen.
+4. Create an OAuth client with application type **Web application**.
+5. Add these authorized JavaScript origins:
+   - `http://127.0.0.1:5173`
+   - `http://localhost:5173`
+   - `https://<your-frontend-domain>.com`
+6. Add these redirect URIs:
+   - `http://localhost:8787/api/auth/callback/google`
+   - `https://api.<your-domain>/api/auth/callback/google`
+   - `https://<your-frontend-domain>/api/auth/callback/google` only if you intentionally route the Worker under `/api/*` on the frontend host
+7. Save the credentials with:
+
+```bash
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+For local development, also add `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` to `packages/backend/.dev.vars`.
+
+`CORS_ORIGIN` must include your frontend origin or Better Auth callback checks
+will fail.
+
+## Database migrations
+
+Do not hand-edit migrations.
+
+```bash
+pnpm -C packages/backend db:generate
+pnpm -C packages/backend db:migrate:dev
+# for production:
+pnpm -C packages/backend db:migrate:prod
+```
+
+## Deploy the backend worker
+
+```bash
+pnpm -C packages/backend deploy
+```
+
+If you want automatic backend deploys in Cloudflare:
+
+1. Open **Workers & Pages**.
+2. Open your Worker.
+3. Open **Settings**.
+4. Under **Build** -> **Git Repository**, click **Connect**.
+5. Select your forked repository.
+6. Leave **Build command** empty.
+7. Set **Deploy command** to `pnpm run deploy`.
+8. Set **Root directory** to `packages/backend`.
+
+## Configure email routing
+
+1. Open **Email Routing** in Cloudflare.
+2. Click **Onboard Domain**.
+3. Select the correct zone.
+4. Open the domain.
+5. In **Routing Rules**, add a catch-all rule:
+   - Custom Address: Catch All
+   - Action: **Send to a worker**
+   - Destination: your deployed Worker
+
+If you use multiple domains, repeat this for each domain in `EMAIL_DOMAINS`.
+
+## Configure custom domain for Worker API
+
+1. Open **Workers & Pages**.
+2. Open your Worker.
+3. Open **Settings**.
+4. In **Domains & Routes**, click **Add**.
+5. Choose **Custom domain**.
+6. Enter your API domain, for example `api.spinupmail.com`.
+
+Use a dedicated API subdomain as the default production setup. Only fall back
+to a frontend-host `/api/*` route if you specifically need a same-host
+topology.
+
+### Worker config
+
+Example values in `packages/backend/wrangler.toml`:
+
+```toml
+[vars]
+EMAIL_DOMAINS = "spinupmail.com,spinupmail.dev"
+AUTH_ALLOWED_EMAIL_DOMAIN = "example.com"
+MAX_ADDRESSES_PER_ORGANIZATION = "100"
+API_KEY_RATE_LIMIT_WINDOW = "60"
+API_KEY_RATE_LIMIT_MAX = "120"
+AUTH_RATE_LIMIT_WINDOW = "60"
+AUTH_RATE_LIMIT_MAX = "100"
+AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW = "3600"
+AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX = "2"
+EMAIL_ATTACHMENTS_ENABLED = "true"
+EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION = "104857600"
+```
+
+### UI behavior
+
+If you configure more than one domain, the UI shows a domain selector when you
+create an address. If there is only one domain, it is used automatically.
+
+## Deploy the frontend
+
+Create a **Pages** project, not a Worker.
+
+1. Open **Workers & Pages**.
+2. Click the link to deploy Pages.
+3. Import your forked repository.
+4. Use these settings:
+   - Framework preset: `None`
+   - Build command: `pnpm run build`
+   - Build output directory: `dist`
+   - Root directory: `packages/frontend`
+
+Set these environment variables in Pages:
+
+```env
+VITE_AUTH_BASE_URL=https://api.spinupmail.com/api/auth
+VITE_API_BASE_URL=https://api.spinupmail.com
+VITE_TURNSTILE_SITE_KEY=<your site key>
+```
+
+### Local environment variables
+
+Create `packages/frontend/.env`:
+
+```env
+VITE_AUTH_BASE_URL=http://localhost:8787/api/auth
+VITE_API_BASE_URL=http://localhost:8787
+VITE_TURNSTILE_SITE_KEY=<Your Site Key>
+```
+
+## Set up frontend custom domain
+
+After Pages is deployed:
+
+1. Open **Custom domains** in your Pages project.
+2. Click **Set up a custom domain**.
+3. Enter your frontend domain, for example `app.spinupmail.com`.
+4. Confirm the DNS record.
+5. Activate the domain.
+
+## API usage
+
+Generate an API key from the UI and include `X-Org-Id` in API key requests.
+
+List addresses:
+
+```bash
+curl "https://api.your-domain.com/api/email-addresses" \
+  -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>"
+```
+
+List emails:
+
+```bash
+curl "https://api.your-domain.com/api/emails?address=john-123@your-domain.com" \
+  -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>"
+```
+
+Download an attachment:
+
+```bash
+curl -L "https://api.your-domain.com/api/emails/<email_id>/attachments/<attachment_id>" \
+  -H "X-API-Key: <your_api_key>" \
+  -H "X-Org-Id: <organization_id>" \
+  --output attachment.bin
+```
+
+## Local development
+
+Start the backend:
+
+```bash
+pnpm -C packages/backend dev
+```
+
+Start the frontend:
+
+```bash
+pnpm -C packages/frontend dev
+```
+
+The frontend dev server proxies `/api/*` to `http://127.0.0.1:8787`.
+
+## Local email testing
+
+Cloudflare does not deliver real emails to `.workers.dev` domains. For local
+testing, use Wrangler's local email endpoint:
+
+```bash
+curl --location 'http://localhost:8787/cdn-cgi/handler/email?from=sender%40example.com&to=test-82bdbbd2%40spinupmail.com' \
+  --header 'Content-Type: application/json' \
+  --data-raw 'Received: from smtp.example.com (127.0.0.1)
+        by cloudflare-email.com (unknown) id 4fwwffRXOpyR
+        for <recipient@example.com>; Tue, 27 Aug 2024 15:50:20 +0000
+From: "John" <sender@example.com>
+Reply-To: sender@example.com
+To: recipient@example.com
+Subject: Testing Email Workers Local Dev
+Content-Type: text/html; charset="windows-1252"
+X-Mailer: Curl
+Date: Tue, 27 Aug 2024 08:49:44 -0700
+Message-ID: <MAKE-THIS-UNIQUE-6114391943504294873000@ZSH-GHOSTTY>
+
+Hi there'
+```
+
+Set a unique `Message-ID` for each test email.
+
+To test real delivery, use a real domain in Cloudflare Email Routing and point
+the rule to your Worker.
+
+## Notes
+
+- Email addresses must be created before email is sent.
+- Unknown addresses are rejected.
+- HTML is sanitized on the backend, checked again on the frontend, and rendered inside a Shadow DOM container.

@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 export type ApiFieldSpec = {
   name: string;
   type: string;
@@ -101,10 +102,27 @@ const emailAddressFields: Array<ApiFieldSpec> = [
       "Parsed address metadata. May be an object, string, or null depending on what was stored.",
   },
   {
+    name: "emailCount",
+    type: "number",
+    description: "Number of stored emails currently linked to the inbox.",
+  },
+  {
     name: "allowedFromDomains",
     type: "string[]",
     description:
       "Normalized allowlist of sender domains extracted from metadata.",
+  },
+  {
+    name: "blockedSenderDomains",
+    type: "string[]",
+    description:
+      "Normalized denylist of sender domains extracted from metadata.",
+  },
+  {
+    name: "inboundRatePolicy",
+    type: "object | null",
+    description:
+      "Optional inbound abuse policy extracted from metadata. Null when no custom policy is set.",
   },
   {
     name: "maxReceivedEmailCount",
@@ -157,6 +175,17 @@ const emailListItemFields: Array<ApiFieldSpec> = [
     description: "Raw sender value from the message envelope or headers.",
   },
   {
+    name: "sender",
+    type: "string | null",
+    description:
+      "Stored sender identity value when available, typically including display name and address.",
+  },
+  {
+    name: "senderLabel",
+    type: "string",
+    description: "Display-friendly sender label derived from sender or from.",
+  },
+  {
     name: "subject",
     type: "string | null",
     description: "Parsed subject line when present.",
@@ -175,6 +204,12 @@ const emailListItemFields: Array<ApiFieldSpec> = [
     name: "rawTruncated",
     type: "boolean",
     description: "True when the stored raw source exceeded configured limits.",
+  },
+  {
+    name: "isSample",
+    type: "boolean",
+    description:
+      "True when the email was generated as a starter sample message.",
   },
   {
     name: "hasHtml",
@@ -235,9 +270,135 @@ const attachmentFields: Array<ApiFieldSpec> = [
     type: "string",
     description: "Relative API path for the attachment download endpoint.",
   },
+  {
+    name: "inlinePath",
+    type: "string",
+    description:
+      "Relative API path that requests inline rendering for safe image attachments.",
+  },
 ];
 
 export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
+  {
+    id: "post-organization",
+    method: "POST",
+    path: "/api/organizations",
+    purpose:
+      "Create a new organization for the authenticated user and provision its starter inbox when possible.",
+    successStatus: 201,
+    auth: {
+      summary:
+        "Authenticated endpoint. Organization scope is not required because this route creates the organization.",
+      headers: [
+        authHeader,
+        {
+          name: "Content-Type",
+          value: "application/json",
+          required: true,
+          notes: "JSON request body is required.",
+        },
+      ],
+    },
+    bodyFields: [
+      {
+        name: "name",
+        type: "string",
+        required: true,
+        description: "Organization display name.",
+        constraints: "Trimmed length must be between 2 and 64 characters.",
+      },
+    ],
+    responseFields: [
+      {
+        name: "organization",
+        type: "object",
+        description: "Created organization record.",
+      },
+      {
+        name: "organization.id",
+        type: "string",
+        description: "Organization identifier.",
+      },
+      {
+        name: "organization.name",
+        type: "string",
+        description: "Organization display name.",
+      },
+      {
+        name: "organization.slug",
+        type: "string",
+        description: "Resolved unique organization slug.",
+      },
+      {
+        name: "organization.logo",
+        type: "string | null",
+        description: "Organization logo URL when set.",
+      },
+      {
+        name: "starterAddressId",
+        type: "string | null",
+        description:
+          "Starter inbox address ID when provisioning succeeds, otherwise null.",
+      },
+      {
+        name: "seededSampleEmailCount",
+        type: "number",
+        description:
+          "Number of sample emails seeded into the starter inbox during provisioning.",
+      },
+      {
+        name: "starterInboxProvisioned",
+        type: "boolean",
+        description:
+          "Whether starter inbox setup completed successfully during organization creation.",
+      },
+      {
+        name: "warning",
+        type: "string | undefined",
+        description:
+          "Present when the organization was created but starter inbox provisioning failed.",
+      },
+    ],
+    errors: [
+      {
+        status: 400,
+        error: "Organization name must be between 2 and 64 characters",
+        when: "The request body is missing a valid name or the name is out of range.",
+      },
+      {
+        status: 400,
+        error: "EMAIL_DOMAINS is not configured",
+        when: "The backend cannot provision the required starter inbox domain.",
+      },
+      {
+        status: 409,
+        error: "Unable to create organization. Please try again.",
+        when: "Repeated slug collision retries are exhausted during organization creation.",
+      },
+      {
+        status: 500,
+        error: "Unable to create organization",
+        when: "Organization creation fails for another backend or auth-layer reason.",
+      },
+    ],
+    exampleRequest: `curl -X POST "https://api.spinupmail.com/api/organizations" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: spin_..." \\
+  -d '{
+    "name": "QA Team"
+  }'`,
+    exampleResponse: `{
+  "organization": {
+    "id": "org_abc123",
+    "name": "QA Team",
+    "slug": "qa-team",
+    "logo": null
+  },
+  "starterAddressId": "addr_123",
+  "seededSampleEmailCount": 2,
+  "starterInboxProvisioned": true
+}`,
+  },
   {
     id: "get-domains",
     method: "GET",
@@ -478,6 +639,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Total attachment bytes stored for the organization.",
       },
       {
+        name: "attachmentSizeLimit",
+        type: "number",
+        description:
+          "Resolved per-organization attachment storage cap in bytes.",
+      },
+      {
         name: "topDomains",
         type: "Array<object>",
         description: "Most frequent sender domains.",
@@ -561,6 +728,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "totalEmailCount": 241,
   "attachmentCount": 19,
   "attachmentSizeTotal": 483210,
+  "attachmentSizeLimit": 104857600,
   "topDomains": [
     { "domain": "github.com", "count": 32 }
   ],
@@ -599,6 +767,13 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Number of items per page.",
         defaultValue: "10",
         constraints: "Clamped to 1-50.",
+      },
+      {
+        name: "search",
+        type: "string",
+        required: false,
+        description:
+          "Case-insensitive address search string applied to the organization inbox list.",
       },
       {
         name: "sortBy",
@@ -700,10 +875,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "domain": "spinupmail.dev",
       "meta": {
         "allowedFromDomains": ["github.com"],
+        "blockedSenderDomains": ["spam.test"],
         "maxReceivedEmailCount": 25,
         "maxReceivedEmailAction": "rejectNew"
       },
+      "emailCount": 3,
       "allowedFromDomains": ["github.com"],
+      "blockedSenderDomains": ["spam.test"],
+      "inboundRatePolicy": null,
       "maxReceivedEmailCount": 25,
       "maxReceivedEmailAction": "rejectNew",
       "createdAt": "2026-03-08T09:00:00.000Z",
@@ -751,6 +930,27 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description:
           "Opaque pagination cursor returned by the previous response.",
       },
+      {
+        name: "search",
+        type: "string",
+        required: false,
+        description:
+          "Case-insensitive address search string applied before recent-activity ordering.",
+      },
+      {
+        name: "sortBy",
+        type: '"recentActivity" | "createdAt"',
+        required: false,
+        description: "Sort field for the recent-activity feed.",
+        defaultValue: "recentActivity",
+      },
+      {
+        name: "sortDirection",
+        type: '"asc" | "desc"',
+        required: false,
+        description: "Sort direction for the recent-activity feed.",
+        defaultValue: "desc",
+      },
     ],
     responseFields: [
       {
@@ -766,6 +966,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         name: "nextCursor",
         type: "string | null",
         description: "Cursor to request the next page or null when exhausted.",
+      },
+      {
+        name: "totalItems",
+        type: "number",
+        description:
+          "Total matching inbox count before cursor pagination is applied.",
       },
     ],
     errors: [
@@ -807,7 +1013,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "localPart": "signup-test",
       "domain": "spinupmail.dev",
       "meta": null,
+      "emailCount": 4,
       "allowedFromDomains": [],
+      "blockedSenderDomains": [],
+      "inboundRatePolicy": null,
       "maxReceivedEmailCount": null,
       "maxReceivedEmailAction": null,
       "createdAt": "2026-03-08T09:00:00.000Z",
@@ -818,7 +1027,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "lastReceivedAtMs": 1772963110000
     }
   ],
-  "nextCursor": "1772963110000:addr_123"
+  "nextCursor": "1772963110000:addr_123",
+  "totalItems": 8
 }`,
   },
   {
@@ -881,6 +1091,23 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         constraints: "Maximum 10 domains, each at most 50 characters.",
       },
       {
+        name: "blockedSenderDomains",
+        type: "string[] | string",
+        required: false,
+        description:
+          "Sender-domain denylist. Strings are split on commas and normalized to lowercase unique domains.",
+        constraints: "Maximum 50 domains, each at most 50 characters.",
+      },
+      {
+        name: "inboundRatePolicy",
+        type: "object",
+        required: false,
+        description:
+          "Optional inbound abuse control object with positive whole-number limits such as senderDomainSoftMax, senderDomainBlockMax, senderAddressBlockMax, inboxBlockMax, dedupeWindowSeconds, initialBlockSeconds, and maxBlockSeconds.",
+        constraints:
+          "Must contain at least one supported positive whole-number field. Each value is capped at 864000.",
+      },
+      {
         name: "maxReceivedEmailCount",
         type: "number",
         required: false,
@@ -941,6 +1168,17 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 400,
+        error: "blockedSenderDomains contains invalid domain(s)",
+        when: "One or more sender denylist entries are not valid domain hostnames.",
+      },
+      {
+        status: 400,
+        error:
+          "inboundRatePolicy must be an object with at least one positive whole-number limit",
+        when: "inboundRatePolicy is present but does not resolve to a supported policy object.",
+      },
+      {
+        status: 400,
         error:
           "localPart is required and may only contain letters, numbers, dot, underscore, plus, and dash",
         when: "localPart normalizes to an empty or invalid value.",
@@ -971,6 +1209,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "domain": "spinupmail.dev",
     "ttlMinutes": 120,
     "allowedFromDomains": ["github.com", "example.com"],
+    "blockedSenderDomains": ["spam.test"],
     "maxReceivedEmailCount": 25,
     "maxReceivedEmailAction": "rejectNew",
     "acceptedRiskNotice": true
@@ -982,16 +1221,74 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "domain": "spinupmail.dev",
   "meta": {
     "allowedFromDomains": ["github.com", "example.com"],
+    "blockedSenderDomains": ["spam.test"],
     "maxReceivedEmailCount": 25,
     "maxReceivedEmailAction": "rejectNew"
   },
+  "emailCount": 0,
   "allowedFromDomains": ["github.com", "example.com"],
+  "blockedSenderDomains": ["spam.test"],
+  "inboundRatePolicy": null,
   "maxReceivedEmailCount": 25,
   "maxReceivedEmailAction": "rejectNew",
   "createdAt": "2026-03-08T09:00:00.000Z",
   "createdAtMs": 1772960400000,
   "expiresAt": "2026-03-08T11:00:00.000Z",
   "expiresAtMs": 1772967600000
+}`,
+  },
+  {
+    id: "get-email-address-detail",
+    method: "GET",
+    path: "/api/email-addresses/:id",
+    purpose:
+      "Fetch a single inbox record for the current organization by address ID.",
+    successStatus: 200,
+    auth: {
+      summary:
+        "Authenticated and organization-scoped. API key requests must include X-Org-Id.",
+      headers: [authHeader, orgHeader],
+    },
+    pathParams: [
+      {
+        name: "id",
+        type: "string",
+        required: true,
+        description: "Address identifier.",
+      },
+    ],
+    responseFields: emailAddressFields,
+    errors: [
+      {
+        status: 404,
+        error: "address not found",
+        when: "The requested address does not exist in the current organization.",
+      },
+    ],
+    exampleRequest: `curl "https://api.spinupmail.com/api/email-addresses/addr_123" \\
+  -H "X-API-Key: spin_..." \\
+  -H "X-Org-Id: org_abc123"`,
+    exampleResponse: `{
+  "id": "addr_123",
+  "address": "signup-test@spinupmail.dev",
+  "localPart": "signup-test",
+  "domain": "spinupmail.dev",
+  "meta": {
+    "allowedFromDomains": ["github.com"],
+    "blockedSenderDomains": ["spam.test"]
+  },
+  "emailCount": 4,
+  "allowedFromDomains": ["github.com"],
+  "blockedSenderDomains": ["spam.test"],
+  "inboundRatePolicy": null,
+  "maxReceivedEmailCount": null,
+  "maxReceivedEmailAction": null,
+  "createdAt": "2026-03-08T09:00:00.000Z",
+  "createdAtMs": 1772960400000,
+  "expiresAt": null,
+  "expiresAtMs": null,
+  "lastReceivedAt": "2026-03-08T09:45:10.000Z",
+  "lastReceivedAtMs": 1772963110000
 }`,
   },
   {
@@ -1066,6 +1363,23 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         constraints: "Maximum 10 domains, each at most 50 characters.",
       },
       {
+        name: "blockedSenderDomains",
+        type: "string[] | string | null",
+        required: false,
+        description:
+          "Replacement sender denylist. Null clears the current denylist.",
+        constraints: "Maximum 50 domains, each at most 50 characters.",
+      },
+      {
+        name: "inboundRatePolicy",
+        type: "object | null",
+        required: false,
+        description:
+          "Replacement inbound abuse policy. Null clears the current policy.",
+        constraints:
+          "When not null, must contain at least one supported positive whole-number field capped at 864000.",
+      },
+      {
         name: "maxReceivedEmailCount",
         type: "number | null",
         required: false,
@@ -1105,6 +1419,17 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 400,
+        error: "blockedSenderDomains contains invalid domain(s)",
+        when: "One or more sender denylist entries are not valid domain hostnames.",
+      },
+      {
+        status: 400,
+        error:
+          "inboundRatePolicy must be an object with at least one positive whole-number limit",
+        when: "inboundRatePolicy is present but does not resolve to a supported policy object.",
+      },
+      {
+        status: 400,
         error: "localPart is reserved and cannot be used",
         when: "localPart matches a reserved inbox keyword.",
       },
@@ -1139,7 +1464,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "maxReceivedEmailCount": 50,
     "maxReceivedEmailAction": "cleanAll"
   },
+  "emailCount": 4,
   "allowedFromDomains": ["github.com"],
+  "blockedSenderDomains": [],
+  "inboundRatePolicy": null,
   "maxReceivedEmailCount": 50,
   "maxReceivedEmailAction": "cleanAll",
   "createdAt": "2026-03-08T09:00:00.000Z",
@@ -1223,6 +1551,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     notes: [
       "You must provide either address or addressId.",
       "after and before accept either millisecond timestamps or values parseable by Date.parse().",
+      "search is full-text and does not support after, before, or order=asc.",
     ],
     queryParams: [
       {
@@ -1266,6 +1595,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: false,
         description: "Upper time bound for email receivedAt filtering.",
       },
+      {
+        name: "search",
+        type: "string",
+        required: false,
+        description:
+          "Full-text search over stored email content and indexed metadata for the target inbox.",
+        constraints: "Trimmed length up to 30 characters.",
+      },
     ],
     responseFields: [
       {
@@ -1295,6 +1632,11 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "Neither address nor addressId is provided.",
       },
       {
+        status: 400,
+        error: "search does not support after, before, or order=asc parameters",
+        when: "search is combined with unsupported time filters or ascending order.",
+      },
+      {
         status: 404,
         error: "address not found",
         when: "The supplied address or addressId does not exist in the current organization.",
@@ -1315,10 +1657,13 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "addressId": "addr_123",
       "to": "signup-test@spinupmail.dev",
       "from": "notifications@github.com",
+      "sender": "\"GitHub\" <notifications@github.com>",
+      "senderLabel": "GitHub",
       "subject": "Verify your email",
       "messageId": "<abc@example.com>",
       "rawSize": 13821,
       "rawTruncated": false,
+      "isSample": false,
       "hasHtml": true,
       "hasText": true,
       "attachmentCount": 1,
@@ -1388,6 +1733,16 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Raw sender value.",
       },
       {
+        name: "sender",
+        type: "string | null",
+        description: "Stored sender identity value when available.",
+      },
+      {
+        name: "senderLabel",
+        type: "string",
+        description: "Display-friendly sender label derived from sender data.",
+      },
+      {
         name: "subject",
         type: "string | null",
         description: "Parsed subject line.",
@@ -1430,6 +1785,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Whether the stored raw payload was truncated.",
       },
       {
+        name: "isSample",
+        type: "boolean",
+        description:
+          "True when the email was generated as a starter sample message.",
+      },
+      {
         name: "rawDownloadPath",
         type: "string",
         description:
@@ -1467,6 +1828,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "address": "signup-test@spinupmail.dev",
   "to": "signup-test@spinupmail.dev",
   "from": "notifications@github.com",
+  "sender": "\"GitHub\" <notifications@github.com>",
+  "senderLabel": "GitHub",
   "subject": "Verify your email",
   "messageId": "<abc@example.com>",
   "headers": [{ "name": "from", "value": "notifications@github.com" }],
@@ -1475,6 +1838,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "raw": "From: notifications@github.com\\n...",
   "rawSize": 13821,
   "rawTruncated": false,
+  "isSample": false,
   "rawDownloadPath": "/api/emails/mail_123/raw",
   "attachments": [
     {
@@ -1484,7 +1848,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "size": 48211,
       "disposition": "attachment",
       "contentId": null,
-      "downloadPath": "/api/emails/mail_123/attachments/att_987"
+      "downloadPath": "/api/emails/mail_123/attachments/att_987",
+      "inlinePath": "/api/emails/mail_123/attachments/att_987?inline=1"
     }
   ],
   "receivedAt": "2026-03-08T09:45:10.000Z",
@@ -1575,9 +1940,19 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description: "Attachment identifier.",
       },
     ],
+    queryParams: [
+      {
+        name: "inline",
+        type: "string",
+        required: false,
+        description:
+          "Set to 1 or true to request inline rendering for safe image attachments.",
+      },
+    ],
     notes: [
       "Attachment download requires R2_BUCKET to be configured.",
       "Successful responses stream binary content with attachment headers instead of JSON.",
+      "inline rendering is only allowed for safe inline image content types.",
     ],
     responseFields: [
       {
@@ -1610,8 +1985,18 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 404,
+        error: "Attachments are disabled",
+        when: "EMAIL_ATTACHMENTS_ENABLED is false for the Worker.",
+      },
+      {
+        status: 404,
         error: "attachment not found",
         when: "The attachment metadata does not exist in the current organization.",
+      },
+      {
+        status: 415,
+        error: "attachment content cannot be rendered inline",
+        when: "inline rendering is requested for a non-inline-safe attachment type.",
       },
       {
         status: 404,
