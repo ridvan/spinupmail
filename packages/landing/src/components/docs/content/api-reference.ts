@@ -1260,6 +1260,26 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     responseFields: emailAddressFields,
     errors: [
       {
+        status: 400,
+        error: "x-org-id header is required for api key usage",
+        when: "An API key request omits X-Org-Id.",
+      },
+      {
+        status: 400,
+        error: "active organization is required",
+        when: "A session request has no active organization and does not pass X-Org-Id.",
+      },
+      {
+        status: 401,
+        error: "unauthorized",
+        when: "The request is not authenticated.",
+      },
+      {
+        status: 403,
+        error: "forbidden",
+        when: "The authenticated principal does not belong to the requested organization.",
+      },
+      {
         status: 404,
         error: "address not found",
         when: "The requested address does not exist in the current organization.",

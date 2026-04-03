@@ -4,6 +4,7 @@ import { apiEndpointSpecs } from "./api-reference";
 describe("api-reference coverage", () => {
   it("covers every required product endpoint exactly once", () => {
     const requiredEndpoints = [
+      "POST /api/organizations",
       "GET /api/domains",
       "GET /api/organizations/stats",
       "GET /api/organizations/stats/email-activity",
@@ -11,6 +12,7 @@ describe("api-reference coverage", () => {
       "GET /api/email-addresses",
       "GET /api/email-addresses/recent-activity",
       "POST /api/email-addresses",
+      "GET /api/email-addresses/:id",
       "PATCH /api/email-addresses/:id",
       "DELETE /api/email-addresses/:id",
       "GET /api/emails",

@@ -179,7 +179,7 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
   "api-organizations": {
     headings: [
       {
-        id: "create-organization",
+        id: "post-organization",
         title: "Create organization",
         level: 2,
       },
@@ -222,7 +222,7 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
         level: 2,
       },
       {
-        id: "get-an-email-address",
+        id: "get-email-address-detail",
         title: "Get an email address",
         level: 2,
       },
