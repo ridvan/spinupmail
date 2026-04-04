@@ -6,6 +6,7 @@ describe("shared contracts", () => {
     const parsed = domainConfigSchema.safeParse({
       items: ["spinupmail.com"],
       default: "spinupmail.com",
+      forcedLocalPartPrefix: null,
     });
 
     expect(parsed.success).toBe(true);

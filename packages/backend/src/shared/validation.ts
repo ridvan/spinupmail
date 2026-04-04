@@ -38,6 +38,31 @@ export const sanitizeLocalPart = (value: string) => {
   return cleaned.replace(/^\.+|\.+$/g, "").slice(0, 64);
 };
 
+const FORCED_LOCAL_PART_SEPARATOR = "-";
+
+const normalizeForcedLocalPartPrefix = (value: string) =>
+  sanitizeLocalPart(value).replace(/[._+-]+$/g, "");
+
+export const applyForcedLocalPartPrefix = (
+  localPart: string,
+  forcedPrefix?: string
+) => {
+  const normalizedPrefix = forcedPrefix
+    ? normalizeForcedLocalPartPrefix(forcedPrefix)
+    : "";
+
+  if (!normalizedPrefix || !localPart) {
+    return localPart;
+  }
+
+  const prefixedStart = `${normalizedPrefix}${FORCED_LOCAL_PART_SEPARATOR}`;
+  if (localPart.startsWith(prefixedStart)) {
+    return localPart;
+  }
+
+  return `${prefixedStart}${localPart}`;
+};
+
 export const RESERVED_LOCAL_PART_KEYWORDS = [
   "abuse",
   "admin",

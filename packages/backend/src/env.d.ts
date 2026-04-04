@@ -18,6 +18,7 @@ declare global {
     EMAIL_STORE_HEADERS_IN_DB?: string;
     EMAIL_STORE_RAW_IN_DB?: string;
     EMAIL_STORE_RAW_IN_R2?: string;
+    FORCED_MAIL_PREFIX?: string;
     MAX_ADDRESSES_PER_ORGANIZATION?: string;
     RESEND_FROM_EMAIL?: string;
   }

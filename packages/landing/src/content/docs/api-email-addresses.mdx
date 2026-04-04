@@ -11,7 +11,13 @@ keywords:
   - inbox policy
 ---
 
-The address API is where most automation starts. It lets you provision an inbox, constrain who can send to it, limit how long it lives, and clean it up when the workflow ends.
+The address API is where most automation starts. It lets you provision an
+inbox, constrain who can send to it, limit how long it lives, and clean it up
+when the workflow ends.
+
+If the Worker is configured with `FORCED_MAIL_PREFIX`, create and rename
+operations always apply that prefix on the backend before the final address is
+validated and stored.
 
 ## List email addresses
 

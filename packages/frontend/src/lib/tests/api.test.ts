@@ -28,6 +28,7 @@ describe("api client helpers", () => {
         JSON.stringify({
           items: ["spinupmail.com"],
           default: "spinupmail.com",
+          forcedLocalPartPrefix: "temp",
         }),
         {
           status: 200,
@@ -39,6 +40,7 @@ describe("api client helpers", () => {
     const result = await listDomains({ organizationId: "org-1" });
 
     expect(result.items).toEqual(["spinupmail.com"]);
+    expect(result.forcedLocalPartPrefix).toBe("temp");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

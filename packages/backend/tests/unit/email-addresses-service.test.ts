@@ -184,6 +184,42 @@ describe("email addresses service", () => {
     });
   });
 
+  it("forces the configured prefix when creating an address", async () => {
+    const result = await createEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        FORCED_MAIL_PREFIX: "Temp",
+      } as CloudflareBindings,
+      session: {
+        session: { id: "session-1", userId: "user-1" },
+        user: { id: "user-1", emailVerified: true },
+      },
+      organizationId: "org-1",
+      payload: {
+        localPart: "project-team",
+        acceptedRiskNotice: true,
+      },
+    });
+
+    expect(mocks.insertAddress).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        address: "temp-project-team@spinupmail.com",
+        localPart: "temp-project-team",
+      }),
+      100
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 200,
+        body: expect.objectContaining({
+          address: "temp-project-team@spinupmail.com",
+          localPart: "temp-project-team",
+        }),
+      })
+    );
+  });
+
   it("returns the organization address limit error when no insert slot is available", async () => {
     mocks.insertAddress.mockResolvedValue(false);
 
@@ -452,6 +488,67 @@ describe("email addresses service", () => {
         error: "Address already exists",
         address: "demo-team@spinupmail.com",
         id: "address-2",
+      },
+    });
+  });
+
+  it("forces the configured prefix when updating the local part", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "project@spinupmail.com",
+      localPart: "project",
+      domain: "spinupmail.com",
+      meta: null,
+      emailCount: 2,
+      createdAt: new Date("2026-03-20T10:00:00.000Z"),
+      expiresAt: null,
+      lastReceivedAt: null,
+    });
+
+    const result = await updateEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        FORCED_MAIL_PREFIX: "temp",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      addressId: "address-1",
+      payload: {
+        localPart: "project-v2",
+      },
+    });
+
+    expect(mocks.updateAddressByIdAndOrganization).toHaveBeenCalledWith({
+      db: {},
+      addressId: "address-1",
+      organizationId: "org-1",
+      values: {
+        address: "temp-project-v2@spinupmail.com",
+        localPart: "temp-project-v2",
+        domain: "spinupmail.com",
+        meta: null,
+        expiresAt: null,
+      },
+    });
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        id: "address-1",
+        address: "temp-project-v2@spinupmail.com",
+        localPart: "temp-project-v2",
+        domain: "spinupmail.com",
+        meta: null,
+        emailCount: 2,
+        allowedFromDomains: [],
+        blockedSenderDomains: [],
+        inboundRatePolicy: null,
+        maxReceivedEmailCount: null,
+        maxReceivedEmailAction: null,
+        createdAt: "2026-03-20T10:00:00.000Z",
+        createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
+        expiresAt: null,
+        expiresAtMs: null,
+        lastReceivedAt: null,
+        lastReceivedAtMs: null,
       },
     });
   });

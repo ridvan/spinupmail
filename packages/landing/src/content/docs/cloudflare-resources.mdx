@@ -101,6 +101,7 @@ control routing, email limits, and optional product behavior.
 | Variable | Default or usage |
 | --- | --- |
 | `AUTH_ALLOWED_EMAIL_DOMAIN` | Restricts sign-up and sign-in to one email domain for internal deployments |
+| `FORCED_MAIL_PREFIX` | Forces every created or renamed inbox local part to start with this prefix plus `-`; unset disables the feature |
 | `EMAIL_MAX_BYTES` | Max raw email bytes parsed by the Worker |
 | `EMAIL_BODY_MAX_BYTES` | Max HTML and text body bytes persisted in D1 |
 | `EMAIL_FORWARD_TO` | Optional forward target |
@@ -121,6 +122,10 @@ control routing, email limits, and optional product behavior.
 domains, Spinupmail treats them as valid receiving domains and the UI will show
 a domain selector during address creation. If you configure only one domain,
 the app uses it automatically.
+
+If you also set `FORCED_MAIL_PREFIX`, Spinupmail displays that enforced prefix
+in the create/edit address forms and always applies it on the backend when an
+address is created or renamed.
 
 <Callout tone="warning" title="Routing rules are per domain">
   Cloudflare Email Routing rules are not shared across domains. Every domain in

@@ -196,6 +196,7 @@ export type CreateOrganizationResponse = {
 export type DomainConfig = {
   items: string[];
   default: string | null;
+  forcedLocalPartPrefix: string | null;
 };
 
 export type OrganizationStatsItem = {

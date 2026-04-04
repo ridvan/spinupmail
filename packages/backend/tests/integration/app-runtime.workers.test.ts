@@ -4,7 +4,7 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import { createWorkerHandler } from "@/index";
-import { normalizeDomain } from "@/shared/env";
+import { getForcedMailPrefix, normalizeDomain } from "@/shared/env";
 
 type SessionShape = {
   session?: {
@@ -77,6 +77,10 @@ const requestWorker = async (
 };
 
 const workerEnv = env as unknown as Pick<CloudflareBindings, "EMAIL_DOMAINS">;
+const workerMailPrefixEnv = env as unknown as Pick<
+  CloudflareBindings,
+  "FORCED_MAIL_PREFIX"
+>;
 
 const getConfiguredDomains = () =>
   (workerEnv.EMAIL_DOMAINS ?? "")
@@ -128,6 +132,7 @@ describe("worker fetch (workers pool) runtime behavior", () => {
     await expect(response.json()).resolves.toEqual({
       items: getConfiguredDomains(),
       default: getConfiguredDomains()[0] ?? null,
+      forcedLocalPartPrefix: getForcedMailPrefix(workerMailPrefixEnv) ?? null,
     });
   });
 

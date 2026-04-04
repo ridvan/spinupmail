@@ -3,6 +3,7 @@ import { z } from "zod";
 export const domainConfigSchema = z.object({
   items: z.array(z.string().min(1)),
   default: z.string().nullable(),
+  forcedLocalPartPrefix: z.string().nullable(),
 });
 
 export const organizationStatsItemSchema = z.object({

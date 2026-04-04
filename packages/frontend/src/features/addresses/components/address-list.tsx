@@ -86,6 +86,7 @@ import { cn } from "@/lib/utils";
 
 type AddressListProps = {
   domains: string[];
+  forcedLocalPartPrefix?: string | null;
 };
 
 const PAGE_SIZE = 10;
@@ -556,7 +557,10 @@ const AddressTableRow = React.memo(
   }
 );
 
-const AddressListContent = ({ domains }: AddressListProps) => {
+const AddressListContent = ({
+  domains,
+  forcedLocalPartPrefix = null,
+}: AddressListProps) => {
   const { effectiveTimeZone } = useTimezone();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1218,6 +1222,7 @@ const AddressListContent = ({ domains }: AddressListProps) => {
       <EditAddressSheet
         address={editingAddress}
         domains={domains}
+        forcedLocalPartPrefix={forcedLocalPartPrefix}
         errorMessage={editSheetErrorMessage}
         isLoading={isEditSheetLoading}
         isNotFound={isNotFoundError(editingAddressQuery.error)}
@@ -1228,8 +1233,14 @@ const AddressListContent = ({ domains }: AddressListProps) => {
   );
 };
 
-export const AddressList = ({ domains }: AddressListProps) => (
+export const AddressList = ({
+  domains,
+  forcedLocalPartPrefix = null,
+}: AddressListProps) => (
   <NuqsAdapter>
-    <AddressListContent domains={domains} />
+    <AddressListContent
+      domains={domains}
+      forcedLocalPartPrefix={forcedLocalPartPrefix}
+    />
   </NuqsAdapter>
 );

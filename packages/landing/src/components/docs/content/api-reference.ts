@@ -423,6 +423,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description:
           "Default domain suggested to clients. It is the first configured domain when available.",
       },
+      {
+        name: "forcedLocalPartPrefix",
+        type: "string | null",
+        description:
+          "Forced inbox local-part prefix configured on the Worker. When non-null, clients should treat <prefix>- as always applied by the backend.",
+      },
     ],
     errors: [
       {
@@ -445,7 +451,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   -H "X-API-Key: spin_..."`,
     exampleResponse: `{
   "items": ["spinupmail.dev", "qa.spinupmail.dev"],
-  "default": "spinupmail.dev"
+  "default": "spinupmail.dev",
+  "forcedLocalPartPrefix": "temp"
 }`,
   },
   {
@@ -1038,6 +1045,9 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     purpose:
       "Create a new inbox under the current organization with TTL, sender restrictions, and inbox size controls.",
     successStatus: 200,
+    notes: [
+      "If the Worker sets FORCED_MAIL_PREFIX, the backend prepends <prefix>- to localPart before reserved-word checks, conflict checks, and persistence.",
+    ],
     auth: {
       summary:
         "Authenticated and organization-scoped. API key requests must include X-Org-Id.",
@@ -1059,7 +1069,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: true,
         description: "Inbox local part before normalization.",
         constraints:
-          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
+          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected. If FORCED_MAIL_PREFIX is configured, the backend prepends <prefix>- before final validation and storage.",
       },
       {
         name: "ttlMinutes",
@@ -1216,8 +1226,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   }'`,
     exampleResponse: `{
   "id": "addr_123",
-  "address": "signup-test@spinupmail.dev",
-  "localPart": "signup-test",
+  "address": "temp-signup-test@spinupmail.dev",
+  "localPart": "temp-signup-test",
   "domain": "spinupmail.dev",
   "meta": {
     "allowedFromDomains": ["github.com", "example.com"],
@@ -1343,6 +1353,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     notes: [
       "Set ttlMinutes to null to remove the expiration time.",
       "Set maxReceivedEmailCount to null to clear the inbox-size limit from metadata.",
+      "If the Worker sets FORCED_MAIL_PREFIX, localPart updates are stored with <prefix>- prepended on the backend.",
     ],
     bodyFields: [
       {
@@ -1351,7 +1362,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: false,
         description: "New local part for the address.",
         constraints:
-          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected.",
+          "1-30 characters after trim, letters/numbers/dot/underscore/plus/dash only. Reserved inbox keywords are rejected. If FORCED_MAIL_PREFIX is configured, the backend prepends <prefix>- before final validation and storage.",
       },
       {
         name: "ttlMinutes",
@@ -1476,8 +1487,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   }'`,
     exampleResponse: `{
   "id": "addr_123",
-  "address": "signup-test@spinupmail.dev",
-  "localPart": "signup-test",
+  "address": "temp-signup-test@spinupmail.dev",
+  "localPart": "temp-signup-test",
   "domain": "spinupmail.dev",
   "meta": {
     "allowedFromDomains": ["github.com"],

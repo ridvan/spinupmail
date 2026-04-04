@@ -1,12 +1,14 @@
 import { getDb } from "@/platform/db/client";
 import {
   getAllowedDomains,
+  getForcedMailPrefix,
   getMaxAddressesPerOrganization,
 } from "@/shared/env";
 import { isAddressConflictError } from "@/shared/errors";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
 import {
   applyMaxReceivedEmailLimitToMeta,
+  applyForcedLocalPartPrefix,
   buildAddressMetaForStorage,
   getAllowedFromDomainsFromMeta,
   getBlockedSenderDomainsFromMeta,
@@ -421,18 +423,11 @@ export const createEmailAddress = async ({
 
   const providedLocalPart =
     typeof body.localPart === "string" ? body.localPart : "";
-  const trimmedLocalPart = providedLocalPart.trim();
-
-  if (trimmedLocalPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
-      },
-    };
-  }
-
-  const localPart = sanitizeLocalPart(providedLocalPart);
+  const forcedMailPrefix = getForcedMailPrefix(env);
+  const localPart = applyForcedLocalPartPrefix(
+    sanitizeLocalPart(providedLocalPart),
+    forcedMailPrefix
+  );
 
   if (!localPart) {
     return {
@@ -440,6 +435,15 @@ export const createEmailAddress = async ({
       body: {
         error:
           "localPart is required and may only contain letters, numbers, dot, underscore, plus, and dash",
+      },
+    };
+  }
+
+  if (localPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
       },
     };
   }
@@ -714,20 +718,17 @@ export const updateEmailAddress = async ({
     };
   }
 
-  const localPartSource =
-    typeof body.localPart === "string" ? body.localPart : existing.localPart;
-  const trimmedLocalPart = localPartSource.trim();
-  if (trimmedLocalPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
-      },
-    };
-  }
-  const localPart = sanitizeLocalPart(localPartSource);
+  const forcedMailPrefix = getForcedMailPrefix(env);
+  const isLocalPartUpdate = typeof body.localPart === "string";
+  const localPartSource = isLocalPartUpdate
+    ? (body.localPart ?? "")
+    : existing.localPart;
+  const sanitizedLocalPart = sanitizeLocalPart(localPartSource);
+  const localPart = isLocalPartUpdate
+    ? applyForcedLocalPartPrefix(sanitizedLocalPart, forcedMailPrefix)
+    : existing.localPart;
 
-  if (!localPart) {
+  if (isLocalPartUpdate && !localPart) {
     return {
       status: 400 as const,
       body: {
@@ -737,7 +738,16 @@ export const updateEmailAddress = async ({
     };
   }
 
-  if (hasReservedLocalPartKeyword(localPart)) {
+  if (isLocalPartUpdate && localPart.length > ADDRESS_LOCAL_PART_MAX_LENGTH) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `localPart must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      },
+    };
+  }
+
+  if (isLocalPartUpdate && hasReservedLocalPartKeyword(localPart)) {
     return {
       status: 400 as const,
       body: { error: "localPart is reserved and cannot be used" },

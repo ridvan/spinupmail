@@ -3,6 +3,7 @@ import {
   getAuthAllowedEmailDomain,
   getAuthRateLimitConfig,
   getAllowedDomains,
+  getForcedMailPrefix,
   getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
   getMaxAddressesPerOrganization,
@@ -36,6 +37,19 @@ describe("shared env helpers", () => {
       } as CloudflareBindings)
     ).toBe("example.com");
     expect(getAuthAllowedEmailDomain({} as CloudflareBindings)).toBeUndefined();
+  });
+
+  it("normalizes the optional forced mail prefix", () => {
+    expect(
+      getForcedMailPrefix({
+        FORCED_MAIL_PREFIX: " Temp-+ ",
+      } as CloudflareBindings)
+    ).toBe("temp");
+    expect(
+      getForcedMailPrefix({
+        FORCED_MAIL_PREFIX: " !!! ",
+      } as CloudflareBindings)
+    ).toBeUndefined();
   });
 
   it("parses positive numbers and rejects invalid values", () => {

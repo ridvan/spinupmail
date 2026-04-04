@@ -1,4 +1,4 @@
-import { getAllowedDomains } from "@/shared/env";
+import { getAllowedDomains, getForcedMailPrefix } from "@/shared/env";
 
 export const getDomainsResponse = (env: CloudflareBindings) => {
   const allowed = getAllowedDomains(env);
@@ -11,6 +11,10 @@ export const getDomainsResponse = (env: CloudflareBindings) => {
 
   return {
     status: 200 as const,
-    body: { items: allowed, default: allowed[0] ?? null },
+    body: {
+      items: allowed,
+      default: allowed[0] ?? null,
+      forcedLocalPartPrefix: getForcedMailPrefix(env) ?? null,
+    },
   };
 };

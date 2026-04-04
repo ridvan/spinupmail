@@ -11,6 +11,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -28,7 +34,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
+import {
+  formatForcedLocalPartPrefix,
+  getCustomLocalPartMaxLength,
+  stripForcedLocalPartPrefix,
+} from "@/features/addresses/lib/forced-local-part-prefix";
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
@@ -50,6 +66,7 @@ import { cn } from "@/lib/utils";
 type EditAddressSheetProps = {
   address: EmailAddress | null;
   domains: string[];
+  forcedLocalPartPrefix?: string | null;
   errorMessage?: string | null;
   isLoading?: boolean;
   isNotFound?: boolean;
@@ -57,14 +74,17 @@ type EditAddressSheetProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-const editAddressSchema = (availableDomains: string[]) =>
+const editAddressSchema = (
+  availableDomains: string[],
+  localPartMaxLength: number
+) =>
   z.object({
     localPart: z
       .string()
       .trim()
       .min(1, "Username is required")
-      .max(ADDRESS_LOCAL_PART_MAX_LENGTH, {
-        message: `Username must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      .max(localPartMaxLength, {
+        message: `Username must be ${localPartMaxLength} characters or fewer`,
       })
       .refine(value => addressPartRegex.test(value), {
         message:
@@ -133,10 +153,12 @@ const deriveTtlMinutes = (expiresAt: string | null) => {
 const EditAddressSheetForm = ({
   address,
   domains,
+  forcedLocalPartPrefix = null,
   onOpenChange,
 }: {
   address: EmailAddress;
   domains: string[];
+  forcedLocalPartPrefix?: string | null;
   onOpenChange: (open: boolean) => void;
 }) => {
   const updateMutation = useUpdateAddressMutation();
@@ -144,9 +166,20 @@ const EditAddressSheetForm = ({
     () => uniqueDomains(domains),
     [domains]
   );
+  const localPartMaxLength = getCustomLocalPartMaxLength(
+    ADDRESS_LOCAL_PART_MAX_LENGTH,
+    forcedLocalPartPrefix
+  );
+  const forcedLocalPartPrefixText = forcedLocalPartPrefix
+    ? formatForcedLocalPartPrefix(forcedLocalPartPrefix)
+    : null;
+  const isLocalPartInputDisabled = localPartMaxLength === 0;
   const initialValues = React.useMemo(
     () => ({
-      localPart: address.localPart,
+      localPart: stripForcedLocalPartPrefix(
+        address.localPart,
+        forcedLocalPartPrefix
+      ),
       domain: address.domain || domains[0] || "",
       ttlMinutes: deriveTtlMinutes(address.expiresAt ?? null) as
         | number
@@ -155,13 +188,13 @@ const EditAddressSheetForm = ({
       maxReceivedEmailCount: address.maxReceivedEmailCount ?? undefined,
       maxReceivedEmailAction: address.maxReceivedEmailAction ?? "cleanAll",
     }),
-    [address, domains]
+    [address, domains, forcedLocalPartPrefix]
   );
 
   const form = useForm({
     defaultValues: initialValues,
     validators: {
-      onSubmit: editAddressSchema(availableDomains),
+      onSubmit: editAddressSchema(availableDomains, localPartMaxLength),
     },
     onSubmit: async ({ value }) => {
       const updateAddressToast = toast.promise(
@@ -219,16 +252,38 @@ const EditAddressSheetForm = ({
                   <FieldLabel htmlFor="edit-address-local-part">
                     Username
                   </FieldLabel>
-                  <Input
-                    id="edit-address-local-part"
-                    name={field.name}
-                    value={field.state.value}
-                    maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
-                    onBlur={field.handleBlur}
-                    onChange={event => field.handleChange(event.target.value)}
-                    placeholder="support"
-                    aria-invalid={isInvalid}
-                  />
+                  <InputGroup>
+                    {forcedLocalPartPrefixText ? (
+                      <InputGroupAddon>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="inline-flex cursor-help" />
+                            }
+                          >
+                            <InputGroupText>
+                              {forcedLocalPartPrefixText}
+                            </InputGroupText>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={6}>
+                            Updated addresses always start with{" "}
+                            {forcedLocalPartPrefixText}
+                          </TooltipContent>
+                        </Tooltip>
+                      </InputGroupAddon>
+                    ) : null}
+                    <InputGroupInput
+                      id="edit-address-local-part"
+                      name={field.name}
+                      value={field.state.value}
+                      maxLength={localPartMaxLength || undefined}
+                      onBlur={field.handleBlur}
+                      onChange={event => field.handleChange(event.target.value)}
+                      placeholder="support"
+                      disabled={isLocalPartInputDisabled}
+                      aria-invalid={isInvalid}
+                    />
+                  </InputGroup>
                   {isInvalid ? (
                     <FieldError
                       errors={toFieldErrors(field.state.meta.errors)}
@@ -522,6 +577,7 @@ const EditAddressSheetForm = ({
 export const EditAddressSheet = ({
   address,
   domains,
+  forcedLocalPartPrefix = null,
   errorMessage = null,
   isLoading = false,
   isNotFound = false,
@@ -546,6 +602,7 @@ export const EditAddressSheet = ({
             key={address.id}
             address={address}
             domains={domains}
+            forcedLocalPartPrefix={forcedLocalPartPrefix}
             onOpenChange={onOpenChange}
           />
         ) : errorMessage ? (

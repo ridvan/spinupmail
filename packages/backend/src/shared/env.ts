@@ -10,6 +10,10 @@ const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
 const AUTH_RATE_LIMIT_WINDOW_DEFAULT = 60;
 const AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT = 60 * 60;
 const AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX_DEFAULT = 2;
+const readProcessEnv = (key: string) => {
+  if (typeof process === "undefined" || !process.env) return undefined;
+  return process.env[key];
+};
 
 const clampKvBackedRateLimitWindow = (windowSeconds: number) =>
   Math.max(windowSeconds, CLOUDFLARE_KV_MINIMUM_TTL_SECONDS);
@@ -62,6 +66,22 @@ export const parsePositiveInteger = (value: string | null | undefined) => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
   return parsed;
+};
+
+export const getForcedMailPrefix = (
+  env?: Pick<CloudflareBindings, "FORCED_MAIL_PREFIX">
+) => {
+  const configured =
+    env?.FORCED_MAIL_PREFIX ?? readProcessEnv("FORCED_MAIL_PREFIX");
+  if (!configured?.trim()) return undefined;
+
+  const normalized = configured
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._+-]/g, "")
+    .replace(/^[._+-]+|[._+-]+$/g, "");
+
+  return normalized || undefined;
 };
 
 export const getMaxTotalAttachmentStoragePerOrganization = (
@@ -124,11 +144,6 @@ export const getApiKeyUsageRateLimitConfig = (
     parsePositiveInteger(env?.API_KEY_RATE_LIMIT_MAX?.trim()) ??
     API_KEY_RATE_LIMIT_MAX_DEFAULT,
 });
-
-const readProcessEnv = (key: string) => {
-  if (typeof process === "undefined" || !process.env) return undefined;
-  return process.env[key];
-};
 
 export const isE2ETestUtilsEnabled = (
   env?: Pick<CloudflareBindings, "ENABLE_E2E_TEST_UTILS">

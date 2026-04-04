@@ -116,7 +116,7 @@ test.describe("spinupmail app behaviors", () => {
     const address = await authSeed.createAddress({
       organizationId,
       userId: session.userId,
-      localPart: `command-search-${Date.now()}`,
+      localPart: `cmd-${Math.random().toString(36).slice(2, 8)}`,
       tag: "command-menu-address",
     });
 
@@ -246,7 +246,7 @@ test.describe("spinupmail app behaviors", () => {
     const address = await authSeed.createAddress({
       organizationId,
       userId: session.userId,
-      localPart: `inbox-search-${Date.now()}`,
+      localPart: `search-${Math.random().toString(36).slice(2, 8)}`,
       tag: "inbox-search",
     });
 

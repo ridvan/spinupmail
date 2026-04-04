@@ -134,6 +134,7 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
 - `[vars].RESEND_FROM_EMAIL` (e.g. `Spinupmail <verify@spinupmail.com>`. Will be used when sending Verification/Password Reset emails.)
 - Optional: `[vars].AUTH_ALLOWED_EMAIL_DOMAIN` (restrict auth to one email domain. **Useful when you want to deploy an internal tool for your organization and restrict access to a specific domain.**)
 - Optional:
+  - `[vars].FORCED_MAIL_PREFIX` (when set, every created or renamed inbox is forced to start with this prefix plus `-`, for example `temp-`)
   - `[vars].EMAIL_MAX_BYTES`
   - `[vars].EMAIL_BODY_MAX_BYTES`
   - `[vars].EMAIL_FORWARD_TO`
@@ -371,6 +372,7 @@ In `packages/backend/wrangler.toml`:
 ```
 [vars]
 EMAIL_DOMAINS = "spinupmail.com,spinupmail.dev"
+FORCED_MAIL_PREFIX = "temp" # Optional. Forces created/renamed inboxes to start with temp-
 AUTH_ALLOWED_EMAIL_DOMAIN = "example.com" # Optional if you want to restrict sign-ups/sign-ins to a domain
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
 API_KEY_RATE_LIMIT_WINDOW = "60"
@@ -387,6 +389,11 @@ EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION = "104857600"
 
 When multiple domains are configured, the UI shows a **domain selector** during
 address creation. If only one domain is configured, it is used automatically.
+
+If `FORCED_MAIL_PREFIX` is configured, the UI also shows the enforced prefix in
+the create/edit username field, but the backend remains the source of truth:
+every created or renamed address is normalized to start with
+`<FORCED_MAIL_PREFIX>-`, even if a client tries to bypass the UI.
 
 ## 8. Deploy the Frontend (Cloudflare Pages)
 

@@ -26,6 +26,7 @@ import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
+  InputGroupText,
 } from "@/components/ui/input-group";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SendIcon, type SendIconHandle } from "@/components/ui/send";
@@ -37,7 +38,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DomainTagsInput } from "@/features/addresses/components/address-form-fields";
+import {
+  formatForcedLocalPartPrefix,
+  getCustomLocalPartMaxLength,
+} from "@/features/addresses/lib/forced-local-part-prefix";
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
@@ -58,6 +68,7 @@ import { cn } from "@/lib/utils";
 type CreateAddressFormProps = {
   domains: string[];
   isDomainsLoading?: boolean;
+  forcedLocalPartPrefix?: string | null;
 };
 
 const RANDOM_LOCAL_PART_PRIMARY_WORDS = [
@@ -109,12 +120,15 @@ const generateRandomSuffix = () =>
 const buildRandomLocalPart = () =>
   `${getRandomItem(RANDOM_LOCAL_PART_PRIMARY_WORDS)}-${getRandomItem(RANDOM_LOCAL_PART_SECONDARY_WORDS)}-${generateRandomSuffix()}`;
 
-const generateRandomLocalPart = (currentValue = "") => {
+const generateRandomLocalPart = (
+  currentValue = "",
+  maxLength = ADDRESS_LOCAL_PART_MAX_LENGTH
+) => {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const candidate = buildRandomLocalPart();
     if (
       candidate !== currentValue &&
-      candidate.length <= ADDRESS_LOCAL_PART_MAX_LENGTH &&
+      candidate.length <= maxLength &&
       addressPartRegex.test(candidate) &&
       !hasReservedLocalPartKeyword(candidate)
     ) {
@@ -122,17 +136,25 @@ const generateRandomLocalPart = (currentValue = "") => {
     }
   }
 
-  return "relay-desk-x1";
+  const fallbackCandidate =
+    ["relay-x1", "note-x1", "queue-x1", "box-x1", "x1"].find(
+      candidate => candidate !== currentValue && candidate.length <= maxLength
+    ) ?? "";
+
+  return fallbackCandidate || (maxLength > 0 ? "x" : "");
 };
 
-const createAddressSchema = (availableDomains: string[]) =>
+const createAddressSchema = (
+  availableDomains: string[],
+  localPartMaxLength: number
+) =>
   z.object({
     localPart: z
       .string()
       .trim()
       .min(1, "Username is required")
-      .max(ADDRESS_LOCAL_PART_MAX_LENGTH, {
-        message: `Username must be ${ADDRESS_LOCAL_PART_MAX_LENGTH} characters or fewer`,
+      .max(localPartMaxLength, {
+        message: `Username must be ${localPartMaxLength} characters or fewer`,
       })
       .refine(value => addressPartRegex.test(value), {
         message:
@@ -195,10 +217,19 @@ const createAddressSchema = (availableDomains: string[]) =>
 export const CreateAddressForm = ({
   domains,
   isDomainsLoading = false,
+  forcedLocalPartPrefix = null,
 }: CreateAddressFormProps) => {
   const createMutation = useCreateAddressMutation();
   const sendIconRef = useRef<SendIconHandle>(null);
   const availableDomains = useMemo(() => uniqueDomains(domains), [domains]);
+  const localPartMaxLength = getCustomLocalPartMaxLength(
+    ADDRESS_LOCAL_PART_MAX_LENGTH,
+    forcedLocalPartPrefix
+  );
+  const forcedLocalPartPrefixText = forcedLocalPartPrefix
+    ? formatForcedLocalPartPrefix(forcedLocalPartPrefix)
+    : null;
+  const isLocalPartInputDisabled = localPartMaxLength === 0;
   const copyCreatedAddress = async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
@@ -219,7 +250,7 @@ export const CreateAddressForm = ({
       acceptedRiskNotice: false,
     },
     validators: {
-      onSubmit: createAddressSchema(availableDomains),
+      onSubmit: createAddressSchema(availableDomains, localPartMaxLength),
     },
     onSubmit: async ({ value }) => {
       const selectedDomain = value.domain?.trim() || domains[0] || undefined;
@@ -310,16 +341,36 @@ export const CreateAddressForm = ({
                             Username
                           </FieldLabel>
                           <InputGroup>
+                            {forcedLocalPartPrefixText ? (
+                              <InputGroupAddon>
+                                <Tooltip>
+                                  <TooltipTrigger
+                                    render={
+                                      <span className="inline-flex cursor-help" />
+                                    }
+                                  >
+                                    <InputGroupText>
+                                      {forcedLocalPartPrefixText}
+                                    </InputGroupText>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={6}>
+                                    Addresses created here always start with{" "}
+                                    {forcedLocalPartPrefixText}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </InputGroupAddon>
+                            ) : null}
                             <InputGroupInput
                               id="address-local-part"
                               name={field.name}
                               value={field.state.value}
-                              maxLength={ADDRESS_LOCAL_PART_MAX_LENGTH}
+                              maxLength={localPartMaxLength || undefined}
                               onBlur={field.handleBlur}
                               onChange={event =>
                                 field.handleChange(event.target.value)
                               }
                               placeholder="support"
+                              disabled={isLocalPartInputDisabled}
                               aria-invalid={isInvalid}
                             />
                             <InputGroupAddon align="inline-end">
@@ -329,9 +380,13 @@ export const CreateAddressForm = ({
                                 className="cursor-pointer border-none bg-transparent! uppercase tracking-[0.08em]"
                                 aria-label="Generate random username"
                                 title="Generate random username"
+                                disabled={isLocalPartInputDisabled}
                                 onClick={() =>
                                   field.handleChange(
-                                    generateRandomLocalPart(field.state.value)
+                                    generateRandomLocalPart(
+                                      field.state.value,
+                                      localPartMaxLength
+                                    )
                                   )
                                 }
                               >
@@ -553,7 +608,10 @@ export const CreateAddressForm = ({
                           </label>
                           <Button
                             variant="outline"
-                            disabled={createMutation.isPending}
+                            disabled={
+                              createMutation.isPending ||
+                              isLocalPartInputDisabled
+                            }
                             type="submit"
                             className="w-fit cursor-pointer mt-1"
                             onMouseEnter={() => {

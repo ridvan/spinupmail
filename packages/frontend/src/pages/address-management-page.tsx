@@ -19,6 +19,7 @@ export const AddressManagementPage = () => {
         <CreateAddressForm
           domains={domainsQuery.data?.items ?? []}
           isDomainsLoading={domainsQuery.isLoading}
+          forcedLocalPartPrefix={domainsQuery.data?.forcedLocalPartPrefix}
         />
       </section>
 
@@ -27,7 +28,10 @@ export const AddressManagementPage = () => {
         className="scroll-mt-24 md:scroll-mt-28"
         aria-label="Addresses list"
       >
-        <AddressList domains={domainsQuery.data?.items ?? []} />
+        <AddressList
+          domains={domainsQuery.data?.items ?? []}
+          forcedLocalPartPrefix={domainsQuery.data?.forcedLocalPartPrefix}
+        />
       </section>
     </div>
   );

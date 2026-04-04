@@ -83,6 +83,7 @@ Update `packages/backend/wrangler.toml` with your values:
 Optional vars from the README:
 
 - `AUTH_ALLOWED_EMAIL_DOMAIN`
+- `FORCED_MAIL_PREFIX`
 - `EMAIL_MAX_BYTES`
 - `EMAIL_BODY_MAX_BYTES`
 - `EMAIL_FORWARD_TO`
@@ -134,6 +135,8 @@ Use values like these:
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be set in `wrangler.toml` under `[vars]`
+- `FORCED_MAIL_PREFIX = temp` forces all created and renamed inbox local parts
+  to start with `temp-`
 
 ### Creating Turnstile key
 
@@ -261,6 +264,7 @@ Example values in `packages/backend/wrangler.toml`:
 ```toml
 [vars]
 EMAIL_DOMAINS = "spinupmail.com,spinupmail.dev"
+FORCED_MAIL_PREFIX = "temp"
 AUTH_ALLOWED_EMAIL_DOMAIN = "example.com"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
 API_KEY_RATE_LIMIT_WINDOW = "60"
@@ -277,6 +281,10 @@ EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION = "104857600"
 
 If you configure more than one domain, the UI shows a domain selector when you
 create an address. If there is only one domain, it is used automatically.
+
+If `FORCED_MAIL_PREFIX` is set, the create and edit forms show that prefix in
+the username input group. The backend still enforces it, so API clients cannot
+opt out by sending a different `localPart`.
 
 ## Deploy the frontend
 
