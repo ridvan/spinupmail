@@ -1,13 +1,11 @@
-import { SQLiteDialect } from "drizzle-orm/sqlite-core";
 import {
   getOrganizationAttachmentStorageUsage,
   insertEmailAttachmentIfOrganizationQuotaAllows,
   deleteEmailsForAddress,
+  getInboxReservationCounts,
   insertInboundEmail,
   reserveInboxSlot,
 } from "@/modules/inbound-email/repo";
-
-const dialect = new SQLiteDialect();
 
 const createPreparedStatement = (query: string) => {
   const statement = {
@@ -21,9 +19,6 @@ const createPreparedStatement = (query: string) => {
 
   return statement;
 };
-
-const renderSql = (fragment: unknown) =>
-  dialect.sqlToQuery(fragment as Parameters<typeof dialect.sqlToQuery>[0]);
 
 describe("inbound email repo", () => {
   it("inserts the email row before running follow-up writes", async () => {
@@ -222,73 +217,111 @@ describe("inbound email repo", () => {
     ]);
   });
 
-  it("returns whether inbox reservation updated a row under the email-count cap", async () => {
-    const state: {
-      where?: unknown;
-    } = {};
+  it("reads reservation counts for the address and organization", async () => {
+    const first = vi.fn().mockResolvedValue({
+      addressEmailCount: "7",
+      organizationEmailCount: "15",
+    });
+    const prepare = vi.fn(() => ({
+      bind: vi.fn(() => ({
+        first,
+      })),
+    }));
+    const db = {
+      $client: {
+        prepare,
+      },
+    } as unknown as Parameters<typeof getInboxReservationCounts>[0];
+
+    await expect(
+      getInboxReservationCounts(db, {
+        addressId: "address-1",
+        organizationId: "org-1",
+      })
+    ).resolves.toEqual({
+      addressEmailCount: 7,
+      organizationEmailCount: 15,
+    });
+  });
+
+  it("returns whether inbox reservation updated a row under the address and organization caps", async () => {
     const run = vi.fn().mockResolvedValue({
       meta: {
         changes: 1,
       },
     });
-    const chain = {
-      set: vi.fn(() => chain),
-      where: vi.fn((value: unknown) => {
-        state.where = value;
-        return chain;
-      }),
-      run,
-    };
+    const statement = createPreparedStatement("");
+    const prepare = vi.fn((query: string) => ({
+      ...statement,
+      query,
+      bind(...values: unknown[]) {
+        return {
+          query,
+          values,
+          run,
+        };
+      },
+    }));
     const db = {
-      update: vi.fn(() => chain),
+      $client: {
+        prepare,
+      },
     } as unknown as Parameters<typeof reserveInboxSlot>[0]["db"];
 
     await expect(
       reserveInboxSlot({
         db,
         addressId: "address-1",
+        organizationId: "org-1",
+        addressEmailCount: 4,
+        organizationEmailCount: 9,
         maxReceivedEmailCount: 10,
+        maxOrganizationReceivedEmailCount: 20,
       })
     ).resolves.toBe(true);
 
-    const where = renderSql(state.where);
-    expect(where.sql).toContain('"email_addresses"."id" = ?');
-    expect(where.sql).toContain('"email_addresses"."email_count" < ?');
-    expect(where.params).toEqual(["address-1", 10]);
+    const prepared = prepare.mock.results[0]?.value;
+    expect(prepared.query).toContain("UPDATE email_addresses");
+    expect(prepared.query).toContain("organization_id = ?");
+    expect(prepared.query).toContain("email_count = ?");
+    expect(prepared.query).toContain("email_count < ?");
+    expect(prepared.query).toContain("SELECT coalesce(sum(email_count), 0)");
+    expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("returns false when inbox reservation does not update a row under the email-count cap", async () => {
-    const state: {
-      where?: unknown;
-    } = {};
+  it("returns false when inbox reservation does not update a row under the address and organization caps", async () => {
     const run = vi.fn().mockResolvedValue({
       meta: {
         changes: 0,
       },
     });
-    const chain = {
-      set: vi.fn(() => chain),
-      where: vi.fn((value: unknown) => {
-        state.where = value;
-        return chain;
-      }),
-      run,
-    };
+    const prepare = vi.fn((query: string) => ({
+      query,
+      bind(...values: unknown[]) {
+        return {
+          query,
+          values,
+          run,
+        };
+      },
+    }));
     const db = {
-      update: vi.fn(() => chain),
+      $client: {
+        prepare,
+      },
     } as unknown as Parameters<typeof reserveInboxSlot>[0]["db"];
 
     await expect(
       reserveInboxSlot({
         db,
         addressId: "address-1",
+        organizationId: "org-1",
+        addressEmailCount: 10,
+        organizationEmailCount: 20,
         maxReceivedEmailCount: 10,
+        maxOrganizationReceivedEmailCount: 20,
       })
     ).resolves.toBe(false);
-
-    const where = renderSql(state.where);
-    expect(where.sql).toContain('"email_addresses"."id" = ?');
-    expect(where.sql).toContain('"email_addresses"."email_count" < ?');
-    expect(where.params).toEqual(["address-1", 10]);
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

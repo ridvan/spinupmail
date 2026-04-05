@@ -142,6 +142,8 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
   - `[vars].EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` (default: `104857600`)
   - `[vars].EMAIL_ATTACHMENTS_ENABLED` (default: `true`)
   - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
+  - `[vars].MAX_RECEIVED_EMAILS_PER_ORGANIZATION` (default: `1000`)
+  - `[vars].MAX_RECEIVED_EMAILS_PER_ADDRESS` (default: `100`)
   - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
   - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
   - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
@@ -375,6 +377,8 @@ EMAIL_DOMAINS = "spinupmail.com,spinupmail.dev"
 FORCED_MAIL_PREFIX = "temp" # Optional. Forces created/renamed inboxes to start with temp-
 AUTH_ALLOWED_EMAIL_DOMAIN = "example.com" # Optional if you want to restrict sign-ups/sign-ins to a domain
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
+MAX_RECEIVED_EMAILS_PER_ORGANIZATION = "1000"
+MAX_RECEIVED_EMAILS_PER_ADDRESS = "100"
 API_KEY_RATE_LIMIT_WINDOW = "60"
 API_KEY_RATE_LIMIT_MAX = "120"
 AUTH_RATE_LIMIT_WINDOW = "60"
@@ -490,6 +494,8 @@ Limits:
 - `EMAIL_ATTACHMENT_MAX_BYTES`: max size per attachment uploaded to R2 (default `10485760`).
 - `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION`: max total attachment storage across all emails in one organization (default `104857600`, or 100 MB).
 - `EMAIL_ATTACHMENTS_ENABLED`: when `false`, inbound attachments are ignored and attachment UI/API surfaces are disabled (`true` by default).
+- `MAX_RECEIVED_EMAILS_PER_ORGANIZATION`: hard cap across all stored emails in one organization (default `1000`).
+- `MAX_RECEIVED_EMAILS_PER_ADDRESS`: hard cap across stored emails in one address (default `100`).
 - `EMAIL_STORE_HEADERS_IN_DB`: persist full header JSON in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_DB`: persist full raw MIME in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_R2`: persist full raw MIME in private R2 (`false` by default).

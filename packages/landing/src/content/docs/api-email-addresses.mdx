@@ -19,6 +19,16 @@ If the Worker is configured with `FORCED_MAIL_PREFIX`, create and rename
 operations always apply that prefix on the backend before the final address is
 validated and stored.
 
+Email retention is controlled by two limits:
+
+- `/api/domains` returns `maxReceivedEmailsPerAddress` and
+  `maxReceivedEmailsPerOrganization` so clients can mirror the active limits.
+- Address create and update requests still use `maxReceivedEmailCount` and
+  `maxReceivedEmailAction` for the per-inbox policy stored in metadata.
+- The effective inbox retention limit is capped by the current
+  `maxReceivedEmailsPerAddress` value, and inbound storage is also bounded by
+  the organization-wide `maxReceivedEmailsPerOrganization` total.
+
 ## List email addresses
 
 <ApiEndpointReference specId="get-email-addresses" />

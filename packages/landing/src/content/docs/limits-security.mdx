@@ -25,6 +25,8 @@ These limits are part of the current Spinupmail product behavior.
 | Organizations per user | `3`, configurable in backend auth setup |
 | Members per organization | `10`, configurable in backend auth setup |
 | Addresses per organization | `100` by default, configurable with `MAX_ADDRESSES_PER_ORGANIZATION` |
+| Stored emails per address | `100` by default, configurable with `MAX_RECEIVED_EMAILS_PER_ADDRESS` |
+| Stored emails per organization | `1000` by default, configurable with `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` |
 
 If an organization reaches its address cap, new address creation is blocked
 until the limit is raised or existing addresses are removed.
@@ -32,6 +34,10 @@ until the limit is raised or existing addresses are removed.
 The organization and membership caps are currently set in the Better Auth
 organization plugin configuration rather than exposed as `wrangler.toml`
 variables.
+
+`GET /api/domains` exposes the live `maxReceivedEmailsPerAddress` and
+`maxReceivedEmailsPerOrganization` values so clients can stay aligned with the
+currently deployed limits.
 
 ## Email and attachment limits
 
@@ -44,10 +50,21 @@ These settings control how much inbound mail Spinupmail accepts and stores.
 | `EMAIL_ATTACHMENT_MAX_BYTES` | `10485760` bytes per attachment |
 | `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | `104857600` bytes total per organization |
 | `EMAIL_ATTACHMENTS_ENABLED` | `true` |
+| `MAX_RECEIVED_EMAILS_PER_ADDRESS` | `100` stored emails per inbox by default |
+| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` | `1000` stored emails across the organization by default |
 
 Oversized message bodies are dropped before D1 persistence to avoid write
 failures. Oversized attachments are skipped, and new attachments are also
 skipped once an organization would exceed its total attachment quota.
+
+For inbox retention, Spinupmail enforces both limits together:
+
+- The configured address policy (`maxReceivedEmailCount`) cannot exceed
+  `MAX_RECEIVED_EMAILS_PER_ADDRESS`.
+- If an address does not store its own override, inbound processing falls back
+  to the current `MAX_RECEIVED_EMAILS_PER_ADDRESS` default.
+- The total number of stored emails across all inboxes in the org cannot exceed
+  `MAX_RECEIVED_EMAILS_PER_ORGANIZATION`.
 
 <Callout tone="warning" title="Attachment quota is enforced at org scope">
   The total attachment storage limit applies across all inboxes in the same

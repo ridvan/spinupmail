@@ -20,6 +20,12 @@ export const AddressManagementPage = () => {
           domains={domainsQuery.data?.items ?? []}
           isDomainsLoading={domainsQuery.isLoading}
           forcedLocalPartPrefix={domainsQuery.data?.forcedLocalPartPrefix}
+          maxReceivedEmailsPerOrganization={
+            domainsQuery.data?.maxReceivedEmailsPerOrganization
+          }
+          maxReceivedEmailsPerAddress={
+            domainsQuery.data?.maxReceivedEmailsPerAddress
+          }
         />
       </section>
 
@@ -31,6 +37,9 @@ export const AddressManagementPage = () => {
         <AddressList
           domains={domainsQuery.data?.items ?? []}
           forcedLocalPartPrefix={domainsQuery.data?.forcedLocalPartPrefix}
+          maxReceivedEmailsPerAddress={
+            domainsQuery.data?.maxReceivedEmailsPerAddress
+          }
         />
       </section>
     </div>

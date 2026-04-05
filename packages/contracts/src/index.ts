@@ -4,6 +4,8 @@ export const domainConfigSchema = z.object({
   items: z.array(z.string().min(1)),
   default: z.string().nullable(),
   forcedLocalPartPrefix: z.string().nullable(),
+  maxReceivedEmailsPerOrganization: z.number().int().positive(),
+  maxReceivedEmailsPerAddress: z.number().int().positive(),
 });
 
 export const organizationStatsItemSchema = z.object({

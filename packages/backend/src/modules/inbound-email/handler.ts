@@ -8,6 +8,8 @@ import {
   EMAIL_MAX_BYTES_DEFAULT,
 } from "@/shared/constants";
 import {
+  getMaxReceivedEmailsPerAddress,
+  getMaxReceivedEmailsPerOrganization,
   isEmailAttachmentsEnabled,
   parseBooleanEnv,
   parsePositiveNumber,
@@ -37,6 +39,7 @@ import {
   deleteEmailsForAddress,
   findAddressByRecipient,
   findInboundEmailByAddressAndMessageId,
+  getInboxReservationCounts,
   insertInboundEmail,
   reserveInboxSlot,
   resetAddressEmailCount,
@@ -51,6 +54,75 @@ import {
   checkInboundAbusePreflight,
   recordAcceptedInboundEmailAbuse,
 } from "./abuse";
+
+type InboxReservationResult =
+  | { reserved: true }
+  | {
+      reserved: false;
+      reason: "address_limit" | "organization_limit" | "not_found" | "conflict";
+    };
+
+const getReservationFailureReason = (result: InboxReservationResult) =>
+  result.reserved ? null : result.reason;
+
+const reserveInboxSlotWithLimits = async ({
+  db,
+  addressId,
+  organizationId,
+  maxReceivedEmailCount,
+  maxOrganizationReceivedEmailCount,
+}: {
+  db: ReturnType<typeof getDb>;
+  addressId: string;
+  organizationId: string;
+  maxReceivedEmailCount: number;
+  maxOrganizationReceivedEmailCount: number;
+}): Promise<InboxReservationResult> => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const counts = await getInboxReservationCounts(db, {
+      addressId,
+      organizationId,
+    });
+    if (!counts) {
+      return { reserved: false, reason: "not_found" };
+    }
+
+    if (counts.addressEmailCount >= maxReceivedEmailCount) {
+      return { reserved: false, reason: "address_limit" };
+    }
+
+    if (counts.organizationEmailCount >= maxOrganizationReceivedEmailCount) {
+      return { reserved: false, reason: "organization_limit" };
+    }
+
+    const reserved = await reserveInboxSlot({
+      db,
+      addressId,
+      organizationId,
+      addressEmailCount: counts.addressEmailCount,
+      organizationEmailCount: counts.organizationEmailCount,
+      maxReceivedEmailCount,
+      maxOrganizationReceivedEmailCount,
+    });
+    if (reserved) return { reserved: true };
+  }
+
+  const counts = await getInboxReservationCounts(db, {
+    addressId,
+    organizationId,
+  });
+  if (!counts) {
+    return { reserved: false, reason: "not_found" };
+  }
+  if (counts.addressEmailCount >= maxReceivedEmailCount) {
+    return { reserved: false, reason: "address_limit" };
+  }
+  if (counts.organizationEmailCount >= maxOrganizationReceivedEmailCount) {
+    return { reserved: false, reason: "organization_limit" };
+  }
+
+  return { reserved: false, reason: "conflict" };
+};
 
 export const handleIncomingEmail = async (
   message: ForwardableEmailMessage,
@@ -146,11 +218,16 @@ export const handleIncomingEmail = async (
       return;
     }
     const addressMeta = parseAddressMeta(addressRow.meta);
-    const maxReceivedEmailCount = getMaxReceivedEmailCountFromMeta(addressMeta);
+    const addressHardLimit = getMaxReceivedEmailsPerAddress(env);
+    const organizationHardLimit = getMaxReceivedEmailsPerOrganization(env);
+    const configuredMaxReceivedEmailCount =
+      getMaxReceivedEmailCountFromMeta(addressMeta);
+    const maxReceivedEmailCount = Math.min(
+      configuredMaxReceivedEmailCount ?? addressHardLimit,
+      addressHardLimit
+    );
     const maxReceivedEmailAction =
-      maxReceivedEmailCount === null
-        ? null
-        : getMaxReceivedEmailActionFromMeta(addressMeta);
+      getMaxReceivedEmailActionFromMeta(addressMeta);
 
     const maxBytes =
       parsePositiveNumber(env.EMAIL_MAX_BYTES) ?? EMAIL_MAX_BYTES_DEFAULT;
@@ -232,86 +309,97 @@ export const handleIncomingEmail = async (
     const toValue = message.to || recipient;
 
     let inboxSlotReserved = false;
-    let reservationDecision = "not_required";
-    if (maxReceivedEmailCount !== null) {
-      inboxSlotReserved = await reserveInboxSlot({
+    let reservationDecision = "reserved";
+    let reservationResult = await reserveInboxSlotWithLimits({
+      db,
+      addressId: addressRow.id,
+      organizationId,
+      maxReceivedEmailCount,
+      maxOrganizationReceivedEmailCount: organizationHardLimit,
+    });
+    inboxSlotReserved = reservationResult.reserved;
+    let reservationFailureReason =
+      getReservationFailureReason(reservationResult);
+    reservationDecision = inboxSlotReserved
+      ? "reserved"
+      : (reservationFailureReason ?? "conflict");
+
+    if (
+      !inboxSlotReserved &&
+      reservationFailureReason === "address_limit" &&
+      maxReceivedEmailAction === "cleanAll"
+    ) {
+      if (env.R2_BUCKET) {
+        try {
+          await Promise.all([
+            deleteR2ObjectsByPrefix({
+              bucket: env.R2_BUCKET,
+              prefix: `email-attachments/${organizationId}/${addressRow.id}/`,
+            }),
+            deleteR2ObjectsByPrefix({
+              bucket: env.R2_BUCKET,
+              prefix: `email-raw/${organizationId}/${addressRow.id}/`,
+            }),
+          ]);
+        } catch (error) {
+          logInboundError(
+            "[email] Failed to clean address files after limit reached",
+            logFields({
+              organizationId,
+              error,
+            })
+          );
+          message.setReject("Temporary processing error");
+          return;
+        }
+      }
+
+      await deleteEmailsForAddress(db, addressRow.id);
+      await resetAddressEmailCount(db, addressRow.id);
+      reservationResult = await reserveInboxSlotWithLimits({
         db,
         addressId: addressRow.id,
+        organizationId,
         maxReceivedEmailCount,
+        maxOrganizationReceivedEmailCount: organizationHardLimit,
       });
-      reservationDecision = inboxSlotReserved ? "reserved" : "limit_reached";
-
-      if (!inboxSlotReserved && maxReceivedEmailAction === "rejectNew") {
-        reservationDecision = "rejected_limit";
-        logInboundInfo(
-          "[email] Inbound reservation decision",
-          logFields({
-            decision: reservationDecision,
-            maxReceivedEmailCount,
-            maxReceivedEmailAction,
-          })
-        );
-        message.setReject("Address inbox limit reached");
-        return;
-      }
-
-      if (!inboxSlotReserved && maxReceivedEmailAction === "cleanAll") {
-        if (env.R2_BUCKET) {
-          try {
-            await Promise.all([
-              deleteR2ObjectsByPrefix({
-                bucket: env.R2_BUCKET,
-                prefix: `email-attachments/${organizationId}/${addressRow.id}/`,
-              }),
-              deleteR2ObjectsByPrefix({
-                bucket: env.R2_BUCKET,
-                prefix: `email-raw/${organizationId}/${addressRow.id}/`,
-              }),
-            ]);
-          } catch (error) {
-            logInboundError(
-              "[email] Failed to clean address files after limit reached",
-              logFields({
-                organizationId,
-                error,
-              })
-            );
-            message.setReject("Temporary processing error");
-            return;
-          }
-        }
-
-        await deleteEmailsForAddress(db, addressRow.id);
-        await resetAddressEmailCount(db, addressRow.id);
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          inboxSlotReserved = await reserveInboxSlot({
-            db,
-            addressId: addressRow.id,
-            maxReceivedEmailCount,
-          });
-          if (inboxSlotReserved) break;
-        }
-        reservationDecision = inboxSlotReserved
-          ? "reserved_after_cleanup"
-          : "rejected_after_cleanup";
-      }
-
-      if (!inboxSlotReserved) {
-        logInboundInfo(
-          "[email] Inbound reservation decision",
-          logFields({
-            decision: reservationDecision,
-            maxReceivedEmailCount,
-            maxReceivedEmailAction,
-          })
-        );
-        message.setReject("Address inbox limit reached");
-        return;
-      }
-
-      reservedAddressId = addressRow.id;
-      reservedOrganizationId = organizationId;
+      inboxSlotReserved = reservationResult.reserved;
+      reservationFailureReason = getReservationFailureReason(reservationResult);
+      reservationDecision = inboxSlotReserved
+        ? "reserved_after_cleanup"
+        : reservationFailureReason === "organization_limit"
+          ? "organization_limit_after_cleanup"
+          : reservationFailureReason === "address_limit"
+            ? "rejected_after_cleanup"
+            : (reservationFailureReason ?? "conflict");
     }
+
+    if (!inboxSlotReserved) {
+      logInboundInfo(
+        "[email] Inbound reservation decision",
+        logFields({
+          decision: reservationDecision,
+          maxReceivedEmailCount,
+          maxReceivedEmailAction,
+          organizationHardLimit,
+        })
+      );
+
+      if (reservationFailureReason === "organization_limit") {
+        message.setReject("Organization inbox limit reached");
+        return;
+      }
+      if (reservationFailureReason === "address_limit") {
+        message.setReject("Address inbox limit reached");
+        return;
+      }
+
+      message.setReject("Temporary processing error");
+      return;
+    }
+
+    reservedAddressId = addressRow.id;
+    reservedOrganizationId = organizationId;
 
     logInboundInfo(
       "[email] Inbound reservation decision",
@@ -319,6 +407,7 @@ export const handleIncomingEmail = async (
         decision: reservationDecision,
         maxReceivedEmailCount,
         maxReceivedEmailAction,
+        organizationHardLimit,
       })
     );
 

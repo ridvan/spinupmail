@@ -7,6 +7,8 @@ import {
   getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
   getMaxAddressesPerOrganization,
+  getMaxReceivedEmailsPerAddress,
+  getMaxReceivedEmailsPerOrganization,
   normalizeDomain,
   parseBooleanEnv,
   parsePositiveInteger,
@@ -115,6 +117,56 @@ describe("shared env helpers", () => {
     expect(
       getMaxTotalAttachmentStoragePerOrganization({} as CloudflareBindings)
     ).toBe(104857600);
+  });
+
+  it("parses max received emails per organization and falls back to default", () => {
+    expect(
+      getMaxReceivedEmailsPerOrganization({
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "2500",
+      } as CloudflareBindings)
+    ).toBe(2500);
+    expect(
+      getMaxReceivedEmailsPerOrganization({
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "1.5",
+      } as CloudflareBindings)
+    ).toBe(1000);
+    expect(
+      getMaxReceivedEmailsPerOrganization({
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "0",
+      } as CloudflareBindings)
+    ).toBe(1000);
+    expect(
+      getMaxReceivedEmailsPerOrganization({
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "invalid",
+      } as CloudflareBindings)
+    ).toBe(1000);
+    expect(getMaxReceivedEmailsPerOrganization({} as CloudflareBindings)).toBe(
+      1000
+    );
+  });
+
+  it("parses max received emails per address and falls back to default", () => {
+    expect(
+      getMaxReceivedEmailsPerAddress({
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "250",
+      } as CloudflareBindings)
+    ).toBe(250);
+    expect(
+      getMaxReceivedEmailsPerAddress({
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "1.5",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxReceivedEmailsPerAddress({
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "0",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxReceivedEmailsPerAddress({
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "invalid",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(getMaxReceivedEmailsPerAddress({} as CloudflareBindings)).toBe(100);
   });
 
   it("parses boolean-like env values with fallback", () => {

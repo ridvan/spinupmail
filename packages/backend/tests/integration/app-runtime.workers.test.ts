@@ -4,7 +4,12 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import { createWorkerHandler } from "@/index";
-import { getForcedMailPrefix, normalizeDomain } from "@/shared/env";
+import {
+  getForcedMailPrefix,
+  getMaxReceivedEmailsPerAddress,
+  getMaxReceivedEmailsPerOrganization,
+  normalizeDomain,
+} from "@/shared/env";
 
 type SessionShape = {
   session?: {
@@ -133,6 +138,9 @@ describe("worker fetch (workers pool) runtime behavior", () => {
       items: getConfiguredDomains(),
       default: getConfiguredDomains()[0] ?? null,
       forcedLocalPartPrefix: getForcedMailPrefix(workerMailPrefixEnv) ?? null,
+      maxReceivedEmailsPerOrganization:
+        getMaxReceivedEmailsPerOrganization(env),
+      maxReceivedEmailsPerAddress: getMaxReceivedEmailsPerAddress(env),
     });
   });
 

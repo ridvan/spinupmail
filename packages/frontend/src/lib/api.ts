@@ -197,6 +197,8 @@ export type DomainConfig = {
   items: string[];
   default: string | null;
   forcedLocalPartPrefix: string | null;
+  maxReceivedEmailsPerOrganization: number;
+  maxReceivedEmailsPerAddress: number;
 };
 
 export type OrganizationStatsItem = {

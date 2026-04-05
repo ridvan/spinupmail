@@ -1,4 +1,9 @@
-import { getAllowedDomains, getForcedMailPrefix } from "@/shared/env";
+import {
+  getAllowedDomains,
+  getForcedMailPrefix,
+  getMaxReceivedEmailsPerAddress,
+  getMaxReceivedEmailsPerOrganization,
+} from "@/shared/env";
 
 export const getDomainsResponse = (env: CloudflareBindings) => {
   const allowed = getAllowedDomains(env);
@@ -15,6 +20,9 @@ export const getDomainsResponse = (env: CloudflareBindings) => {
       items: allowed,
       default: allowed[0] ?? null,
       forcedLocalPartPrefix: getForcedMailPrefix(env) ?? null,
+      maxReceivedEmailsPerOrganization:
+        getMaxReceivedEmailsPerOrganization(env),
+      maxReceivedEmailsPerAddress: getMaxReceivedEmailsPerAddress(env),
     },
   };
 };

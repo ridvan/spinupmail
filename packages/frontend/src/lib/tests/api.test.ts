@@ -29,6 +29,8 @@ describe("api client helpers", () => {
           items: ["spinupmail.com"],
           default: "spinupmail.com",
           forcedLocalPartPrefix: "temp",
+          maxReceivedEmailsPerOrganization: 1000,
+          maxReceivedEmailsPerAddress: 100,
         }),
         {
           status: 200,
@@ -41,6 +43,8 @@ describe("api client helpers", () => {
 
     expect(result.items).toEqual(["spinupmail.com"]);
     expect(result.forcedLocalPartPrefix).toBe("temp");
+    expect(result.maxReceivedEmailsPerOrganization).toBe(1000);
+    expect(result.maxReceivedEmailsPerAddress).toBe(100);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

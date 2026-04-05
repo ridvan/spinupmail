@@ -4,6 +4,8 @@ export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
 const MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT = 100;
+const MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT = 1_000;
+const MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT = 100;
 const CLOUDFLARE_KV_MINIMUM_TTL_SECONDS = 60;
 const API_KEY_RATE_LIMIT_WINDOW_DEFAULT = 60;
 const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
@@ -49,6 +51,34 @@ export const getMaxAddressesPerOrganization = (env: CloudflareBindings) => {
   const parsed = Number(rawLimit);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT;
+  }
+
+  return parsed;
+};
+
+export const getMaxReceivedEmailsPerOrganization = (
+  env: Pick<CloudflareBindings, "MAX_RECEIVED_EMAILS_PER_ORGANIZATION">
+) => {
+  const rawLimit = env.MAX_RECEIVED_EMAILS_PER_ORGANIZATION?.trim();
+  if (!rawLimit) return MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT;
+
+  const parsed = Number(rawLimit);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT;
+  }
+
+  return parsed;
+};
+
+export const getMaxReceivedEmailsPerAddress = (
+  env: Pick<CloudflareBindings, "MAX_RECEIVED_EMAILS_PER_ADDRESS">
+) => {
+  const rawLimit = env.MAX_RECEIVED_EMAILS_PER_ADDRESS?.trim();
+  if (!rawLimit) return MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT;
+
+  const parsed = Number(rawLimit);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT;
   }
 
   return parsed;

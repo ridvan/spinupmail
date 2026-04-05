@@ -7,6 +7,8 @@ describe("shared contracts", () => {
       items: ["spinupmail.com"],
       default: "spinupmail.com",
       forcedLocalPartPrefix: null,
+      maxReceivedEmailsPerOrganization: 1000,
+      maxReceivedEmailsPerAddress: 100,
     });
 
     expect(parsed.success).toBe(true);

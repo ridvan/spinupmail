@@ -215,9 +215,36 @@ describe("email addresses service", () => {
         body: expect.objectContaining({
           address: "temp-project-team@spinupmail.com",
           localPart: "temp-project-team",
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
         }),
       })
     );
+  });
+
+  it("stores the default inbox limit when create payload omits it", async () => {
+    await createEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
+      } as CloudflareBindings,
+      session: {
+        session: { id: "session-1", userId: "user-1" },
+        user: { id: "user-1", emailVerified: true },
+      },
+      organizationId: "org-1",
+      payload: {
+        localPart: "demo-team",
+        acceptedRiskNotice: true,
+      },
+    });
+
+    expect(
+      JSON.parse(mocks.insertAddress.mock.calls[0]?.[1]?.meta as string)
+    ).toEqual({
+      maxReceivedEmailCount: 25,
+      maxReceivedEmailAction: "cleanAll",
+    });
   });
 
   it("returns the organization address limit error when no insert slot is available", async () => {
@@ -244,6 +271,34 @@ describe("email addresses service", () => {
       body: {
         error:
           "Address limit reached. Each organization can create up to 3 addresses.",
+      },
+    });
+  });
+
+  it("rejects address inbox limits above the configured hard cap on create", async () => {
+    const result = await createEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
+      } as CloudflareBindings,
+      session: {
+        session: { id: "session-1", userId: "user-1" },
+        user: { id: "user-1", emailVerified: true },
+      },
+      organizationId: "org-1",
+      payload: {
+        localPart: "demo-team",
+        acceptedRiskNotice: true,
+        maxReceivedEmailCount: 26,
+        maxReceivedEmailAction: "cleanAll",
+      },
+    });
+
+    expect(mocks.insertAddress).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 400,
+      body: {
+        error: "maxReceivedEmailCount must be a whole number between 1 and 25",
       },
     });
   });
@@ -376,7 +431,7 @@ describe("email addresses service", () => {
     });
   });
 
-  it("clears policy controls and TTL when updating an address back to defaults", async () => {
+  it("resets inbox limits to the default cap when updating an address back to defaults", async () => {
     mocks.findAddressByIdAndOrganization.mockResolvedValue({
       id: "address-1",
       address: "project@spinupmail.com",
@@ -422,7 +477,10 @@ describe("email addresses service", () => {
         address: "project@spinupmail.com",
         localPart: "project",
         domain: "spinupmail.com",
-        meta: null,
+        meta: JSON.stringify({
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        }),
         expiresAt: null,
       },
     });
@@ -433,19 +491,57 @@ describe("email addresses service", () => {
         address: "project@spinupmail.com",
         localPart: "project",
         domain: "spinupmail.com",
-        meta: null,
+        meta: {
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
         emailCount: 7,
         allowedFromDomains: [],
         blockedSenderDomains: [],
         inboundRatePolicy: null,
-        maxReceivedEmailCount: null,
-        maxReceivedEmailAction: null,
+        maxReceivedEmailCount: 100,
+        maxReceivedEmailAction: "cleanAll",
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
         expiresAt: null,
         expiresAtMs: null,
         lastReceivedAt: "2026-03-28T12:00:00.000Z",
         lastReceivedAtMs: Date.parse("2026-03-28T12:00:00.000Z"),
+      },
+    });
+  });
+
+  it("rejects address inbox limits above the configured hard cap on update", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "project@spinupmail.com",
+      localPart: "project",
+      domain: "spinupmail.com",
+      meta: null,
+      emailCount: 2,
+      createdAt: new Date("2026-03-20T10:00:00.000Z"),
+      expiresAt: null,
+      lastReceivedAt: null,
+    });
+
+    const result = await updateEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      addressId: "address-1",
+      payload: {
+        maxReceivedEmailCount: 26,
+        maxReceivedEmailAction: "cleanAll",
+      },
+    });
+
+    expect(mocks.updateAddressByIdAndOrganization).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 400,
+      body: {
+        error: "maxReceivedEmailCount must be a whole number between 1 and 25",
       },
     });
   });
@@ -525,7 +621,10 @@ describe("email addresses service", () => {
         address: "temp-project-v2@spinupmail.com",
         localPart: "temp-project-v2",
         domain: "spinupmail.com",
-        meta: null,
+        meta: JSON.stringify({
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        }),
         expiresAt: null,
       },
     });
@@ -536,13 +635,16 @@ describe("email addresses service", () => {
         address: "temp-project-v2@spinupmail.com",
         localPart: "temp-project-v2",
         domain: "spinupmail.com",
-        meta: null,
+        meta: {
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
         emailCount: 2,
         allowedFromDomains: [],
         blockedSenderDomains: [],
         inboundRatePolicy: null,
-        maxReceivedEmailCount: null,
-        maxReceivedEmailAction: null,
+        maxReceivedEmailCount: 100,
+        maxReceivedEmailAction: "cleanAll",
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
         expiresAt: null,

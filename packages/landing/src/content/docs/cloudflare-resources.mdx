@@ -109,6 +109,8 @@ control routing, email limits, and optional product behavior.
 | `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | Total attachment quota per organization, default `104857600` |
 | `EMAIL_ATTACHMENTS_ENABLED` | Toggle attachment processing, default `true` |
 | `MAX_ADDRESSES_PER_ORGANIZATION` | Address cap per org, default `100` |
+| `MAX_RECEIVED_EMAILS_PER_ADDRESS` | Default and hard cap for stored emails per inbox, default `100` |
+| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` | Total stored-email cap across one org, default `1000` |
 | `API_KEY_RATE_LIMIT_WINDOW` and `API_KEY_RATE_LIMIT_MAX` | Rate limit window and max for `x-api-key` traffic |
 | `AUTH_RATE_LIMIT_WINDOW` and `AUTH_RATE_LIMIT_MAX` | Better Auth global rate limiting |
 | `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | Change-email rate limiting |

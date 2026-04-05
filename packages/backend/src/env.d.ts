@@ -20,6 +20,8 @@ declare global {
     EMAIL_STORE_RAW_IN_R2?: string;
     FORCED_MAIL_PREFIX?: string;
     MAX_ADDRESSES_PER_ORGANIZATION?: string;
+    MAX_RECEIVED_EMAILS_PER_ADDRESS?: string;
+    MAX_RECEIVED_EMAILS_PER_ORGANIZATION?: string;
     RESEND_FROM_EMAIL?: string;
   }
 }

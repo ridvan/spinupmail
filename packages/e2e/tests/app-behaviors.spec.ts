@@ -172,6 +172,9 @@ test.describe("spinupmail app behaviors", () => {
     await page.getByRole("textbox", { name: "Username" }).fill(localPart);
     await page.getByRole("combobox", { name: "Domain" }).click();
     await page.getByRole("option").first().click();
+    await page
+      .locator('label[for="address-max-received-action-clean-all"]')
+      .click();
     await page.getByRole("checkbox").first().click();
     await page
       .getByRole("button", { name: "Create address", exact: true })

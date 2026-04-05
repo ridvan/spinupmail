@@ -238,7 +238,7 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction ttl localPart acceptedRiskNotice recent activity cursor search",
+      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction maxReceivedEmailsPerAddress maxReceivedEmailsPerOrganization ttl localPart acceptedRiskNotice recent activity cursor search",
     codeText:
       "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id",
   },

@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { emailAddresses, emailAttachments, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 import {
@@ -33,6 +33,41 @@ export const findInboundEmailByAddressAndMessageId = (
       and(eq(emails.addressId, addressId), eq(emails.messageId, messageId))
     )
     .get();
+
+export const getInboxReservationCounts = async (
+  db: AppDb,
+  values: {
+    addressId: string;
+    organizationId: string;
+  }
+) => {
+  const row = await db.$client
+    .prepare(
+      `
+        SELECT
+          email_count AS addressEmailCount,
+          (
+            SELECT coalesce(sum(email_count), 0)
+            FROM email_addresses
+            WHERE organization_id = ?
+          ) AS organizationEmailCount
+        FROM email_addresses
+        WHERE id = ? AND organization_id = ?
+      `
+    )
+    .bind(values.organizationId, values.addressId, values.organizationId)
+    .first<{
+      addressEmailCount: number | string | null;
+      organizationEmailCount: number | string | null;
+    }>();
+
+  if (!row) return null;
+
+  return {
+    addressEmailCount: Number(row.addressEmailCount ?? 0),
+    organizationEmailCount: Number(row.organizationEmailCount ?? 0),
+  };
+};
 
 export const getOrganizationAttachmentStorageUsage = async (
   db: AppDb,
@@ -227,22 +262,46 @@ export const insertInboundEmail = async (
 export const reserveInboxSlot = ({
   db,
   addressId,
+  organizationId,
+  addressEmailCount,
+  organizationEmailCount,
   maxReceivedEmailCount,
+  maxOrganizationReceivedEmailCount,
 }: {
   db: AppDb;
   addressId: string;
+  organizationId: string;
+  addressEmailCount: number;
+  organizationEmailCount: number;
   maxReceivedEmailCount: number;
+  maxOrganizationReceivedEmailCount: number;
 }) =>
-  db
-    .update(emailAddresses)
-    .set({
-      emailCount: sql`${emailAddresses.emailCount} + 1`,
-    })
-    .where(
-      and(
-        eq(emailAddresses.id, addressId),
-        lt(emailAddresses.emailCount, maxReceivedEmailCount)
-      )
+  db.$client
+    .prepare(
+      `
+        UPDATE email_addresses
+        SET email_count = email_count + 1
+        WHERE id = ?
+          AND organization_id = ?
+          AND email_count = ?
+          AND email_count < ?
+          AND (
+            SELECT coalesce(sum(email_count), 0)
+            FROM email_addresses
+            WHERE organization_id = ?
+          ) = ?
+          AND ? < ?
+      `
+    )
+    .bind(
+      addressId,
+      organizationId,
+      addressEmailCount,
+      maxReceivedEmailCount,
+      organizationId,
+      organizationEmailCount,
+      organizationEmailCount,
+      maxOrganizationReceivedEmailCount
     )
     .run()
     .then(result => result.meta.changes > 0);

@@ -87,6 +87,7 @@ import { cn } from "@/lib/utils";
 type AddressListProps = {
   domains: string[];
   forcedLocalPartPrefix?: string | null;
+  maxReceivedEmailsPerAddress?: number;
 };
 
 const PAGE_SIZE = 10;
@@ -560,6 +561,7 @@ const AddressTableRow = React.memo(
 const AddressListContent = ({
   domains,
   forcedLocalPartPrefix = null,
+  maxReceivedEmailsPerAddress,
 }: AddressListProps) => {
   const { effectiveTimeZone } = useTimezone();
   const location = useLocation();
@@ -1223,6 +1225,7 @@ const AddressListContent = ({
         address={editingAddress}
         domains={domains}
         forcedLocalPartPrefix={forcedLocalPartPrefix}
+        maxReceivedEmailsPerAddress={maxReceivedEmailsPerAddress}
         errorMessage={editSheetErrorMessage}
         isLoading={isEditSheetLoading}
         isNotFound={isNotFoundError(editingAddressQuery.error)}
@@ -1236,11 +1239,13 @@ const AddressListContent = ({
 export const AddressList = ({
   domains,
   forcedLocalPartPrefix = null,
+  maxReceivedEmailsPerAddress,
 }: AddressListProps) => (
   <NuqsAdapter>
     <AddressListContent
       domains={domains}
       forcedLocalPartPrefix={forcedLocalPartPrefix}
+      maxReceivedEmailsPerAddress={maxReceivedEmailsPerAddress}
     />
   </NuqsAdapter>
 );

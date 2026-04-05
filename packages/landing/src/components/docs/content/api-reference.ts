@@ -404,7 +404,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     method: "GET",
     path: "/api/domains",
     purpose:
-      "Return the inbound domains currently configured for the Worker so clients can select a valid address domain.",
+      "Return the inbound domains and current inbox-retention defaults currently configured for the Worker.",
     successStatus: 200,
     auth: {
       summary:
@@ -429,6 +429,18 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         description:
           "Forced inbox local-part prefix configured on the Worker. When non-null, clients should treat <prefix>- as always applied by the backend.",
       },
+      {
+        name: "maxReceivedEmailsPerOrganization",
+        type: "number",
+        description:
+          "Current organization-wide ceiling for stored emails across all inboxes in the active deployment.",
+      },
+      {
+        name: "maxReceivedEmailsPerAddress",
+        type: "number",
+        description:
+          "Current default and hard cap for stored emails per inbox in the active deployment.",
+      },
     ],
     errors: [
       {
@@ -452,7 +464,9 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     exampleResponse: `{
   "items": ["spinupmail.dev", "qa.spinupmail.dev"],
   "default": "spinupmail.dev",
-  "forcedLocalPartPrefix": "temp"
+  "forcedLocalPartPrefix": "temp",
+  "maxReceivedEmailsPerOrganization": 1000,
+  "maxReceivedEmailsPerAddress": 100
 }`,
   },
   {
@@ -1047,6 +1061,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     successStatus: 200,
     notes: [
       "If the Worker sets FORCED_MAIL_PREFIX, the backend prepends <prefix>- to localPart before reserved-word checks, conflict checks, and persistence.",
+      "GET /api/domains exposes the live maxReceivedEmailsPerAddress and maxReceivedEmailsPerOrganization values for client-side defaults and validation hints.",
     ],
     auth: {
       summary:
@@ -1122,14 +1137,16 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         type: "number",
         required: false,
         description:
-          "Maximum number of emails the inbox may retain before taking action.",
-        constraints: "Whole number between 1 and 100000.",
+          "Requested per-inbox retention limit before taking action.",
+        constraints:
+          "Whole number between 1 and 100000. When omitted, the backend stores the current MAX_RECEIVED_EMAILS_PER_ADDRESS default. Effective runtime retention is still capped by the live /api/domains maxReceivedEmailsPerAddress value.",
       },
       {
         name: "maxReceivedEmailAction",
         type: '"cleanAll" | "rejectNew"',
         required: false,
-        description: "Action applied when maxReceivedEmailCount is reached.",
+        description:
+          "Action applied when maxReceivedEmailCount is reached. When omitted, the backend stores cleanAll.",
         defaultValue: "cleanAll",
       },
       {
@@ -1352,7 +1369,8 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     ],
     notes: [
       "Set ttlMinutes to null to remove the expiration time.",
-      "Set maxReceivedEmailCount to null to clear the inbox-size limit from metadata.",
+      "Set maxReceivedEmailCount to null to clear the stored inbox-size override from metadata. Runtime enforcement then falls back to the current MAX_RECEIVED_EMAILS_PER_ADDRESS default.",
+      "Organization-wide inbound retention is still limited by MAX_RECEIVED_EMAILS_PER_ORGANIZATION even though that value is not stored on each address record.",
       "If the Worker sets FORCED_MAIL_PREFIX, localPart updates are stored with <prefix>- prepended on the backend.",
     ],
     bodyFields: [
@@ -1415,8 +1433,9 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         type: "number | null",
         required: false,
         description:
-          "Updated inbox-size limit. Null removes the current limit.",
-        constraints: "Whole number between 1 and 100000 when not null.",
+          "Updated per-inbox retention override. Null removes the stored override.",
+        constraints:
+          "Whole number between 1 and 100000 when not null. Effective runtime retention is still capped by the live /api/domains maxReceivedEmailsPerAddress value.",
       },
       {
         name: "maxReceivedEmailAction",

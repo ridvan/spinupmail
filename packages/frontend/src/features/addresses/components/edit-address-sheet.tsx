@@ -49,7 +49,6 @@ import {
 import {
   ADDRESS_LOCAL_PART_MAX_LENGTH,
   ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS,
-  ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
   ADDRESS_TTL_MAX_MINUTES,
   ALLOWED_FROM_DOMAIN_MAX_LENGTH,
   ALLOWED_FROM_DOMAINS_MAX_ITEMS,
@@ -62,12 +61,12 @@ import {
 import { useUpdateAddressMutation } from "@/features/addresses/hooks/use-addresses";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import type { EmailAddress } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 type EditAddressSheetProps = {
   address: EmailAddress | null;
   domains: string[];
   forcedLocalPartPrefix?: string | null;
+  maxReceivedEmailsPerAddress?: number;
   errorMessage?: string | null;
   isLoading?: boolean;
   isNotFound?: boolean;
@@ -75,13 +74,26 @@ type EditAddressSheetProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+type EditAddressFormValues = {
+  localPart: string;
+  domain: string;
+  ttlMinutes: number | undefined;
+  allowedFromDomains: string[];
+  maxReceivedEmailCount: number | undefined;
+  maxReceivedEmailAction: "cleanAll" | "rejectNew" | "";
+  usernameChangeConfirmed: boolean;
+};
+
 const hasUsernameChanged = (nextLocalPart: string, initialLocalPart: string) =>
   nextLocalPart.trim() !== initialLocalPart.trim();
+
+const DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS = 100;
 
 const editAddressSchema = (
   availableDomains: string[],
   localPartMaxLength: number,
-  initialLocalPart: string
+  initialLocalPart: string,
+  maxReceivedEmailsPerAddress: number
 ) =>
   z
     .object({
@@ -133,19 +145,27 @@ const editAddressSchema = (
           values => values.every(domain => domainRegex.test(domain)),
           "Use valid hostnames like `example.com`"
         ),
-      maxReceivedEmailCount: z.union([
-        z
-          .number()
-          .int({ message: "Max received emails must be a whole number" })
-          .positive({
-            message: "Max received emails must be a positive number",
-          })
-          .max(ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX, {
-            message: `Max received emails must be ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX} or less`,
-          }),
-        z.undefined(),
-      ]),
-      maxReceivedEmailAction: z.enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS),
+      maxReceivedEmailCount: z
+        .union([
+          z
+            .number()
+            .int({ message: "Max received emails must be a whole number" })
+            .positive({
+              message: "Max received emails must be a positive number",
+            })
+            .max(maxReceivedEmailsPerAddress, {
+              message: `Max received emails must be ${maxReceivedEmailsPerAddress} or less`,
+            }),
+          z.undefined(),
+        ])
+        .refine(value => value !== undefined, {
+          message: "Max received emails is required",
+        }),
+      maxReceivedEmailAction: z
+        .union([z.enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS), z.literal("")])
+        .refine(value => value !== "", {
+          message: "Choose what happens when the limit is reached",
+        }),
       usernameChangeConfirmed: z.boolean(),
     })
     .superRefine((value, ctx) => {
@@ -176,11 +196,13 @@ const EditAddressSheetForm = ({
   address,
   domains,
   forcedLocalPartPrefix = null,
+  maxReceivedEmailsPerAddress = DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS,
   onOpenChange,
 }: {
   address: EmailAddress;
   domains: string[];
   forcedLocalPartPrefix?: string | null;
+  maxReceivedEmailsPerAddress?: number;
   onOpenChange: (open: boolean) => void;
 }) => {
   const updateMutation = useUpdateAddressMutation();
@@ -196,7 +218,7 @@ const EditAddressSheetForm = ({
     ? formatForcedLocalPartPrefix(forcedLocalPartPrefix)
     : null;
   const isLocalPartInputDisabled = localPartMaxLength === 0;
-  const initialValues = React.useMemo(
+  const initialValues = React.useMemo<EditAddressFormValues>(
     () => ({
       localPart: stripForcedLocalPartPrefix(
         address.localPart,
@@ -207,11 +229,12 @@ const EditAddressSheetForm = ({
         | number
         | undefined,
       allowedFromDomains: address.allowedFromDomains ?? ([] as string[]),
-      maxReceivedEmailCount: address.maxReceivedEmailCount ?? undefined,
-      maxReceivedEmailAction: address.maxReceivedEmailAction ?? "cleanAll",
+      maxReceivedEmailCount:
+        address.maxReceivedEmailCount ?? maxReceivedEmailsPerAddress,
+      maxReceivedEmailAction: address.maxReceivedEmailAction ?? "",
       usernameChangeConfirmed: false,
     }),
-    [address, domains, forcedLocalPartPrefix]
+    [address, domains, forcedLocalPartPrefix, maxReceivedEmailsPerAddress]
   );
 
   const form = useForm({
@@ -220,7 +243,8 @@ const EditAddressSheetForm = ({
       onSubmit: editAddressSchema(
         availableDomains,
         localPartMaxLength,
-        initialValues.localPart
+        initialValues.localPart,
+        maxReceivedEmailsPerAddress
       ),
     },
     onSubmit: async ({ value }) => {
@@ -232,11 +256,12 @@ const EditAddressSheetForm = ({
             domain: value.domain.trim(),
             ttlMinutes: value.ttlMinutes ?? null,
             allowedFromDomains: uniqueDomains(value.allowedFromDomains),
-            maxReceivedEmailCount: value.maxReceivedEmailCount ?? null,
+            maxReceivedEmailCount:
+              value.maxReceivedEmailCount ?? maxReceivedEmailsPerAddress,
             maxReceivedEmailAction:
-              value.maxReceivedEmailCount !== undefined
-                ? value.maxReceivedEmailAction
-                : undefined,
+              value.maxReceivedEmailAction === ""
+                ? undefined
+                : value.maxReceivedEmailAction,
           },
         }),
         {
@@ -255,6 +280,8 @@ const EditAddressSheetForm = ({
       onOpenChange(false);
     },
   });
+
+  const hasSubmitAttempted = form.state.submissionAttempts > 0;
 
   return (
     <form
@@ -518,132 +545,113 @@ const EditAddressSheetForm = ({
           />
         </div>
 
-        <form.Subscribe
-          selector={state => state.values.maxReceivedEmailCount !== undefined}
-        >
-          {isLimitEnabled => (
-            <div
-              className={cn(
-                "rounded-lg border p-3",
-                isLimitEnabled
-                  ? "border-border bg-muted/35"
-                  : "border-border/70 bg-muted/20"
-              )}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">Inbox limit</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Empty = unlimited.
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                    isLimitEnabled
-                      ? "border-foreground/20 bg-background/70 text-foreground"
-                      : "border-border/80 text-muted-foreground"
-                  )}
-                >
-                  {isLimitEnabled ? "Enabled" : "Unlimited"}
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start">
-                <form.Field
-                  name="maxReceivedEmailCount"
-                  children={field => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
-
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor="edit-address-max-received-email-count">
-                          Max emails
-                        </FieldLabel>
-                        <Input
-                          id="edit-address-max-received-email-count"
-                          name={field.name}
-                          type="number"
-                          min={1}
-                          max={ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}
-                          step={1}
-                          value={field.state.value ?? ""}
-                          onBlur={field.handleBlur}
-                          onChange={event => {
-                            const nextValue = event.target.value;
-                            field.handleChange(
-                              nextValue === "" ? undefined : Number(nextValue)
-                            );
-                          }}
-                          placeholder="Unlimited"
-                          className="h-9"
-                          aria-invalid={isInvalid}
-                        />
-                        {isInvalid ? (
-                          <FieldError
-                            errors={toFieldErrors(field.state.meta.errors)}
-                          />
-                        ) : null}
-                      </Field>
-                    );
-                  }}
-                />
-
-                <form.Field
-                  name="maxReceivedEmailAction"
-                  children={field => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
-
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel>On limit</FieldLabel>
-                        <RadioGroup
-                          value={field.state.value}
-                          className="grid gap-2 sm:grid-cols-2"
-                          onValueChange={value =>
-                            field.handleChange(
-                              (value ?? "cleanAll") as "cleanAll" | "rejectNew"
-                            )
-                          }
-                          onBlur={() => field.handleBlur()}
-                          aria-invalid={isInvalid}
-                        >
-                          <label
-                            htmlFor="edit-address-max-received-action-clean-all"
-                            className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
-                          >
-                            <RadioGroupItem
-                              id="edit-address-max-received-action-clean-all"
-                              value="cleanAll"
-                            />
-                            <span className="font-medium">Delete all</span>
-                          </label>
-                          <label
-                            htmlFor="edit-address-max-received-action-reject-new"
-                            className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
-                          >
-                            <RadioGroupItem
-                              id="edit-address-max-received-action-reject-new"
-                              value="rejectNew"
-                            />
-                            <span className="font-medium">Reject new</span>
-                          </label>
-                        </RadioGroup>
-                        {isInvalid ? (
-                          <FieldError
-                            errors={toFieldErrors(field.state.meta.errors)}
-                          />
-                        ) : null}
-                      </Field>
-                    );
-                  }}
-                />
-              </div>
+        <div className="rounded-lg border border-border bg-muted/35 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Inbox limit</p>
+              <p className="text-[11px] text-muted-foreground">
+                This address uses the default limit unless you change it here.
+              </p>
             </div>
-          )}
-        </form.Subscribe>
+            <span className="rounded-full border border-foreground/20 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-foreground">
+              Required
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start">
+            <form.Field
+              name="maxReceivedEmailCount"
+              children={field => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor="edit-address-max-received-email-count">
+                      Max emails
+                    </FieldLabel>
+                    <Input
+                      id="edit-address-max-received-email-count"
+                      name={field.name}
+                      type="number"
+                      min={1}
+                      max={maxReceivedEmailsPerAddress}
+                      step={1}
+                      value={field.state.value ?? ""}
+                      onBlur={field.handleBlur}
+                      onChange={event => {
+                        const nextValue = event.target.value;
+                        field.handleChange(
+                          nextValue === "" ? undefined : Number(nextValue)
+                        );
+                      }}
+                      placeholder={`Up to ${maxReceivedEmailsPerAddress.toLocaleString()}`}
+                      className="h-9"
+                      aria-invalid={isInvalid}
+                    />
+                    {isInvalid ? (
+                      <FieldError
+                        errors={toFieldErrors(field.state.meta.errors)}
+                      />
+                    ) : null}
+                  </Field>
+                );
+              }}
+            />
+
+            <form.Field
+              name="maxReceivedEmailAction"
+              children={field => {
+                const isInvalid =
+                  (field.state.meta.isTouched || hasSubmitAttempted) &&
+                  !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel>On limit</FieldLabel>
+                    <RadioGroup
+                      value={field.state.value}
+                      className="grid gap-2 sm:grid-cols-2"
+                      onValueChange={value =>
+                        field.handleChange(
+                          (value ?? "") as "cleanAll" | "rejectNew" | ""
+                        )
+                      }
+                      onBlur={() => field.handleBlur()}
+                      aria-invalid={isInvalid}
+                    >
+                      <label
+                        htmlFor="edit-address-max-received-action-clean-all"
+                        className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
+                      >
+                        <RadioGroupItem
+                          id="edit-address-max-received-action-clean-all"
+                          value="cleanAll"
+                        />
+                        <span className="font-medium">Delete all</span>
+                      </label>
+                      <label
+                        htmlFor="edit-address-max-received-action-reject-new"
+                        className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
+                      >
+                        <RadioGroupItem
+                          id="edit-address-max-received-action-reject-new"
+                          value="rejectNew"
+                        />
+                        <span className="font-medium">Reject new</span>
+                      </label>
+                    </RadioGroup>
+                    {isInvalid ? (
+                      <FieldError
+                        errors={toFieldErrors(field.state.meta.errors)}
+                      />
+                    ) : null}
+                  </Field>
+                );
+              }}
+            />
+          </div>
+        </div>
       </FieldGroup>
 
       <SheetFooter className="p-0">
@@ -667,12 +675,18 @@ export const EditAddressSheet = ({
   address,
   domains,
   forcedLocalPartPrefix = null,
+  maxReceivedEmailsPerAddress,
   errorMessage = null,
   isLoading = false,
   isNotFound = false,
   open,
   onOpenChange,
 }: EditAddressSheetProps) => {
+  const formKey =
+    address && address.maxReceivedEmailCount === null
+      ? `${address.id}:${maxReceivedEmailsPerAddress ?? DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS}`
+      : address?.id;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -688,10 +702,11 @@ export const EditAddressSheet = ({
 
         {address ? (
           <EditAddressSheetForm
-            key={address.id}
+            key={formKey}
             address={address}
             domains={domains}
             forcedLocalPartPrefix={forcedLocalPartPrefix}
+            maxReceivedEmailsPerAddress={maxReceivedEmailsPerAddress}
             onOpenChange={onOpenChange}
           />
         ) : errorMessage ? (

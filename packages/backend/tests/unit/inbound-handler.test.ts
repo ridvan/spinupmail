@@ -3,6 +3,7 @@ import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 const mocks = vi.hoisted(() => ({
   findAddressByRecipient: vi.fn(),
   findInboundEmailByAddressAndMessageId: vi.fn(),
+  getInboxReservationCounts: vi.fn(),
   reserveInboxSlot: vi.fn(),
   incrementAddressEmailCount: vi.fn(),
   decrementAddressEmailCount: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("@/modules/inbound-email/repo", () => ({
   findAddressByRecipient: mocks.findAddressByRecipient,
   findInboundEmailByAddressAndMessageId:
     mocks.findInboundEmailByAddressAndMessageId,
+  getInboxReservationCounts: mocks.getInboxReservationCounts,
   reserveInboxSlot: mocks.reserveInboxSlot,
   incrementAddressEmailCount: mocks.incrementAddressEmailCount,
   decrementAddressEmailCount: mocks.decrementAddressEmailCount,
@@ -114,6 +116,10 @@ describe("inbound email handler", () => {
     mocks.capTextForStorage.mockImplementation(value => value);
     mocks.persistRawEmailToR2.mockResolvedValue(undefined);
     mocks.persistAttachments.mockResolvedValue(undefined);
+    mocks.getInboxReservationCounts.mockResolvedValue({
+      addressEmailCount: 0,
+      organizationEmailCount: 0,
+    });
     mocks.reserveInboxSlot.mockResolvedValue(true);
     mocks.incrementAddressEmailCount.mockResolvedValue(undefined);
     mocks.decrementAddressEmailCount.mockResolvedValue(undefined);
@@ -246,7 +252,10 @@ describe("inbound email handler", () => {
       }),
       expiresAt: null,
     });
-    mocks.reserveInboxSlot.mockResolvedValue(false);
+    mocks.getInboxReservationCounts.mockResolvedValue({
+      addressEmailCount: 3,
+      organizationEmailCount: 3,
+    });
     mocks.checkInboundAbusePreflight.mockResolvedValue({
       allowed: true,
       senderAddress: "sender@example.com",
@@ -269,6 +278,36 @@ describe("inbound email handler", () => {
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
   });
 
+  it("rejects incoming mail when the organization inbox hard limit is reached", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+    mocks.getInboxReservationCounts.mockResolvedValue({
+      addressEmailCount: 2,
+      organizationEmailCount: 5,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "5",
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(message.setReject).toHaveBeenCalledWith(
+      "Organization inbox limit reached"
+    );
+    expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+  });
+
   it("cleans inbox and accepts new mail when limit is reached in clean mode", async () => {
     const message = buildMessage();
     const ctx = buildCtx();
@@ -282,13 +321,56 @@ describe("inbound email handler", () => {
       }),
       expiresAt: null,
     });
-    mocks.reserveInboxSlot
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
+    mocks.getInboxReservationCounts
+      .mockResolvedValueOnce({
+        addressEmailCount: 2,
+        organizationEmailCount: 2,
+      })
+      .mockResolvedValueOnce({
+        addressEmailCount: 0,
+        organizationEmailCount: 0,
+      });
+    mocks.reserveInboxSlot.mockResolvedValueOnce(true);
 
     await handleIncomingEmail(
       message as never,
       {
+        R2_BUCKET: {} as R2Bucket,
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.deleteR2ObjectsByPrefix).toHaveBeenCalledTimes(2);
+    expect(mocks.deleteEmailsForAddress).toHaveBeenCalledWith({}, "address-1");
+    expect(mocks.resetAddressEmailCount).toHaveBeenCalledWith({}, "address-1");
+    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("cleans inbox at the default address cap when no explicit inbox meta is stored", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+    mocks.getInboxReservationCounts
+      .mockResolvedValueOnce({
+        addressEmailCount: 2,
+        organizationEmailCount: 2,
+      })
+      .mockResolvedValueOnce({
+        addressEmailCount: 0,
+        organizationEmailCount: 0,
+      });
+    mocks.reserveInboxSlot.mockResolvedValueOnce(true);
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "2",
         R2_BUCKET: {} as R2Bucket,
       } as CloudflareBindings,
       ctx as never
@@ -321,7 +403,15 @@ describe("inbound email handler", () => {
         addressId: "address-1",
       },
     });
-    mocks.reserveInboxSlot.mockResolvedValue(false);
+    mocks.getInboxReservationCounts
+      .mockResolvedValueOnce({
+        addressEmailCount: 2,
+        organizationEmailCount: 2,
+      })
+      .mockResolvedValueOnce({
+        addressEmailCount: 2,
+        organizationEmailCount: 2,
+      });
 
     await handleIncomingEmail(
       message as never,
@@ -335,6 +425,42 @@ describe("inbound email handler", () => {
       "Address inbox limit reached"
     );
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
+    expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
+  });
+
+  it("does not clean an inbox when only the organization limit is reached", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 2,
+        maxReceivedEmailAction: "cleanAll",
+      }),
+      expiresAt: null,
+    });
+    mocks.getInboxReservationCounts.mockResolvedValue({
+      addressEmailCount: 1,
+      organizationEmailCount: 5,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {
+        MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "5",
+        R2_BUCKET: {} as R2Bucket,
+      } as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(message.setReject).toHaveBeenCalledWith(
+      "Organization inbox limit reached"
+    );
+    expect(mocks.deleteR2ObjectsByPrefix).not.toHaveBeenCalled();
+    expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.resetAddressEmailCount).not.toHaveBeenCalled();
   });
 
   it("short-circuits already-persisted duplicates before abuse checks or quota reservation", async () => {

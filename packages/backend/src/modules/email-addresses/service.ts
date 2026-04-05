@@ -3,6 +3,7 @@ import {
   getAllowedDomains,
   getForcedMailPrefix,
   getMaxAddressesPerOrganization,
+  getMaxReceivedEmailsPerAddress,
 } from "@/shared/env";
 import { isAddressConflictError } from "@/shared/errors";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
@@ -103,6 +104,32 @@ const parseUpdateBody = (payload: unknown): UpdateEmailAddressBody => {
 
 const normalizeMaxReceivedEmailAction = (value: unknown) =>
   value === "rejectNew" ? "rejectNew" : "cleanAll";
+
+const validateMaxReceivedEmailCount = ({
+  value,
+  addressHardLimit,
+}: {
+  value: number | null | undefined;
+  addressHardLimit: number;
+}) => {
+  if (value === undefined || value === null) return null;
+
+  const maxAllowed = Math.min(
+    ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX,
+    addressHardLimit
+  );
+
+  if (!Number.isInteger(value) || value <= 0 || value > maxAllowed) {
+    return {
+      status: 400 as const,
+      body: {
+        error: `maxReceivedEmailCount must be a whole number between 1 and ${maxAllowed}`,
+      },
+    };
+  }
+
+  return null;
+};
 
 const validateDomainList = ({
   domains,
@@ -474,23 +501,16 @@ export const createEmailAddress = async ({
     };
   }
 
+  const addressHardLimit = getMaxReceivedEmailsPerAddress(env);
   const maxReceivedEmailCount =
     typeof body.maxReceivedEmailCount === "number"
       ? body.maxReceivedEmailCount
-      : undefined;
-  if (
-    maxReceivedEmailCount !== undefined &&
-    (!Number.isInteger(maxReceivedEmailCount) ||
-      maxReceivedEmailCount <= 0 ||
-      maxReceivedEmailCount > ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
-  ) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `maxReceivedEmailCount must be a whole number between 1 and ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}`,
-      },
-    };
-  }
+      : addressHardLimit;
+  const maxReceivedEmailCountValidation = validateMaxReceivedEmailCount({
+    value: maxReceivedEmailCount,
+    addressHardLimit,
+  });
+  if (maxReceivedEmailCountValidation) return maxReceivedEmailCountValidation;
   const maxReceivedEmailAction = normalizeMaxReceivedEmailAction(
     body.maxReceivedEmailAction
   );
@@ -513,14 +533,11 @@ export const createEmailAddress = async ({
       },
     };
   }
-  const meta =
-    maxReceivedEmailCount === undefined
-      ? baseMeta
-      : applyMaxReceivedEmailLimitToMeta({
-          meta: baseMeta,
-          maxReceivedEmailCount,
-          maxReceivedEmailAction,
-        });
+  const meta = applyMaxReceivedEmailLimitToMeta({
+    meta: baseMeta,
+    maxReceivedEmailCount,
+    maxReceivedEmailAction,
+  });
   if (meta === null) {
     return {
       status: 400 as const,
@@ -792,31 +809,30 @@ export const updateEmailAddress = async ({
 
   const existingMaxReceivedEmailCount =
     getMaxReceivedEmailCountFromMeta(existingMeta);
+  const addressHardLimit = getMaxReceivedEmailsPerAddress(env);
   const existingMaxReceivedEmailAction =
     existingMaxReceivedEmailCount === null
       ? "cleanAll"
       : getMaxReceivedEmailActionFromMeta(existingMeta);
   const nextMaxReceivedEmailCount =
     body.maxReceivedEmailCount === undefined
-      ? existingMaxReceivedEmailCount
-      : body.maxReceivedEmailCount;
-  if (
-    nextMaxReceivedEmailCount !== null &&
-    (!Number.isInteger(nextMaxReceivedEmailCount) ||
-      nextMaxReceivedEmailCount <= 0 ||
-      nextMaxReceivedEmailCount > ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX)
-  ) {
-    return {
-      status: 400 as const,
-      body: {
-        error: `maxReceivedEmailCount must be a whole number between 1 and ${ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX}`,
-      },
-    };
+      ? (existingMaxReceivedEmailCount ?? addressHardLimit)
+      : (body.maxReceivedEmailCount ?? addressHardLimit);
+  const nextMaxReceivedEmailCountValidation = validateMaxReceivedEmailCount({
+    value: nextMaxReceivedEmailCount,
+    addressHardLimit,
+  });
+  if (nextMaxReceivedEmailCountValidation) {
+    return nextMaxReceivedEmailCountValidation;
   }
   const nextMaxReceivedEmailAction =
-    body.maxReceivedEmailAction === undefined
-      ? existingMaxReceivedEmailAction
-      : normalizeMaxReceivedEmailAction(body.maxReceivedEmailAction);
+    body.maxReceivedEmailCount === null
+      ? body.maxReceivedEmailAction === undefined
+        ? "cleanAll"
+        : normalizeMaxReceivedEmailAction(body.maxReceivedEmailAction)
+      : body.maxReceivedEmailAction === undefined
+        ? existingMaxReceivedEmailAction
+        : normalizeMaxReceivedEmailAction(body.maxReceivedEmailAction);
 
   if (body.ttlMinutes !== undefined && body.ttlMinutes !== null) {
     if (
@@ -842,6 +858,7 @@ export const updateEmailAddress = async ({
 
   let metaForStorage = existing.meta;
   const shouldUpdateMeta =
+    existingMaxReceivedEmailCount === null ||
     body.meta !== undefined ||
     body.allowedFromDomains !== undefined ||
     body.blockedSenderDomains !== undefined ||
@@ -854,10 +871,14 @@ export const updateEmailAddress = async ({
       metaBase === null &&
       allowedFromDomains.length === 0 &&
       blockedSenderDomains.length === 0 &&
-      inboundRatePolicyResult.policy === null &&
-      nextMaxReceivedEmailCount === null
+      inboundRatePolicyResult.policy === null
     ) {
-      metaForStorage = null;
+      metaForStorage =
+        applyMaxReceivedEmailLimitToMeta({
+          meta: null,
+          maxReceivedEmailCount: nextMaxReceivedEmailCount,
+          maxReceivedEmailAction: nextMaxReceivedEmailAction,
+        }) ?? null;
     } else {
       const nextMeta = buildAddressMetaForStorage(metaBase, {
         allowedFromDomains,
