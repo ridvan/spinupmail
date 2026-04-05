@@ -275,6 +275,7 @@ describe("inbound email handler", () => {
       "Address inbox limit reached"
     );
     expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
   });
 
@@ -305,6 +306,7 @@ describe("inbound email handler", () => {
       "Organization inbox limit reached"
     );
     expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
   });
 

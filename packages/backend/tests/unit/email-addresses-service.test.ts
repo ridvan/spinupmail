@@ -546,6 +546,76 @@ describe("email addresses service", () => {
     });
   });
 
+  it("allows updates when a carried-forward inbox limit is above the current hard cap", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "project@spinupmail.com",
+      localPart: "project",
+      domain: "spinupmail.com",
+      meta: JSON.stringify({
+        maxReceivedEmailCount: 100,
+        maxReceivedEmailAction: "rejectNew",
+      }),
+      emailCount: 2,
+      createdAt: new Date("2026-03-20T10:00:00.000Z"),
+      expiresAt: new Date("2026-03-29T10:00:00.000Z"),
+      lastReceivedAt: null,
+    });
+
+    const result = await updateEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+        MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      addressId: "address-1",
+      payload: {
+        ttlMinutes: null,
+      },
+    });
+
+    expect(mocks.updateAddressByIdAndOrganization).toHaveBeenCalledWith({
+      db: {},
+      addressId: "address-1",
+      organizationId: "org-1",
+      values: {
+        address: "project@spinupmail.com",
+        localPart: "project",
+        domain: "spinupmail.com",
+        meta: JSON.stringify({
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "rejectNew",
+        }),
+        expiresAt: null,
+      },
+    });
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        id: "address-1",
+        address: "project@spinupmail.com",
+        localPart: "project",
+        domain: "spinupmail.com",
+        meta: {
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "rejectNew",
+        },
+        emailCount: 2,
+        allowedFromDomains: [],
+        blockedSenderDomains: [],
+        inboundRatePolicy: null,
+        maxReceivedEmailCount: 100,
+        maxReceivedEmailAction: "rejectNew",
+        createdAt: "2026-03-20T10:00:00.000Z",
+        createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
+        expiresAt: null,
+        expiresAtMs: null,
+        lastReceivedAt: null,
+        lastReceivedAtMs: null,
+      },
+    });
+  });
+
   it("returns the conflicting id when an address update hits a unique conflict", async () => {
     mocks.findAddressByIdAndOrganization.mockResolvedValue({
       id: "address-1",

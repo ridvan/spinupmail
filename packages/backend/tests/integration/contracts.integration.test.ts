@@ -12,5 +12,10 @@ describe("backend contracts", () => {
     expect(result.status).toBe(200);
     const parsed = domainConfigSchema.safeParse(result.body);
     expect(parsed.success).toBe(true);
+    if (!parsed.success) {
+      throw parsed.error;
+    }
+    expect(parsed.data.maxReceivedEmailsPerOrganization).toBe(1200);
+    expect(parsed.data.maxReceivedEmailsPerAddress).toBe(150);
   });
 });

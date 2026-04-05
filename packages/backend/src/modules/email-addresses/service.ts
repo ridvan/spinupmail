@@ -814,9 +814,13 @@ export const updateEmailAddress = async ({
     existingMaxReceivedEmailCount === null
       ? "cleanAll"
       : getMaxReceivedEmailActionFromMeta(existingMeta);
+  const carriedMaxReceivedEmailCount =
+    existingMaxReceivedEmailCount === null
+      ? addressHardLimit
+      : Math.min(existingMaxReceivedEmailCount, addressHardLimit);
   const nextMaxReceivedEmailCount =
     body.maxReceivedEmailCount === undefined
-      ? (existingMaxReceivedEmailCount ?? addressHardLimit)
+      ? carriedMaxReceivedEmailCount
       : (body.maxReceivedEmailCount ?? addressHardLimit);
   const nextMaxReceivedEmailCountValidation = validateMaxReceivedEmailCount({
     value: nextMaxReceivedEmailCount,
