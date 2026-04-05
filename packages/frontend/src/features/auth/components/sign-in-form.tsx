@@ -257,7 +257,7 @@ export const SignInForm = ({
           <>
             <Field>
               <Button
-                className="w-full border-white/15 bg-white/4 hover:bg-white/8 cursor-pointer"
+                className="w-full cursor-pointer"
                 disabled={googleMutation.isPending}
                 onClick={() => {
                   void googleMutation.mutateAsync();
@@ -281,7 +281,7 @@ export const SignInForm = ({
                 </p>
               ) : null}
             </Field>
-            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
+            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-muted-foreground">
               Or continue with
             </FieldSeparator>
           </>
@@ -304,7 +304,6 @@ export const SignInForm = ({
                 <Input
                   autoComplete="email"
                   aria-invalid={isInvalid}
-                  className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -343,7 +342,6 @@ export const SignInForm = ({
                   <Input
                     autoComplete="current-password"
                     aria-invalid={isInvalid}
-                    className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                     id={field.name}
                     name={field.name}
                     onBlur={field.handleBlur}
@@ -364,8 +362,8 @@ export const SignInForm = ({
       </FieldGroup>
 
       {showVerificationNotice && !isForgotPasswordMode ? (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
-          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-50">
+          <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
             <HugeiconsIcon
               aria-hidden="true"
               className="size-4"
@@ -374,8 +372,10 @@ export const SignInForm = ({
             />
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-emerald-100">Verify your email</p>
-            <p className="text-emerald-50/85">
+            <p className="font-medium text-emerald-800 dark:text-emerald-100">
+              Verify your email
+            </p>
+            <p className="text-emerald-700/90 dark:text-emerald-50/85">
               Use the link in the email to verify your address.
             </p>
           </div>
@@ -449,7 +449,7 @@ export const SignInForm = ({
       </div>
 
       <Button
-        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200 cursor-pointer"
+        className="w-full cursor-pointer"
         disabled={
           mutation.isPending ||
           googleMutation.isPending ||

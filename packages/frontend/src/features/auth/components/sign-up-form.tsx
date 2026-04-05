@@ -87,7 +87,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
       <FieldGroup className="gap-6">
         <Field>
           <Button
-            className="w-full border-white/15 bg-white/4 hover:bg-white/8 cursor-pointer"
+            className="w-full cursor-pointer"
             disabled={googleMutation.isPending}
             onClick={() => {
               void googleMutation.mutateAsync();
@@ -111,7 +111,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
             </p>
           ) : null}
         </Field>
-        <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-neutral-500">
+        <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-muted-foreground">
           Or continue with
         </FieldSeparator>
 
@@ -127,7 +127,6 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
                 <Input
                   autoComplete="name"
                   aria-invalid={isInvalid}
-                  className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -155,7 +154,6 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
                 <Input
                   autoComplete="email"
                   aria-invalid={isInvalid}
-                  className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -184,7 +182,6 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
                 <Input
                   autoComplete="new-password"
                   aria-invalid={isInvalid}
-                  className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                   id={field.name}
                   name={field.name}
                   onBlur={field.handleBlur}
@@ -223,7 +220,7 @@ export const SignUpForm = ({ onSuccess }: SignUpFormProps) => {
       </div>
 
       <Button
-        className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200 cursor-pointer"
+        className="w-full cursor-pointer"
         disabled={
           mutation.isPending ||
           googleMutation.isPending ||

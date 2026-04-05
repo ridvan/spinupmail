@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { AuthLayout } from "@/features/auth/components/auth-layout";
+import {
+  AuthLayout,
+  AuthPageShell,
+} from "@/features/auth/components/auth-layout";
 import { TwoFactorForm } from "@/features/auth/components/two-factor-form";
 
 const safeNextPath = (value: string | null) => {
@@ -25,14 +28,12 @@ export const SignInTwoFactorPage = () => {
       : `/sign-in?next=${encodeURIComponent(nextPath)}`;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+    <AuthPageShell>
       <AuthLayout
         footer={
           <>
             Entered the wrong account?{" "}
-            <Link className="text-neutral-300 hover:text-white" to={signInHref}>
-              Back to sign in
-            </Link>
+            <Link to={signInHref}>Back to sign in</Link>
           </>
         }
         subtitle="Enter your six digit code to finish signing in"
@@ -41,6 +42,6 @@ export const SignInTwoFactorPage = () => {
           onSuccess={() => navigate(nextPath, { replace: true })}
         />
       </AuthLayout>
-    </div>
+    </AuthPageShell>
   );
 };

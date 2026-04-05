@@ -12,6 +12,28 @@ type AuthLayoutProps = ComponentProps<"div"> & {
   title?: ReactNode;
 };
 
+type AuthPageShellProps = ComponentProps<"div"> & {
+  children: ReactNode;
+};
+
+export function AuthPageShell({
+  children,
+  className,
+  ...props
+}: AuthPageShellProps) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-screen items-center justify-center bg-background px-4 py-10",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function AuthLayout({
   className,
   children,
@@ -42,14 +64,14 @@ export function AuthLayout({
         <CardContent className="space-y-6">
           {children}
           {footer ? (
-            <FieldDescription className="text-center text-neutral-400">
+            <FieldDescription className="text-center">
               {footer}
             </FieldDescription>
           ) : null}
         </CardContent>
       </Card>
       {legal ? (
-        <FieldDescription className="px-6 text-center text-neutral-400">
+        <FieldDescription className="px-6 text-center">
           {legal}
         </FieldDescription>
       ) : null}

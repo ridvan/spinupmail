@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { AuthLayout } from "@/features/auth/components/auth-layout";
+import {
+  AuthLayout,
+  AuthPageShell,
+} from "@/features/auth/components/auth-layout";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 
 const safeNextPath = (value: string | null) => {
@@ -32,7 +35,7 @@ export const SignInPage = () => {
       : `/sign-in/2fa?next=${encodeURIComponent(nextPath)}`;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+    <AuthPageShell>
       <AuthLayout
         subtitle={
           isForgotPasswordMode
@@ -41,10 +44,7 @@ export const SignInPage = () => {
         }
         footer={
           <>
-            Don&apos;t have an account?{" "}
-            <Link className="text-neutral-300 hover:text-white" to={signupHref}>
-              Sign up
-            </Link>
+            Don&apos;t have an account? <Link to={signupHref}>Sign up</Link>
           </>
         }
         legal={
@@ -78,6 +78,6 @@ export const SignInPage = () => {
           onForgotPasswordModeChange={setIsForgotPasswordMode}
         />
       </AuthLayout>
-    </div>
+    </AuthPageShell>
   );
 };

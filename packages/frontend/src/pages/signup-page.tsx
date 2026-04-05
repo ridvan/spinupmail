@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { AuthLayout } from "@/features/auth/components/auth-layout";
+import {
+  AuthLayout,
+  AuthPageShell,
+} from "@/features/auth/components/auth-layout";
 import { SignUpForm } from "@/features/auth/components/sign-up-form";
 
 const safeNextPath = (value: string | null) => {
@@ -26,15 +29,12 @@ export const SignupPage = () => {
       : `/sign-in?next=${encodeURIComponent(nextPath)}`;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+    <AuthPageShell>
       <AuthLayout
         subtitle="Create your account and start managing disposable email addresses in minutes."
         footer={
           <>
-            Already have an account?{" "}
-            <Link className="text-neutral-300 hover:text-white" to={loginHref}>
-              Sign in
-            </Link>
+            Already have an account? <Link to={loginHref}>Sign in</Link>
           </>
         }
         legal={
@@ -63,6 +63,6 @@ export const SignupPage = () => {
           onSuccess={() => navigate(postSignUpPath, { replace: true })}
         />
       </AuthLayout>
-    </div>
+    </AuthPageShell>
   );
 };

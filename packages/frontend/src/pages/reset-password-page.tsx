@@ -10,7 +10,10 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { AuthLayout } from "@/features/auth/components/auth-layout";
+import {
+  AuthLayout,
+  AuthPageShell,
+} from "@/features/auth/components/auth-layout";
 import { useResetPasswordMutation } from "@/features/auth/hooks/use-auth-mutations";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { cn } from "@/lib/utils";
@@ -66,15 +69,12 @@ export const ResetPasswordPage = () => {
   const loginLink = "/sign-in";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+    <AuthPageShell>
       <AuthLayout
         subtitle="Choose a new password to finish resetting your account."
         footer={
           <>
-            Remembered your password?{" "}
-            <Link className="text-neutral-300 hover:text-white" to={loginLink}>
-              Sign in
-            </Link>
+            Remembered your password? <Link to={loginLink}>Sign in</Link>
           </>
         }
       >
@@ -115,7 +115,6 @@ export const ResetPasswordPage = () => {
                       <Input
                         autoComplete="new-password"
                         aria-invalid={isInvalid}
-                        className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                         id={field.name}
                         name={field.name}
                         onBlur={field.handleBlur}
@@ -149,7 +148,6 @@ export const ResetPasswordPage = () => {
                       <Input
                         autoComplete="new-password"
                         aria-invalid={isInvalid}
-                        className="border-white/15 bg-white/4 placeholder:text-neutral-500"
                         id={field.name}
                         name={field.name}
                         onBlur={field.handleBlur}
@@ -177,7 +175,7 @@ export const ResetPasswordPage = () => {
             ) : null}
 
             <Button
-              className="w-full border-white bg-white text-neutral-900 hover:bg-neutral-200"
+              className="w-full"
               disabled={mutation.isPending}
               type="submit"
             >
@@ -186,6 +184,6 @@ export const ResetPasswordPage = () => {
           </form>
         )}
       </AuthLayout>
-    </div>
+    </AuthPageShell>
   );
 };

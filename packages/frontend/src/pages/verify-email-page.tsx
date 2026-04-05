@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { AuthLayout } from "@/features/auth/components/auth-layout";
+import {
+  AuthLayout,
+  AuthPageShell,
+} from "@/features/auth/components/auth-layout";
 import { authClient } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -141,7 +144,7 @@ export const VerifyEmailPage = () => {
   }, [flow, navigate, redirectPath, token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[oklch(0.1448_0_0)] px-4 py-10">
+    <AuthPageShell>
       <AuthLayout
         subtitle={
           errorMessage
@@ -150,10 +153,7 @@ export const VerifyEmailPage = () => {
         }
         footer={
           <>
-            Need a new link?{" "}
-            <Link className="text-neutral-300 hover:text-white" to="/sign-in">
-              Back to sign in
-            </Link>
+            Need a new link? <Link to="/sign-in">Back to sign in</Link>
           </>
         }
       >
@@ -169,7 +169,7 @@ export const VerifyEmailPage = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-neutral-400">
+            <p className="text-sm text-muted-foreground">
               Please wait while we verify your email and redirect you.
             </p>
             <Button className="w-full" disabled type="button">
@@ -178,6 +178,6 @@ export const VerifyEmailPage = () => {
           </div>
         )}
       </AuthLayout>
-    </div>
+    </AuthPageShell>
   );
 };
