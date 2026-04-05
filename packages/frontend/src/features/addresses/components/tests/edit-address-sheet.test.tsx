@@ -141,6 +141,9 @@ describe("EditAddressSheet", () => {
     ).toBe("100");
     expect(screen.getByText("Required")).toBeTruthy();
     expect(screen.queryByText("Unlimited")).toBeNull();
+    expect(
+      (screen.getByLabelText("Delete all") as HTMLInputElement).checked
+    ).toBe(true);
   });
 
   it("refreshes the inherited inbox limit when the parent default changes", () => {
@@ -200,7 +203,7 @@ describe("EditAddressSheet", () => {
     ).toBeTruthy();
   });
 
-  it("blocks submit until the limit action is selected explicitly for legacy addresses", async () => {
+  it("submits with the backend default limit action for legacy addresses", async () => {
     const onOpenChange = vi.fn();
 
     updateMutation.mutateAsync.mockResolvedValue(undefined);
@@ -212,11 +215,19 @@ describe("EditAddressSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>
-      expect(updateMutation.mutateAsync).not.toHaveBeenCalled()
+      expect(updateMutation.mutateAsync).toHaveBeenCalledWith({
+        addressId: "address-1",
+        payload: {
+          localPart: "hello",
+          domain: "example.com",
+          ttlMinutes: null,
+          allowedFromDomains: [],
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
+      })
     );
-    expect(
-      screen.getByText("Choose what happens when the limit is reached")
-    ).toBeTruthy();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("allows submit without the extra acknowledgment when the username is unchanged", async () => {

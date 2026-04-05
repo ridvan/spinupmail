@@ -231,7 +231,7 @@ const EditAddressSheetForm = ({
       allowedFromDomains: address.allowedFromDomains ?? ([] as string[]),
       maxReceivedEmailCount:
         address.maxReceivedEmailCount ?? maxReceivedEmailsPerAddress,
-      maxReceivedEmailAction: address.maxReceivedEmailAction ?? "",
+      maxReceivedEmailAction: address.maxReceivedEmailAction ?? "cleanAll",
       usernameChangeConfirmed: false,
     }),
     [address, domains, forcedLocalPartPrefix, maxReceivedEmailsPerAddress]
