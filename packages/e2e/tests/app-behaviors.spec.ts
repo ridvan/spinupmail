@@ -205,7 +205,7 @@ test.describe("spinupmail app behaviors", () => {
           items: ["spinupmail.dev"],
           default: "spinupmail.dev",
           forcedLocalPartPrefix: null,
-          maxReceivedEmailsPerOrganization: 1000,
+          maxReceivedEmailsPerOrganization: 100,
           maxReceivedEmailsPerAddress: 100,
         }),
       });

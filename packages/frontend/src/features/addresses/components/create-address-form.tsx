@@ -156,15 +156,11 @@ const generateRandomLocalPart = (
 
 const DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS = 100;
 
-const resolveSelectedDomain = (value: string, availableDomains: string[]) => {
-  const normalizedValue = normalizeDomainToken(value);
+const getNormalizedSelectedDomain = (value: string) =>
+  normalizeDomainToken(value);
 
-  if (normalizedValue && availableDomains.includes(normalizedValue)) {
-    return normalizedValue;
-  }
-
-  return availableDomains[0] ?? normalizedValue;
-};
+const getSingleAvailableDomain = (availableDomains: string[]) =>
+  availableDomains.length === 1 ? (availableDomains[0] ?? "") : "";
 
 const createAddressSchema = (
   availableDomains: string[],
@@ -197,7 +193,9 @@ const createAddressSchema = (
       z.undefined(),
     ]),
     domain: z.string().superRefine((value, ctx) => {
-      const selectedDomain = resolveSelectedDomain(value, availableDomains);
+      const normalizedDomain = getNormalizedSelectedDomain(value);
+      const selectedDomain =
+        normalizedDomain || getSingleAvailableDomain(availableDomains);
 
       if (!selectedDomain) {
         ctx.addIssue({
@@ -309,8 +307,11 @@ export const CreateAddressForm = ({
       ),
     },
     onSubmit: async ({ value }) => {
+      const normalizedDomain = getNormalizedSelectedDomain(value.domain);
       const selectedDomain =
-        resolveSelectedDomain(value.domain, availableDomains) || undefined;
+        normalizedDomain ||
+        getSingleAvailableDomain(availableDomains) ||
+        undefined;
       const allowedFromDomains = uniqueDomains(value.allowedFromDomains);
       const createAddressToast = toast.promise(
         createMutation.mutateAsync({
@@ -509,10 +510,8 @@ export const CreateAddressForm = ({
                     children={field => {
                       const isInvalid =
                         field.state.meta.isTouched && !field.state.meta.isValid;
-                      const selectedValue = resolveSelectedDomain(
-                        field.state.value,
-                        availableDomains
-                      );
+                      const selectedValue =
+                        getNormalizedSelectedDomain(field.state.value) || "";
                       const isDomainSelectDisabled =
                         isDomainsLoading || availableDomains.length === 0;
 
