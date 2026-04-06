@@ -187,6 +187,61 @@ test.describe("spinupmail app behaviors", () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
+  test("creates an address with a single configured domain", async ({
+    authSeed,
+    page,
+  }) => {
+    await signInWithOrganization(authSeed, {
+      email: uniqueEmail("create-address-single-domain"),
+      name: "Create Address Single Domain User",
+      organizationName: "Create Address Single Domain Org",
+    });
+
+    await page.route(/\/api\/domains(?:\?.*)?$/, async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: ["spinupmail.dev"],
+          default: "spinupmail.dev",
+          forcedLocalPartPrefix: null,
+          maxReceivedEmailsPerOrganization: 1000,
+          maxReceivedEmailsPerAddress: 100,
+        }),
+      });
+    });
+
+    const localPart = `e2e-sd-${Date.now()}`;
+
+    await page.goto("/addresses");
+
+    const domainInput = page.getByLabel("Domain", { exact: true });
+
+    await expect(domainInput).toBeVisible();
+    await expect(domainInput).toBeDisabled();
+    await expect(domainInput).toHaveValue("spinupmail.dev");
+    await expect(page.getByRole("combobox", { name: "Domain" })).toHaveCount(0);
+
+    await page.getByRole("textbox", { name: "Username" }).fill(localPart);
+    await page
+      .locator('label[for="address-max-received-action-clean-all"]')
+      .click();
+    await page.getByRole("checkbox").first().click();
+    await page
+      .getByRole("button", { name: "Create address", exact: true })
+      .click();
+
+    await expect(page.getByText("Address created.")).toBeVisible();
+
+    await expect(
+      page
+        .getByRole("link", {
+          name: new RegExp(`${localPart}@spinupmail\\.dev`, "i"),
+        })
+        .first()
+    ).toBeVisible({ timeout: 30_000 });
+  });
+
   test("shows seeded inbox email content", async ({ authSeed, page }) => {
     const session = await signInWithOrganization(authSeed, {
       email: uniqueEmail("inbox-happy"),

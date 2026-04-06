@@ -92,4 +92,47 @@ describe("CreateAddressForm", () => {
       screen.getByText("Choose what happens when the limit is reached")
     ).toBeTruthy();
   });
+
+  it("submits with the only available domain when domains load after mount", async () => {
+    createMutation.mutateAsync.mockResolvedValue({
+      address: "mailbox01@spinupmail.dev",
+    });
+
+    const { rerender } = render(
+      <CreateAddressForm domains={[]} isDomainsLoading />
+    );
+
+    rerender(
+      <CreateAddressForm
+        domains={["spinupmail.dev"]}
+        isDomainsLoading={false}
+      />
+    );
+
+    expect(
+      (screen.getByDisplayValue("spinupmail.dev") as HTMLInputElement).disabled
+    ).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Username"), {
+      target: { value: "mailbox01" },
+    });
+    fireEvent.click(screen.getByText("Delete all"));
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Create address" }));
+
+    await waitFor(() =>
+      expect(createMutation.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localPart: "mailbox01",
+          domain: "spinupmail.dev",
+          maxReceivedEmailAction: "cleanAll",
+          acceptedRiskNotice: true,
+        })
+      )
+    );
+    expect(screen.queryByText("Domain is required")).toBeNull();
+    expect(
+      screen.queryByText("Select one of the available domains")
+    ).toBeNull();
+  });
 });
