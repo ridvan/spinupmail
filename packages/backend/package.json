@@ -29,7 +29,7 @@
     "css-tree": "^3.2.1",
     "dom-serializer": "^2.0.0",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.7",
+    "hono": "^4.12.12",
     "htmlparser2": "^10.1.0",
     "postal-mime": "^2.7.3",
     "resend": "^6.9.2",
