@@ -602,11 +602,37 @@ const requestBinary = async (
 };
 
 const ensureInboxSelector = (options: InboxAddressSelector) => {
-  if (!options.address && !options.addressId) {
+  const hasAddress = Boolean(options.address?.trim());
+  const hasAddressId = Boolean(options.addressId?.trim());
+
+  if (hasAddress === hasAddressId) {
     throw new SpinupMailValidationError({
-      message: "Either address or addressId is required.",
+      message: "Exactly one of address or addressId is required.",
       source: "request",
     });
+  }
+};
+
+const validatePollingTimingOptions = (options: {
+  timeoutMs?: number;
+  intervalMs?: number;
+}) => {
+  if (
+    options.timeoutMs !== undefined &&
+    (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
+  ) {
+    throw new RangeError(
+      "invalid option: timeoutMs must be a finite number >= 0"
+    );
+  }
+
+  if (
+    options.intervalMs !== undefined &&
+    (!Number.isFinite(options.intervalMs) || options.intervalMs <= 0)
+  ) {
+    throw new RangeError(
+      "invalid option: intervalMs must be a finite number > 0"
+    );
   }
 };
 
@@ -701,6 +727,7 @@ const runPollingLoop = async (
   }
 ): Promise<InboxPollResult> => {
   ensureInboxSelector(options);
+  validatePollingTimingOptions(options);
   validateListEmailsOptions({
     address: options.address,
     addressId: options.addressId,
@@ -796,6 +823,7 @@ const waitForEmailDetail = async (
   options: WaitForEmailOptions
 ) => {
   ensureInboxSelector(options);
+  validatePollingTimingOptions(options);
   validateListEmailsOptions({
     address: options.address,
     addressId: options.addressId,

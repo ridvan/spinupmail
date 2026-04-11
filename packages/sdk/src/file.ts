@@ -1,7 +1,7 @@
 const parseFilenameFromDisposition = (headerValue: string | null) => {
   if (!headerValue) return null;
 
-  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+  const utf8Match = headerValue.match(/filename\*=[^']*'[^']*'([^;]+)/i);
   if (utf8Match?.[1]) {
     try {
       return decodeURIComponent(utf8Match[1]);
@@ -12,6 +12,9 @@ const parseFilenameFromDisposition = (headerValue: string | null) => {
 
   const fallbackMatch = headerValue.match(/filename="([^"]+)"/i);
   if (fallbackMatch?.[1]) return fallbackMatch[1];
+
+  const unquotedMatch = headerValue.match(/filename=([^;"]+)/i);
+  if (unquotedMatch?.[1]) return unquotedMatch[1].trim();
 
   return null;
 };

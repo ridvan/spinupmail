@@ -86,6 +86,24 @@ describe("SpinupMail SDK client", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects ambiguous inbox selectors before sending requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = buildClient(fetchMock);
+
+    await expect(
+      client.emails.list({
+        address: "sdk@spinupmail.dev",
+        addressId: "addr-1",
+      })
+    ).rejects.toMatchObject({
+      name: "SpinupMailValidationError",
+      source: "request",
+      message: "Exactly one of address or addressId is required.",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("serializes Date values for after filters", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
@@ -170,6 +188,37 @@ describe("SpinupMail SDK client", () => {
     expect(file.contentType).toBe("message/rfc822");
     expect(file.contentLength).toBe(11);
     await expect(file.text()).resolves.toBe("raw message");
+  });
+
+  it("parses RFC 5987 and unquoted filenames from content-disposition", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response("raw message", {
+          status: 200,
+          headers: {
+            "content-type": "message/rfc822",
+            "content-disposition":
+              "attachment; filename*=UTF-8'en'hello%20world.eml",
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("raw message", {
+          status: 200,
+          headers: {
+            "content-type": "message/rfc822",
+            "content-disposition": "attachment; filename=plain-name.eml",
+          },
+        })
+      );
+    const client = buildClient(fetchMock);
+
+    const utf8File = await client.emails.getRaw("email-1");
+    const unquotedFile = await client.emails.getRaw("email-2");
+
+    expect(utf8File.filename).toBe("hello world.eml");
+    expect(unquotedFile.filename).toBe("plain-name.eml");
   });
 
   it("supports class initialization from environment defaults", async () => {

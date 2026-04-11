@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "*": ["./../*"],
+      "@/*": ["./src/*"],
+      "@/app/*": ["../backend/src/app/*"],
+      "@/modules/*": ["../backend/src/modules/*"],
+      "@/platform/*": ["../backend/src/platform/*"],
+      "@/shared/*": ["../backend/src/shared/*"],
+      "@/db": ["../backend/src/db/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "../backend/src/env.d.ts",
+    "../backend/worker-configuration.d.ts"
+  ]
+}

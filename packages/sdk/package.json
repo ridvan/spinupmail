@@ -1,6 +1,6 @@
 {
   "name": "spinupmail",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SpinupMail TypeScript SDK for creating and reading temporary email addresses.",
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "tsdown --config tsdown.config.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.test.json && tsgo --noEmit -p tests/tsconfig.json",
     "test": "vitest run --config vitest.config.ts",
     "test:package": "node ./scripts/smoke-package.mjs"
   },
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.11",
+    "@typescript/native-preview": "7.0.0-dev.20260222.1",
     "tsdown": "^0.21.7",
     "typescript": "^5.9.3"
   }

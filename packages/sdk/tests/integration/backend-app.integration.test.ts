@@ -59,6 +59,7 @@ const createAuthFactory = (options: {
 
 const bindings = {
   EMAIL_DOMAINS: "spinupmail.dev",
+  MAX_ADDRESSES_PER_ORGANIZATION: "10",
   MAX_RECEIVED_EMAILS_PER_ORGANIZATION: "1000",
   MAX_RECEIVED_EMAILS_PER_ADDRESS: "100",
 } as unknown as CloudflareBindings;
@@ -116,7 +117,7 @@ describe("SpinupMail SDK backend app integration", () => {
       page: 1,
       pageSize: 10,
       totalItems: 1,
-      addressLimit: 100,
+      addressLimit: 10,
       totalPages: 1,
       sortBy: "createdAt",
       sortDirection: "desc",

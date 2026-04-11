@@ -319,4 +319,16 @@ export type EmailDetail = z.infer<typeof emailDetailSchema>;
 export type DeleteEmailResponse = z.infer<typeof deleteEmailResponseSchema>;
 export type EmailActivityDay = z.infer<typeof emailActivityDaySchema>;
 export type EmailActivityResponse = z.infer<typeof emailActivityResponseSchema>;
+export type EmailSummaryDomain = z.infer<typeof emailSummaryDomainSchema>;
+export type BusiestInbox = z.infer<typeof busiestInboxSchema>;
+export type DormantInbox = z.infer<typeof dormantInboxSchema>;
 export type EmailSummaryResponse = z.infer<typeof emailSummaryResponseSchema>;
+export type OrganizationPickerItem = z.infer<
+  typeof organizationPickerItemSchema
+>;
+export type ExtensionBootstrapUser = z.infer<
+  typeof extensionBootstrapUserSchema
+>;
+export type ExtensionBootstrapResponse = z.infer<
+  typeof extensionBootstrapResponseSchema
+>;

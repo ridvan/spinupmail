@@ -162,6 +162,32 @@ describe("SpinupMail inbox polling", () => {
     ).rejects.toBeInstanceOf(SpinupMailTimeoutError);
   });
 
+  it("rejects invalid polling timing options before polling starts", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = new SpinupMail({
+      baseUrl: "https://api.spinupmail.com",
+      apiKey: "spin_test",
+      organizationId: "org-1",
+      fetch: fetchMock,
+    });
+
+    await expect(
+      client.inboxes.poll({
+        addressId: "addr-1",
+        timeoutMs: -1,
+      })
+    ).rejects.toThrow("invalid option: timeoutMs must be a finite number >= 0");
+
+    await expect(
+      client.inboxes.waitForEmail({
+        addressId: "addr-1",
+        intervalMs: 0,
+      })
+    ).rejects.toThrow("invalid option: intervalMs must be a finite number > 0");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("filters by body text and deletes the matching email after reading", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
