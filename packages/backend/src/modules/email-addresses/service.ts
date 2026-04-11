@@ -549,15 +549,6 @@ export const createEmailAddress = async ({
   }
 
   const responseMeta = meta !== undefined ? parseAddressMeta(meta) : undefined;
-  const responseMaxReceivedEmailCount =
-    getMaxReceivedEmailCountFromMeta(responseMeta);
-  const responseMaxReceivedEmailAction =
-    responseMaxReceivedEmailCount === null
-      ? null
-      : getMaxReceivedEmailActionFromMeta(responseMeta);
-  const responseBlockedSenderDomains =
-    getBlockedSenderDomainsFromMeta(responseMeta);
-  const responseInboundRatePolicy = getInboundRatePolicyFromMeta(responseMeta);
 
   const db = getDb(env);
   const addressLimit = getMaxAddressesPerOrganization(env);
@@ -602,22 +593,20 @@ export const createEmailAddress = async ({
 
   return {
     status: 200 as const,
-    body: {
+    body: toEmailAddressListItem({
       id,
       address,
       localPart,
       domain,
-      meta: responseMeta,
-      allowedFromDomains,
-      blockedSenderDomains: responseBlockedSenderDomains,
-      inboundRatePolicy: responseInboundRatePolicy,
-      maxReceivedEmailCount: responseMaxReceivedEmailCount,
-      maxReceivedEmailAction: responseMaxReceivedEmailAction,
-      createdAt: new Date(now).toISOString(),
-      createdAtMs: now,
-      expiresAt: expiresAt ? expiresAt.toISOString() : undefined,
-      expiresAtMs,
-    },
+      meta:
+        responseMeta === undefined
+          ? null
+          : JSON.stringify(responseMeta ?? null),
+      emailCount: 0,
+      createdAt: new Date(now),
+      expiresAt: expiresAt ?? null,
+      lastReceivedAt: null,
+    }),
   };
 };
 

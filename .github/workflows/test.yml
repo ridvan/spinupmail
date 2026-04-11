@@ -37,11 +37,23 @@ jobs:
       - name: Frontend typecheck
         run: pnpm run typecheck:frontend
 
+      - name: SDK build
+        run: pnpm run build:sdk
+
+      - name: SDK typecheck
+        run: pnpm run typecheck:sdk
+
       - name: Landing typecheck
         run: pnpm run typecheck:landing
 
       - name: Unit tests
         run: pnpm run test:unit
+
+      - name: SDK tests
+        run: pnpm run test:sdk
+
+      - name: SDK package smoke
+        run: pnpm run test:package:sdk
 
       - name: Landing tests
         run: pnpm run test:landing

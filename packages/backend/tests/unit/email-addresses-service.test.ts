@@ -141,10 +141,13 @@ describe("email addresses service", () => {
         },
         maxReceivedEmailCount: 20,
         maxReceivedEmailAction: "rejectNew",
+        emailCount: 0,
         createdAt: "2026-03-28T12:34:56.000Z",
         createdAtMs: Date.parse("2026-03-28T12:34:56.000Z"),
         expiresAt: "2026-03-28T13:34:56.000Z",
         expiresAtMs: Date.parse("2026-03-28T13:34:56.000Z"),
+        lastReceivedAt: null,
+        lastReceivedAtMs: null,
       },
     });
   });

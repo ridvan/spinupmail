@@ -448,6 +448,69 @@ Generate an API key from the UI. Then use it to access the API:
   owner belongs to.
 - Session-cookie requests use the active organization from the user session.
 
+Or use the SDK:
+
+```bash
+npm install spinupmail
+```
+
+```ts
+import { SpinupMail } from "spinupmail";
+
+const spinupmail = new SpinupMail();
+
+const address = await spinupmail.addresses.create({
+  localPart: "signup-flow",
+  acceptedRiskNotice: true,
+});
+
+const email = await spinupmail.inboxes.waitForEmail({
+  addressId: address.id,
+  after: new Date(),
+  subjectIncludes: "verify",
+  timeoutMs: 30_000,
+});
+
+console.log(email.subject);
+```
+
+`new SpinupMail()` reads:
+
+- `SPINUPMAIL_API_KEY`
+- `SPINUPMAIL_BASE_URL` or `https://api.spinupmail.com`
+- `SPINUPMAIL_ORGANIZATION_ID` or `SPINUPMAIL_ORG_ID`
+
+Use `search` to match recent emails by indexed content:
+
+```ts
+const email = await spinupmail.inboxes.waitForEmail({
+  addressId: address.id,
+  search: "verify",
+  timeoutMs: 30_000,
+});
+
+const emails = await spinupmail.emails.list({
+  addressId: address.id,
+  search: "verify",
+});
+```
+
+Use `after` with local filters to wait for a specific email after a specific timestamp:
+
+```ts
+const startedAt = new Date();
+
+const email = await spinupmail.inboxes.waitForEmail({
+  addressId: address.id,
+  after: startedAt,
+  subjectIncludes: "verify",
+  bodyIncludes: "654321",
+  timeoutMs: 30_000,
+});
+
+console.log(email.text);
+```
+
 ```bash
 curl "https://your-domain.com/api/email-addresses" \
   -H "X-API-Key: <your_api_key>" \
