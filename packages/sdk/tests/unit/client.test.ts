@@ -132,6 +132,35 @@ describe("SpinupMail SDK client", () => {
     expect(String(url)).toContain("after=2026-04-11T10%3A00%3A00.000Z");
   });
 
+  it("rejects non-finite and invalid Date timestamp filters", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = buildClient(fetchMock);
+
+    await expect(
+      client.emails.list({
+        addressId: "addr-1",
+        after: Number.NaN,
+      })
+    ).rejects.toMatchObject({
+      name: "SpinupMailValidationError",
+      source: "request",
+      message: "Invalid timestamp: number values must be finite.",
+    });
+
+    await expect(
+      client.emails.list({
+        addressId: "addr-1",
+        after: new Date("not-a-date"),
+      })
+    ).rejects.toMatchObject({
+      name: "SpinupMailValidationError",
+      source: "request",
+      message: "Invalid timestamp: Date values must be valid.",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("maps JSON error payloads into SpinupMailApiError", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ error: "address not found" }), {
@@ -188,6 +217,36 @@ describe("SpinupMail SDK client", () => {
     expect(file.contentType).toBe("message/rfc822");
     expect(file.contentLength).toBe(11);
     await expect(file.text()).resolves.toBe("raw message");
+  });
+
+  it("treats malformed content-length values as absent", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response("raw message", {
+          status: 200,
+          headers: {
+            "content-type": "message/rfc822",
+            "content-length": "-1",
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("raw message", {
+          status: 200,
+          headers: {
+            "content-type": "message/rfc822",
+            "content-length": "1.5",
+          },
+        })
+      );
+    const client = buildClient(fetchMock);
+
+    const negativeLengthFile = await client.emails.getRaw("email-1");
+    const fractionalLengthFile = await client.emails.getRaw("email-2");
+
+    expect(negativeLengthFile.contentLength).toBeNull();
+    expect(fractionalLengthFile.contentLength).toBeNull();
   });
 
   it("parses RFC 5987 and unquoted filenames from content-disposition", async () => {

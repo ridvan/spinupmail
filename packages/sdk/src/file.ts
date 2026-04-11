@@ -34,7 +34,8 @@ export class SpinupMailFile {
 
     const contentLength = response.headers.get("content-length");
     const parsed = contentLength ? Number(contentLength) : Number.NaN;
-    this.contentLength = Number.isFinite(parsed) ? parsed : null;
+    this.contentLength =
+      Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
   }
 
   arrayBuffer() {

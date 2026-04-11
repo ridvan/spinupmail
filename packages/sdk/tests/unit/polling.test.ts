@@ -1,4 +1,8 @@
-import { SpinupMail, SpinupMailTimeoutError } from "@/index";
+import {
+  SpinupMail,
+  SpinupMailTimeoutError,
+  SpinupMailValidationError,
+} from "@/index";
 
 const listResponse = (items: Array<{ id: string; subject: string }>) =>
   new Response(
@@ -176,7 +180,21 @@ describe("SpinupMail inbox polling", () => {
         addressId: "addr-1",
         timeoutMs: -1,
       })
+    ).rejects.toBeInstanceOf(SpinupMailValidationError);
+
+    await expect(
+      client.inboxes.poll({
+        addressId: "addr-1",
+        timeoutMs: -1,
+      })
     ).rejects.toThrow("invalid option: timeoutMs must be a finite number >= 0");
+
+    await expect(
+      client.inboxes.waitForEmail({
+        addressId: "addr-1",
+        intervalMs: 0,
+      })
+    ).rejects.toBeInstanceOf(SpinupMailValidationError);
 
     await expect(
       client.inboxes.waitForEmail({

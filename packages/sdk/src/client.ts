@@ -427,8 +427,30 @@ const resolveOrganizationId = (
 
 const normalizeTimestamp = (value: EmailTimestampFilter | undefined) => {
   if (value === undefined) return undefined;
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === "number" ? String(value) : value;
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new SpinupMailValidationError({
+        message: "Invalid timestamp: number values must be finite.",
+        source: "request",
+      });
+    }
+
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) {
+      throw new SpinupMailValidationError({
+        message: "Invalid timestamp: Date values must be valid.",
+        source: "request",
+      });
+    }
+
+    return value.toISOString();
+  }
+
+  return value;
 };
 
 const normalizeText = (value: string | null | undefined) =>
@@ -621,18 +643,20 @@ const validatePollingTimingOptions = (options: {
     options.timeoutMs !== undefined &&
     (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0)
   ) {
-    throw new RangeError(
-      "invalid option: timeoutMs must be a finite number >= 0"
-    );
+    throw new SpinupMailValidationError({
+      message: "invalid option: timeoutMs must be a finite number >= 0",
+      source: "request",
+    });
   }
 
   if (
     options.intervalMs !== undefined &&
     (!Number.isFinite(options.intervalMs) || options.intervalMs <= 0)
   ) {
-    throw new RangeError(
-      "invalid option: intervalMs must be a finite number > 0"
-    );
+    throw new SpinupMailValidationError({
+      message: "invalid option: intervalMs must be a finite number > 0",
+      source: "request",
+    });
   }
 };
 
