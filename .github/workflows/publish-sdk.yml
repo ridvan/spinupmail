@@ -22,17 +22,28 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      - name: Show versions
+        run: |
+          node -v
+          npm -v
+          pnpm -v
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build SDK
-        run: pnpm run build:sdk
+        run: pnpm -C packages/sdk build
+
+      - name: Test SDK
+        run: pnpm -C packages/sdk test
+
+      - name: Package smoke test
+        run: pnpm -C packages/sdk test:package
 
       - name: Publish spinupmail
-        run: pnpm -C packages/sdk publish --access public --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/sdk
+        run: npm publish
