@@ -1,6 +1,11 @@
 import path from "node:path";
+import { config as loadDotenv } from "dotenv";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "wxt";
+
+loadDotenv({
+  path: path.resolve(__dirname, ".env.local"),
+});
 
 const EXTENSION_NAME = "SpinupMail";
 const CHROMIUM_EXTENSION_KEY =
