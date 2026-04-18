@@ -6,7 +6,7 @@ import {
   exchangeExtensionCode,
   getExtensionInvitation,
 } from "@/modules/extension/service";
-import { FakeKvNamespace } from "../fixtures/fake-kv";
+import { FakeD1Database } from "../fixtures/fake-d1";
 import { withFixedNow } from "../fixtures/time";
 import { withMockedUuids } from "../fixtures/uuid";
 
@@ -164,7 +164,7 @@ describe("extension auth service", () => {
 
   it("stores one-time exchange envelopes and deletes them on exchange", async () => {
     const auth = buildAuth();
-    const kv = new FakeKvNamespace();
+    const db = new FakeD1Database();
 
     await withFixedNow("2026-04-11T13:00:00.000Z", async () => {
       const redirectUrl = await withMockedUuids(
@@ -175,7 +175,7 @@ describe("extension auth service", () => {
             env: {
               BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
               EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
-              SUM_KV: kv,
+              SUM_DB: db as unknown as D1Database,
             } as unknown as CloudflareBindings,
             headers: new Headers(),
             redirectUri: allowedRedirectUri,
@@ -190,8 +190,8 @@ describe("extension auth service", () => {
       const exchanged = await exchangeExtensionCode({
         code: code!,
         env: {
-          SUM_KV: kv,
-        } as Pick<CloudflareBindings, "SUM_KV">,
+          SUM_DB: db as unknown as D1Database,
+        } as Pick<CloudflareBindings, "SUM_DB">,
       });
 
       expect(exchanged).toMatchObject({
@@ -204,8 +204,8 @@ describe("extension auth service", () => {
       const exchangedAgain = await exchangeExtensionCode({
         code: code!,
         env: {
-          SUM_KV: kv,
-        } as Pick<CloudflareBindings, "SUM_KV">,
+          SUM_DB: db as unknown as D1Database,
+        } as Pick<CloudflareBindings, "SUM_DB">,
       });
 
       expect(exchangedAgain).toBeNull();
@@ -214,13 +214,11 @@ describe("extension auth service", () => {
 
   it("deletes the created API key when exchange persistence fails", async () => {
     const auth = buildAuth();
-    const putError = new Error("KV write failed");
+    const insertError = new Error("D1 write failed");
     const headers = new Headers();
-    const kv = {
-      put: vi.fn(async () => {
-        throw putError;
-      }),
-    } as unknown as CloudflareBindings["SUM_KV"];
+    const db = new FakeD1Database({
+      failInsert: insertError,
+    });
 
     await expect(
       createGoogleExtensionCompleteRedirect({
@@ -228,12 +226,12 @@ describe("extension auth service", () => {
         env: {
           BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
           EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
-          SUM_KV: kv,
+          SUM_DB: db as unknown as D1Database,
         } as unknown as CloudflareBindings,
         headers,
         redirectUri: allowedRedirectUri,
       })
-    ).rejects.toThrow("KV write failed");
+    ).rejects.toThrow("D1 write failed");
 
     const authApi = auth.api as {
       createApiKey: ReturnType<typeof vi.fn>;

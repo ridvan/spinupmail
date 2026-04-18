@@ -43,6 +43,13 @@
       "when": 1774632083981,
       "tag": "0005_bent_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1776512232856,
+      "tag": "0006_noisy_roughhouse",
+      "breakpoints": true
     }
   ]
 }

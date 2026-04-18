@@ -6,7 +6,6 @@ import type {
 import type { AuthInstance, AuthSession } from "@/app/types";
 import { getExtensionRedirectOrigins } from "@/shared/env";
 
-const EXTENSION_HANDOFF_PREFIX = "extension:handoff:";
 const EXTENSION_HANDOFF_TTL_SECONDS = 5 * 60;
 const EXTENSION_API_KEY_NAME = "SpinupMail Extension";
 const EXTENSION_API_KEY_METADATA = {
@@ -218,12 +217,29 @@ const createExtensionErrorRedirect = (
 const createExchangeCode = () =>
   `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
 
+const storeExtensionExchangeEnvelope = async ({
+  env,
+  code,
+  envelope,
+}: {
+  env: Pick<CloudflareBindings, "SUM_DB">;
+  code: string;
+  envelope: ExtensionExchangeEnvelope;
+}) => {
+  const expiresAtMs = Date.now() + EXTENSION_HANDOFF_TTL_SECONDS * 1000;
+
+  await env.SUM_DB.prepare(
+    `INSERT INTO extension_auth_handoffs (code, envelope, expires_at)
+     VALUES (?, ?, ?)`
+  )
+    .bind(code, JSON.stringify(envelope), expiresAtMs)
+    .run();
+};
+
 const createExchangeEnvelope = async ({
-  env: _env,
   auth,
   headers,
 }: {
-  env: CloudflareBindings;
   auth: AuthInstance;
   headers: Headers;
 }): Promise<PendingExtensionExchangeEnvelope> => {
@@ -372,16 +388,14 @@ export const createGoogleExtensionCompleteRedirect = async ({
   }
 
   const code = createExchangeCode();
-  const pendingExchange = await createExchangeEnvelope({ env, auth, headers });
+  const pendingExchange = await createExchangeEnvelope({ auth, headers });
 
   try {
-    await env.SUM_KV.put(
-      `${EXTENSION_HANDOFF_PREFIX}${code}`,
-      JSON.stringify(pendingExchange.envelope),
-      {
-        expirationTtl: EXTENSION_HANDOFF_TTL_SECONDS,
-      }
-    );
+    await storeExtensionExchangeEnvelope({
+      env,
+      code,
+      envelope: pendingExchange.envelope,
+    });
   } catch (error) {
     const authApi = auth.api as BetterAuthApi;
     await authApi.deleteApiKey({
@@ -402,18 +416,23 @@ export const exchangeExtensionCode = async ({
   env,
   code,
 }: {
-  env: Pick<CloudflareBindings, "SUM_KV">;
+  env: Pick<CloudflareBindings, "SUM_DB">;
   code: string;
 }) => {
-  const key = `${EXTENSION_HANDOFF_PREFIX}${code}`;
-  const raw = await env.SUM_KV.get(key);
+  const result = await env.SUM_DB.prepare(
+    `DELETE FROM extension_auth_handoffs
+     WHERE code = ?
+       AND expires_at > ?
+     RETURNING envelope`
+  )
+    .bind(code, Date.now())
+    .first<{ envelope: string }>();
 
-  if (!raw) {
+  if (!result?.envelope) {
     return null;
   }
 
-  await env.SUM_KV.delete(key);
-  return JSON.parse(raw) as ExtensionAuthExchangeResponse;
+  return JSON.parse(result.envelope) as ExtensionAuthExchangeResponse;
 };
 
 export const getExtensionInvitation = async ({

@@ -122,6 +122,19 @@ export const emailAttachments = sqliteTable(
   ]
 );
 
+export const extensionAuthHandoffs = sqliteTable(
+  "extension_auth_handoffs",
+  {
+    code: text("code").primaryKey(),
+    envelope: text("envelope").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+  },
+  table => [index("extension_auth_handoffs_expires_idx").on(table.expiresAt)]
+);
+
 export const emailAddressesRelations = relations(
   emailAddresses,
   ({ many }) => ({
