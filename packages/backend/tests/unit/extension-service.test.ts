@@ -10,6 +10,9 @@ import { FakeKvNamespace } from "../fixtures/fake-kv";
 import { withFixedNow } from "../fixtures/time";
 import { withMockedUuids } from "../fixtures/uuid";
 
+const allowedRedirectOrigin = "https://example.chromiumapp.org";
+const allowedRedirectUri = `${allowedRedirectOrigin}/spinupmail-auth`;
+
 const buildAuth = () =>
   ({
     api: {
@@ -111,9 +114,13 @@ describe("extension auth service", () => {
       auth,
       env: {
         BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
-      } as Pick<CloudflareBindings, "BETTER_AUTH_BASE_URL">,
+        EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
+      } as Pick<
+        CloudflareBindings,
+        "BETTER_AUTH_BASE_URL" | "EXTENSION_REDIRECT_ORIGINS"
+      >,
       headers: new Headers(),
-      redirectUri: "https://example.chromiumapp.org/spinupmail-auth",
+      redirectUri: allowedRedirectUri,
     });
 
     expect(start.redirectUrl).toBe("https://accounts.google.test/oauth");
@@ -124,11 +131,33 @@ describe("extension auth service", () => {
         auth,
         env: {
           BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
-        } as Pick<CloudflareBindings, "BETTER_AUTH_BASE_URL">,
+          EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
+        } as Pick<
+          CloudflareBindings,
+          "BETTER_AUTH_BASE_URL" | "EXTENSION_REDIRECT_ORIGINS"
+        >,
         headers: new Headers(),
-        redirectUri: "https://example.com/not-allowed",
+        redirectUri: "https://other.chromiumapp.org/spinupmail-auth",
       })
     ).rejects.toThrow("Invalid extension redirect URI");
+  });
+
+  it("fails closed when extension redirect origins are not configured", async () => {
+    const auth = buildAuth();
+
+    await expect(
+      createGoogleExtensionStartUrl({
+        auth,
+        env: {
+          BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
+        } as Pick<
+          CloudflareBindings,
+          "BETTER_AUTH_BASE_URL" | "EXTENSION_REDIRECT_ORIGINS"
+        >,
+        headers: new Headers(),
+        redirectUri: allowedRedirectUri,
+      })
+    ).rejects.toThrow("EXTENSION_REDIRECT_ORIGINS is not configured");
   });
 
   it("stores one-time exchange envelopes and deletes them on exchange", async () => {
@@ -143,10 +172,11 @@ describe("extension auth service", () => {
             auth,
             env: {
               BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
+              EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
               SUM_KV: kv,
             } as unknown as CloudflareBindings,
             headers: new Headers(),
-            redirectUri: "https://example.chromiumapp.org/spinupmail-auth",
+            redirectUri: allowedRedirectUri,
           })
       );
 

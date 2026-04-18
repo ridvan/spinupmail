@@ -35,7 +35,6 @@ export const createApp = (options: AppFactoryOptions = {}) => {
     app.route("/api", createE2EAuthTestRouter());
   }
   app.route("/api", createAuthHttpRouter());
-  app.route("/api", createExtensionRouter());
 
   app.use("/api/domains", requireAuth);
   app.use("/api/organizations/stats/*", requireAuth);
@@ -48,6 +47,7 @@ export const createApp = (options: AppFactoryOptions = {}) => {
   app.use("/api/email-addresses/*", requireOrganizationScope);
   app.use("/api/emails/*", requireOrganizationScope);
 
+  app.route("/api", createExtensionRouter());
   app.route("/api", createDomainsRouter());
   app.route("/api", createOrganizationsRouter());
   app.route("/api", createEmailAddressesRouter());

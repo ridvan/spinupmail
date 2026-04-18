@@ -3,6 +3,7 @@ import {
   getAuthAllowedEmailDomain,
   getAuthRateLimitConfig,
   getAllowedDomains,
+  getExtensionRedirectOrigins,
   getForcedMailPrefix,
   getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
@@ -39,6 +40,20 @@ describe("shared env helpers", () => {
       } as CloudflareBindings)
     ).toBe("example.com");
     expect(getAuthAllowedEmailDomain({} as CloudflareBindings)).toBeUndefined();
+  });
+
+  it("normalizes configured extension redirect origins and removes invalid entries", () => {
+    expect(
+      getExtensionRedirectOrigins({
+        EXTENSION_REDIRECT_ORIGINS:
+          " https://abc.chromiumapp.org/path , invalid, https://abc.chromiumapp.org, https://def.extensions.allizom.org ",
+      } as CloudflareBindings)
+    ).toEqual([
+      "https://abc.chromiumapp.org",
+      "https://def.extensions.allizom.org",
+    ]);
+
+    expect(getExtensionRedirectOrigins({} as CloudflareBindings)).toEqual([]);
   });
 
   it("normalizes the optional forced mail prefix", () => {

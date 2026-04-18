@@ -4,6 +4,7 @@ import type {
   ExtensionInvitation,
 } from "@spinupmail/contracts";
 import type { AuthInstance, AuthSession } from "@/app/types";
+import { getExtensionRedirectOrigins } from "@/shared/env";
 
 const EXTENSION_HANDOFF_PREFIX = "extension:handoff:";
 const EXTENSION_HANDOFF_TTL_SECONDS = 5 * 60;
@@ -15,11 +16,6 @@ const EXTENSION_API_KEY_METADATA = {
 } as const;
 
 const GOOGLE_PROVIDER = "google";
-
-const allowedExtensionRedirectHosts = [
-  /\.chromiumapp\.org$/i,
-  /\.extensions\.allizom\.org$/i,
-];
 
 type BetterAuthApi = AuthInstance["api"] & {
   signInSocial: (args: {
@@ -163,15 +159,35 @@ const getApiBaseOrigin = (
   return new URL(authBaseUrl).origin;
 };
 
-const isAllowedExtensionRedirectUri = (redirectUri: string) => {
+const getExactOrigin = (value: string) => {
   try {
-    const parsed = new URL(redirectUri);
-    if (parsed.protocol !== "https:") return false;
-    return allowedExtensionRedirectHosts.some(pattern =>
-      pattern.test(parsed.hostname)
-    );
+    const parsed = new URL(value);
+    if (!parsed.protocol || !parsed.host) return null;
+    return `${parsed.protocol}//${parsed.host}`;
   } catch {
-    return false;
+    return null;
+  }
+};
+
+const getAllowedExtensionRedirectOrigins = (
+  env: Pick<CloudflareBindings, "EXTENSION_REDIRECT_ORIGINS">
+) => {
+  const origins = getExtensionRedirectOrigins(env);
+  if (origins.length === 0) {
+    throw new Error("EXTENSION_REDIRECT_ORIGINS is not configured");
+  }
+  return new Set(origins);
+};
+
+const assertAllowedExtensionRedirectUri = (
+  env: Pick<CloudflareBindings, "EXTENSION_REDIRECT_ORIGINS">,
+  redirectUri: string
+) => {
+  const redirectOrigin = getExactOrigin(redirectUri);
+  const allowedOrigins = getAllowedExtensionRedirectOrigins(env);
+
+  if (!redirectOrigin || !allowedOrigins.has(redirectOrigin)) {
+    throw new Error("Invalid extension redirect URI");
   }
 };
 
@@ -277,14 +293,15 @@ export const createGoogleExtensionStartUrl = async ({
   headers,
   redirectUri,
 }: {
-  env: Pick<CloudflareBindings, "BETTER_AUTH_BASE_URL">;
+  env: Pick<
+    CloudflareBindings,
+    "BETTER_AUTH_BASE_URL" | "EXTENSION_REDIRECT_ORIGINS"
+  >;
   auth: AuthInstance;
   headers: Headers;
   redirectUri: string;
 }) => {
-  if (!isAllowedExtensionRedirectUri(redirectUri)) {
-    throw new Error("Invalid extension redirect URI");
-  }
+  assertAllowedExtensionRedirectUri(env, redirectUri);
 
   const authApi = auth.api as BetterAuthApi;
   const callbackUrl = new URL(
@@ -333,9 +350,7 @@ export const createGoogleExtensionCompleteRedirect = async ({
   redirectUri: string;
   error?: string | null;
 }) => {
-  if (!isAllowedExtensionRedirectUri(redirectUri)) {
-    throw new Error("Invalid extension redirect URI");
-  }
+  assertAllowedExtensionRedirectUri(env, redirectUri);
 
   if (error) {
     return createExtensionErrorRedirect(redirectUri, error);

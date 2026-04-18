@@ -3,6 +3,19 @@ import { EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION_DEFAULT } from "@/sha
 export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
+const normalizeOrigin = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!parsed.protocol || !parsed.host) return undefined;
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return undefined;
+  }
+};
+
 const MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT = 100;
 const MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT = 1_000;
 const MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT = 100;
@@ -26,6 +39,22 @@ export const getAllowedOrigins = (env: CloudflareBindings) => {
     .filter(Boolean);
   if (configured && configured.length > 0) return configured;
   return ["http://localhost:5173", "http://127.0.0.1:5173"];
+};
+
+export const getExtensionRedirectOrigins = (
+  env?: Pick<CloudflareBindings, "EXTENSION_REDIRECT_ORIGINS">
+) => {
+  const configured =
+    env?.EXTENSION_REDIRECT_ORIGINS ??
+    readProcessEnv("EXTENSION_REDIRECT_ORIGINS");
+  if (!configured?.trim()) return [];
+
+  const origins = configured
+    .split(",")
+    .map(normalizeOrigin)
+    .filter((value): value is string => Boolean(value));
+
+  return Array.from(new Set(origins));
 };
 
 export const getAllowedDomains = (env: CloudflareBindings) => {

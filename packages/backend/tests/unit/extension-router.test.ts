@@ -39,6 +39,7 @@ describe("extension router", () => {
       undefined,
       {
         BETTER_AUTH_BASE_URL: "http://localhost:8787/api/auth",
+        EXTENSION_REDIRECT_ORIGINS: "https://example.chromiumapp.org",
       } as CloudflareBindings
     );
 

@@ -83,6 +83,38 @@ describe("app auth middleware integration", () => {
     });
   });
 
+  it("returns 401 for extension bootstrap without a session", async () => {
+    const app = createApp({
+      createAuthFactory: createAuthFactory({ session: null }),
+    });
+
+    const response = await app.request(
+      "/api/extension/bootstrap",
+      undefined,
+      testBindings,
+      executionCtx as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "unauthorized" });
+  });
+
+  it("returns 401 for extension invitations without a session", async () => {
+    const app = createApp({
+      createAuthFactory: createAuthFactory({ session: null }),
+    });
+
+    const response = await app.request(
+      "/api/extension/invitations/inv-1",
+      undefined,
+      testBindings,
+      executionCtx as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "unauthorized" });
+  });
+
   it("returns 400 for api-key scoped routes without x-org-id", async () => {
     const app = createApp({
       createAuthFactory: createAuthFactory({

@@ -107,6 +107,7 @@ For local development, create `packages/backend/.dev.vars`:
 BETTER_AUTH_BASE_URL="http://localhost:8787/api/auth"
 BETTER_AUTH_SECRET=""
 CORS_ORIGIN="http://localhost:5173,http://127.0.0.1:5173"
+EXTENSION_REDIRECT_ORIGINS="https://<your-extension-id>.chromiumapp.org"
 RESEND_API_KEY=""
 TURNSTILE_SECRET_KEY=""
 GOOGLE_CLIENT_ID=""
@@ -130,6 +131,7 @@ pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 Use values like these:
 
 - `BETTER_AUTH_BASE_URL = https://api.<your-domain>/api/auth`
+- `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
 - `RESEND_API_KEY = re_...`
@@ -202,6 +204,8 @@ For local development, also add `GOOGLE_CLIENT_ID` and
 
 `CORS_ORIGIN` must include your frontend origin or Better Auth callback checks
 will fail.
+`EXTENSION_REDIRECT_ORIGINS` must list the exact browser-extension redirect
+origins allowed to complete the hosted extension sign-in flow.
 
 ## Database migrations
 

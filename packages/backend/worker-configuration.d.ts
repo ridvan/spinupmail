@@ -23,6 +23,7 @@ declare namespace Cloudflare {
     BETTER_AUTH_BASE_URL: string;
     BETTER_AUTH_SECRET: string;
     CORS_ORIGIN: string;
+    EXTENSION_REDIRECT_ORIGINS: string;
     RESEND_API_KEY: string;
     TURNSTILE_SECRET_KEY: string;
     GOOGLE_CLIENT_ID: string;

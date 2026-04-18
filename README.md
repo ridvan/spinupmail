@@ -151,12 +151,13 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
   - `[vars].MAX_RECEIVED_EMAILS_PER_ADDRESS` (default: `100`)
   - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
   - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
-  - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
-  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)
-  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` (default: `2`)
-  - `[vars].EMAIL_STORE_HEADERS_IN_DB`
-  - `[vars].EMAIL_STORE_RAW_IN_DB`
-  - `[vars].EMAIL_STORE_RAW_IN_R2`
+- `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
+- `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)
+- `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` (default: `2`)
+- `[vars].EXTENSION_REDIRECT_ORIGINS` (comma-separated exact redirect origins for trusted extension builds, for example `https://<extension-id>.chromiumapp.org`)
+- `[vars].EMAIL_STORE_HEADERS_IN_DB`
+- `[vars].EMAIL_STORE_RAW_IN_DB`
+- `[vars].EMAIL_STORE_RAW_IN_R2`
 
 For local development, create `.dev.vars` file in `packages/backend`. Here is a sample file:
 
@@ -164,6 +165,7 @@ For local development, create `.dev.vars` file in `packages/backend`. Here is a 
 BETTER_AUTH_BASE_URL="http://localhost:8787/api/auth"
 BETTER_AUTH_SECRET="" # Run `openssl rand -base64 32` to generate, or you can generate from https://better-auth.com/docs/installation
 CORS_ORIGIN="http://localhost:5173,http://127.0.0.1:5173"
+EXTENSION_REDIRECT_ORIGINS="https://<your-extension-id>.chromiumapp.org"
 RESEND_API_KEY="" # Get from Resend
 TURNSTILE_SECRET_KEY="" # Get from Cloudflare
 GOOGLE_CLIENT_ID="" # Get from Google Cloud Console
@@ -193,6 +195,7 @@ Run each of these commands in the `packages/backend` folder and provide the corr
 Use the Worker URL or your API route URL:
 
 - `BETTER_AUTH_BASE_URL = https://<your-domain>/api/auth`
+- `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
 - `RESEND_API_KEY = re_...`
@@ -316,6 +319,7 @@ Local development with `wrangler dev`:
 Important:
 
 - `CORS_ORIGIN` must include your frontend origin(s) (for example `http://localhost:5173` and your production app origin), because Better Auth validates callback URLs against trusted origins.
+- `EXTENSION_REDIRECT_ORIGINS` must list the exact extension redirect origins you trust for `browser.identity.launchWebAuthFlow`; wildcard `*.chromiumapp.org` or `*.extensions.allizom.org` entries are intentionally not supported.
 - Frontend does not need separate Google env vars for this OAuth redirect flow.
 - If you set `AUTH_ALLOWED_EMAIL_DOMAIN`, Spinupmail will reject email/password sign-up and sign-in outside that domain and will pass the same domain to Google OAuth using the hosted-domain hint (`hd`).
 

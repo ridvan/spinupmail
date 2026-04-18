@@ -3,6 +3,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "wxt";
 
 const EXTENSION_NAME = "SpinupMail";
+const CHROMIUM_EXTENSION_KEY =
+  process.env.WXT_CHROMIUM_EXTENSION_KEY?.trim() || undefined;
 
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
@@ -26,6 +28,11 @@ export default defineConfig({
     action: {
       default_title: EXTENSION_NAME,
     },
+    ...(env.browser !== "firefox" && CHROMIUM_EXTENSION_KEY
+      ? {
+          key: CHROMIUM_EXTENSION_KEY,
+        }
+      : {}),
     icons: {
       16: "/icon.png",
       32: "/icon.png",
