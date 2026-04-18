@@ -239,6 +239,7 @@ function createAuth(
           }),
           apiKey({
             enableSessionForAPIKeys: true,
+            enableMetadata: true,
             apiKeyHeaders: ["x-api-key"],
             defaultPrefix: "spin_",
             storage: "secondary-storage",

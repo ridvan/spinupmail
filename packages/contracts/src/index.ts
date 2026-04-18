@@ -265,10 +265,33 @@ export const extensionBootstrapUserSchema = z.object({
   emailVerified: z.boolean(),
 });
 
+export const extensionInvitationSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email(),
+  role: z.string().min(1),
+  status: z.string().min(1),
+  organizationName: z.string().min(1).optional(),
+  inviterEmail: z.string().email().optional(),
+});
+
 export const extensionBootstrapResponseSchema = z.object({
   user: extensionBootstrapUserSchema,
   organizations: z.array(organizationPickerItemSchema),
   defaultOrganizationId: z.string().min(1).nullable(),
+  pendingInvitations: z.array(extensionInvitationSchema),
+});
+
+export const extensionAuthExchangeRequestSchema = z.object({
+  code: z.string().min(1),
+});
+
+export const extensionAuthExchangeResponseSchema = z.object({
+  apiKey: z.string().min(1),
+  bootstrap: extensionBootstrapResponseSchema,
+});
+
+export const extensionAcceptInvitationRequestSchema = z.object({
+  invitationId: z.string().min(1),
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
@@ -329,6 +352,16 @@ export type OrganizationPickerItem = z.infer<
 export type ExtensionBootstrapUser = z.infer<
   typeof extensionBootstrapUserSchema
 >;
+export type ExtensionInvitation = z.infer<typeof extensionInvitationSchema>;
 export type ExtensionBootstrapResponse = z.infer<
   typeof extensionBootstrapResponseSchema
+>;
+export type ExtensionAuthExchangeRequest = z.infer<
+  typeof extensionAuthExchangeRequestSchema
+>;
+export type ExtensionAuthExchangeResponse = z.infer<
+  typeof extensionAuthExchangeResponseSchema
+>;
+export type ExtensionAcceptInvitationRequest = z.infer<
+  typeof extensionAcceptInvitationRequestSchema
 >;

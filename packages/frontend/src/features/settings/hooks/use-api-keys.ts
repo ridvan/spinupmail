@@ -9,6 +9,11 @@ type ApiKeyListResponse = NonNullable<
 
 type ApiKeyListItem = ApiKeyListResponse["apiKeys"][number];
 
+const isExtensionManagedMetadata = (value: unknown) => {
+  if (!value || typeof value !== "object") return false;
+  return (value as { type?: unknown }).type === "extension-managed";
+};
+
 const normalizeApiKeyRow = (row: {
   id: string;
   name?: string | null;
@@ -48,6 +53,7 @@ export const useApiKeysQuery = () => {
       const rows = result.data?.apiKeys ?? [];
 
       return rows
+        .filter(item => !isExtensionManagedMetadata(item.metadata))
         .map((item: ApiKeyListItem) => normalizeApiKeyRow(item))
         .sort(
           (a: ApiKeyRow, b: ApiKeyRow) =>

@@ -14,14 +14,19 @@
     "db:studio:dev": "pnpm -C packages/backend db:studio:dev",
     "db:studio:prod": "pnpm -C packages/backend db:studio:prod",
     "dev:frontend": "pnpm -C packages/frontend dev",
+    "dev:extension": "pnpm -C packages/extension dev",
+    "dev:extension:firefox": "pnpm -C packages/extension dev:firefox",
     "build:frontend": "pnpm -C packages/frontend build",
+    "build:extension": "pnpm -C packages/extension build",
+    "build:extension:firefox": "pnpm -C packages/extension build:firefox",
     "build:sdk": "pnpm -C packages/sdk build",
     "typecheck:backend": "pnpm -C packages/backend typecheck",
     "typecheck:frontend": "pnpm -C packages/frontend typecheck",
+    "typecheck:extension": "pnpm -C packages/extension typecheck",
     "typecheck:sdk": "pnpm -C packages/sdk typecheck",
     "typecheck:landing": "pnpm -C packages/landing typecheck",
     "deploy:frontend": "pnpm -C packages/frontend deploy",
-    "test:unit": "pnpm -C packages/backend test:unit && pnpm -C packages/frontend test:unit",
+    "test:unit": "pnpm -C packages/backend test:unit && pnpm -C packages/frontend test:unit && pnpm -C packages/extension test:unit",
     "test:sdk": "pnpm -C packages/sdk test",
     "test:package:sdk": "pnpm -C packages/sdk test:package",
     "test:landing": "pnpm -C packages/landing test",
@@ -29,14 +34,14 @@
     "test:integration:workers": "pnpm -C packages/backend test:integration:workers",
     "test:component": "pnpm -C packages/frontend test:component",
     "test:e2e": "pnpm -C packages/e2e test",
-    "test:ci": "pnpm run lint && pnpm run build:backend && pnpm run build:sdk && pnpm run typecheck:frontend && pnpm run typecheck:sdk && pnpm run typecheck:landing && pnpm run test:unit && pnpm run test:sdk && pnpm run test:package:sdk && pnpm run test:landing && pnpm run test:integration && pnpm run test:integration:workers && pnpm run test:component && pnpm run test:e2e",
+    "test:ci": "pnpm run lint && pnpm run build:backend && pnpm run build:sdk && pnpm run build:extension && pnpm run typecheck:frontend && pnpm run typecheck:extension && pnpm run typecheck:sdk && pnpm run typecheck:landing && pnpm run test:unit && pnpm run test:sdk && pnpm run test:package:sdk && pnpm run test:landing && pnpm run test:integration && pnpm run test:integration:workers && pnpm run test:component && pnpm run test:e2e",
     "dev:landing": "pnpm -C packages/landing dev",
     "build:landing": "pnpm -C packages/landing build",
     "deploy:landing": "pnpm -C packages/landing deploy",
     "lint": "pnpm run lint:root && pnpm run lint:landing",
     "lint:backend": "eslint packages/backend",
     "lint:landing": "pnpm -C packages/landing exec eslint .",
-    "lint:root": "eslint packages/backend packages/frontend packages/sdk eslint.config.mjs",
+    "lint:root": "eslint packages/backend packages/frontend packages/extension packages/sdk eslint.config.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -57,7 +62,7 @@
     "vitest": "^3.2.4"
   },
   "lint-staged": {
-    "packages/{backend,frontend,sdk}/**/*.{js,mjs,cjs,ts,tsx}": [
+    "packages/{backend,frontend,extension,sdk}/**/*.{js,mjs,cjs,ts,tsx}": [
       "pnpm exec eslint --quiet --fix --no-warn-ignored"
     ],
     "eslint.config.mjs": [

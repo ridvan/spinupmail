@@ -13,7 +13,10 @@ const backendFiles = [
   "packages/backend/**/*.{js,mjs,cjs,ts}",
   "packages/sdk/**/*.{js,mjs,cjs,ts}",
 ];
-const frontendFiles = ["packages/frontend/**/*.{ts,tsx}"];
+const frontendFiles = [
+  "packages/frontend/**/*.{ts,tsx}",
+  "packages/extension/**/*.{ts,tsx}",
+];
 const configFiles = ["**/*.config.{js,mjs,cjs,ts}"];
 const backendScope = { files: backendFiles, ignores: configFiles };
 const frontendScope = { files: frontendFiles, ignores: configFiles };
@@ -23,6 +26,7 @@ export default [
     ignores: [
       "**/dist/**",
       "**/.output/**",
+      "**/.wxt/**",
       "**/node_modules/**",
       "**/coverage/**",
       "packages/backend/.wrangler/**",
@@ -70,7 +74,8 @@ export default [
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
-        tsconfigRootDir: path.join(rootDir, "packages/frontend"),
+        projectService: true,
+        tsconfigRootDir: rootDir,
       },
     },
     plugins: {
