@@ -1,6 +1,6 @@
 import createDOMPurify from "dompurify";
 import type { ExtensionConnection } from "@/lib/types";
-import { extensionApi, normalizeBaseUrl, resolveApiUrl } from "@/lib/api";
+import { extensionApi, normalizeBaseUrl } from "@/lib/api";
 
 const ALLOWED_TAGS = [
   "a",
@@ -127,6 +127,8 @@ const isRemoteUrl = (value: string) =>
   value.startsWith("//");
 
 const isInternalApiPath = (value: string) => value.startsWith("/api/");
+const BLOB_UNAVAILABLE_PLACEHOLDER =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 const parseSrcset = (value: string) =>
   value
@@ -344,6 +346,23 @@ const collectInternalAssetTargets = (document: Document) => {
   return targets;
 };
 
+const getBlobUnavailableFallback = ({
+  baseUrl,
+  error,
+  path,
+}: {
+  baseUrl: string;
+  error: unknown;
+  path: string;
+}) => {
+  console.warn("Unable to hydrate email HTML asset blob", {
+    baseUrl,
+    error,
+    path,
+  });
+  return BLOB_UNAVAILABLE_PLACEHOLDER;
+};
+
 export const hydrateEmailHtmlAssets = async ({
   connection,
   html,
@@ -379,8 +398,12 @@ export const hydrateEmailHtmlAssets = async ({
                 objectUrl = URL.createObjectURL(blob);
                 assetCache.set(normalized, objectUrl);
                 objectUrls.push(objectUrl);
-              } catch {
-                objectUrl = resolveApiUrl(connection.baseUrl, normalized);
+              } catch (error) {
+                objectUrl = getBlobUnavailableFallback({
+                  baseUrl: connection.baseUrl,
+                  error,
+                  path: normalized,
+                });
               }
             }
 
@@ -409,8 +432,12 @@ export const hydrateEmailHtmlAssets = async ({
           objectUrl = URL.createObjectURL(blob);
           assetCache.set(target.path, objectUrl);
           objectUrls.push(objectUrl);
-        } catch {
-          objectUrl = resolveApiUrl(connection.baseUrl, target.path);
+        } catch (error) {
+          objectUrl = getBlobUnavailableFallback({
+            baseUrl: connection.baseUrl,
+            error,
+            path: target.path,
+          });
         }
       }
 

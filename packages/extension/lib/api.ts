@@ -9,14 +9,6 @@ import {
   extensionInvitationSchema,
   listEmailsParamsSchema,
   recentAddressActivityResponseSchema,
-  type CreateEmailAddressResponse,
-  type DomainConfig,
-  type EmailAddress,
-  type EmailDetail,
-  type EmailListResponse,
-  type ExtensionAuthExchangeResponse,
-  type ExtensionBootstrapResponse,
-  type ExtensionInvitation,
   emailDetailSchema,
 } from "@spinupmail/contracts";
 import { z } from "zod";
@@ -109,9 +101,7 @@ export const extensionApi = {
       throw new Error(await parseApiError(response));
     }
 
-    return extensionAuthExchangeResponseSchema.parse(
-      (await response.json()) as ExtensionAuthExchangeResponse
-    );
+    return extensionAuthExchangeResponseSchema.parse(await response.json());
   },
   async listRecentAddressActivity(
     connection: ExtensionConnection,
@@ -153,7 +143,7 @@ export const extensionApi = {
       {
         organizationId: options.organizationId,
       }
-    ) as Promise<EmailListResponse>;
+    );
   },
   async getEmail(
     connection: ExtensionConnection,
@@ -169,7 +159,7 @@ export const extensionApi = {
       {
         organizationId: options.organizationId,
       }
-    ) as Promise<EmailDetail>;
+    );
   },
   async listDomains(connection: ExtensionConnection, organizationId: string) {
     return apiFetch(
@@ -179,7 +169,7 @@ export const extensionApi = {
       {
         organizationId,
       }
-    ) as Promise<DomainConfig>;
+    );
   },
   async createAddress(
     connection: ExtensionConnection,
@@ -203,7 +193,7 @@ export const extensionApi = {
         method: "POST",
         organizationId: options.organizationId,
       }
-    ) as Promise<CreateEmailAddressResponse>;
+    );
   },
   async createOrganization(connection: ExtensionConnection, name: string) {
     return apiFetch(
@@ -228,7 +218,7 @@ export const extensionApi = {
         body: JSON.stringify({ invitationId }),
         method: "POST",
       }
-    ) as Promise<ExtensionBootstrapResponse>;
+    );
   },
   async getInvitation(connection: ExtensionConnection, invitationId: string) {
     return apiFetch(
@@ -236,7 +226,7 @@ export const extensionApi = {
       `/api/extension/invitations/${encodeURIComponent(invitationId)}`,
       value => extensionInvitationSchema.parse(value),
       {}
-    ) as Promise<ExtensionInvitation>;
+    );
   },
   async getAddress(
     connection: ExtensionConnection,
@@ -252,7 +242,7 @@ export const extensionApi = {
       {
         organizationId: options.organizationId,
       }
-    ) as Promise<EmailAddress>;
+    );
   },
   async fetchBlob(
     connection: ExtensionConnection,

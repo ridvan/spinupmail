@@ -3,7 +3,7 @@ import { EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION_DEFAULT } from "@/sha
 export const normalizeDomain = (value: string) =>
   value.trim().toLowerCase().replace(/^@+/, "").replace(/\.+$/, "");
 
-const normalizeOrigin = (value: string) => {
+export const normalizeOrigin = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
 

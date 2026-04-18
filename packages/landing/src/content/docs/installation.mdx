@@ -204,8 +204,11 @@ For local development, also add `GOOGLE_CLIENT_ID` and
 
 `CORS_ORIGIN` must include your frontend origin or Better Auth callback checks
 will fail.
-`EXTENSION_REDIRECT_ORIGINS` must list the exact browser-extension redirect
-origins allowed to complete the hosted extension sign-in flow.
+`EXTENSION_REDIRECT_ORIGINS` must list exact browser-extension redirect origins
+(full origin with scheme and host, for example
+`https://<extension-id>.chromiumapp.org`) allowed to complete the hosted
+extension sign-in flow; wildcard patterns like `*.chromiumapp.org` or
+`*.extensions.allizom.org` are rejected.
 
 ## Database migrations
 

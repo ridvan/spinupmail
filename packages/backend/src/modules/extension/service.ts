@@ -4,7 +4,7 @@ import type {
   ExtensionInvitation,
 } from "@spinupmail/contracts";
 import type { AuthInstance, AuthSession } from "@/app/types";
-import { getExtensionRedirectOrigins } from "@/shared/env";
+import { getExtensionRedirectOrigins, normalizeOrigin } from "@/shared/env";
 
 const EXTENSION_HANDOFF_TTL_SECONDS = 5 * 60;
 const EXTENSION_API_KEY_NAME = "SpinupMail Extension";
@@ -169,16 +169,6 @@ const getApiBaseOrigin = (
   return new URL(authBaseUrl).origin;
 };
 
-const getExactOrigin = (value: string) => {
-  try {
-    const parsed = new URL(value);
-    if (!parsed.protocol || !parsed.host) return null;
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return null;
-  }
-};
-
 const getAllowedExtensionRedirectOrigins = (
   env: Pick<CloudflareBindings, "EXTENSION_REDIRECT_ORIGINS">
 ) => {
@@ -193,7 +183,7 @@ const assertAllowedExtensionRedirectUri = (
   env: Pick<CloudflareBindings, "EXTENSION_REDIRECT_ORIGINS">,
   redirectUri: string
 ) => {
-  const redirectOrigin = getExactOrigin(redirectUri);
+  const redirectOrigin = normalizeOrigin(redirectUri);
   const allowedOrigins = getAllowedExtensionRedirectOrigins(env);
 
   if (!redirectOrigin || !allowedOrigins.has(redirectOrigin)) {

@@ -69,10 +69,12 @@ export function PopupSessionProvider({
       await persistAuthState(nextState);
       return nextState;
     },
-    initialData: authState,
+    placeholderData: authState,
   });
 
-  const resolvedAuthState = bootstrapQuery.data ?? authState;
+  const resolvedAuthState = bootstrapQuery.isPlaceholderData
+    ? null
+    : (bootstrapQuery.data ?? null);
   const resolvedOrganizationId =
     resolvedAuthState && activeOrganizationId !== null
       ? getResolvedOrganizationId({
