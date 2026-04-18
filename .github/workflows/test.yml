@@ -34,8 +34,17 @@ jobs:
       - name: Backend typecheck
         run: pnpm run typecheck:backend
 
+      - name: Backend build
+        run: pnpm run build:backend
+
       - name: Frontend typecheck
         run: pnpm run typecheck:frontend
+
+      - name: Extension typecheck
+        run: pnpm run typecheck:extension
+
+      - name: Extension build
+        run: pnpm run build:extension
 
       - name: SDK build
         run: pnpm run build:sdk

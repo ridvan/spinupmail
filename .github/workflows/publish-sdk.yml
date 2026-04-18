@@ -3,9 +3,7 @@ name: Publish SDK
 on:
   push:
     tags:
-      - "v*"
-      - "v*.*"
-      - "v*.*.*"
+      - "sdk-v*"
   workflow_dispatch:
 
 jobs:
@@ -15,6 +13,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify SDK tag matches package version
+        if: startsWith(github.ref, 'refs/tags/sdk-v')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#sdk-v}"
+          PACKAGE_VERSION="$(node -p "require('./packages/sdk/package.json').version")"
+
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "SDK tag version ($TAG_VERSION) does not match packages/sdk/package.json ($PACKAGE_VERSION)."
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -35,7 +44,7 @@ jobs:
 
   publish:
     needs: sdk-typecheck
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/sdk-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,6 +53,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify SDK tag matches package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#sdk-v}"
+          PACKAGE_VERSION="$(node -p "require('./packages/sdk/package.json').version")"
+
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "SDK tag version ($TAG_VERSION) does not match packages/sdk/package.json ($PACKAGE_VERSION)."
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

@@ -634,3 +634,60 @@ Hi there'
 To receive **real** emails, use a real domain in Cloudflare Email Routing (you
 can create a dev subdomain like `dev.your-domain.com`) and point the routing
 rule to your Worker.
+
+## Versioning and Releases
+
+SpinupMail uses two separate release tracks:
+
+- Repo releases use tags like `v0.1.0` and represent self-hosted SpinupMail
+  releases published on GitHub.
+- SDK releases use tags like `sdk-v0.1.1` and publish the public
+  `spinupmail` npm package from `packages/sdk`.
+
+This separation keeps repo releases and npm publishes independent. Creating a
+repo tag like `v0.1.0` will not publish the SDK. Creating an SDK tag like
+`sdk-v0.1.1` will not create a product release by itself.
+
+Before creating a release tag, make sure `main` is green in GitHub Actions. For
+a full local pre-release pass, run:
+
+```bash
+pnpm run test:ci
+```
+
+### Repo Releases
+
+Use repo tags for SpinupMail product releases:
+
+```bash
+git tag -a v0.1.0 -m "SpinupMail v0.1.0"
+git push origin v0.1.0
+```
+
+After pushing the tag, create a GitHub Release for that version and summarize
+the notable changes from `CHANGELOG.md`.
+
+### SDK Releases
+
+Use SDK tags for npm publishes:
+
+1. Update `packages/sdk/package.json` to the new SDK version.
+2. Make sure the SDK release checks pass:
+
+```bash
+pnpm -C packages/sdk typecheck
+pnpm -C packages/sdk test
+pnpm -C packages/sdk build
+pnpm -C packages/sdk test:package
+```
+
+3. Create and push the SDK tag:
+
+```bash
+git tag -a sdk-v0.1.1 -m "spinupmail SDK v0.1.1"
+git push origin sdk-v0.1.1
+```
+
+The GitHub Actions workflow in `.github/workflows/publish-sdk.yml` will verify
+that the tag matches `packages/sdk/package.json` and then publish the package
+to npm using trusted publishing.
