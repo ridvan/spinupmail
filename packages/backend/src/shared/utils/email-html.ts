@@ -1,7 +1,7 @@
 import * as csstree from "css-tree";
 import render from "dom-serializer";
 import { parseDocument } from "htmlparser2";
-import sanitizeHtml from "sanitize-html";
+import { createRequire } from "node:module";
 
 const EMAIL_ALLOWED_TAGS = [
   "a",
@@ -114,6 +114,10 @@ type HtmlElement = HtmlNode & {
 type HtmlDocument = {
   children: HtmlNode[];
 };
+
+const require = createRequire(
+  import.meta.url ?? "file:///spinupmail/backend/src/shared/utils/email-html.ts"
+);
 
 const buildList = <TData>(items: TData[]) =>
   new csstree.List<TData>().fromArray(items);
@@ -577,6 +581,18 @@ export const isSafeInlineImageContentType = (
 };
 
 export const sanitizeEmailHtml = (html: string) => {
+  const sanitizeHtmlModule = require("sanitize-html") as
+    | {
+        default?: (dirty: string, options?: Record<string, unknown>) => string;
+      }
+    | ((dirty: string, options?: Record<string, unknown>) => string);
+  const sanitizeHtml =
+    typeof sanitizeHtmlModule === "function"
+      ? sanitizeHtmlModule
+      : (sanitizeHtmlModule.default ??
+        (() => {
+          throw new TypeError("sanitize-html export not found");
+        }));
   const sanitizedHtml = sanitizeHtml(html, {
     allowedTags: EMAIL_ALLOWED_TAGS,
     allowedAttributes: {
@@ -601,7 +617,7 @@ export const sanitizeEmailHtml = (html: string) => {
     enforceHtmlBoundary: false,
     parseStyleAttributes: false,
     transformTags: {
-      a: (_tagName, attribs) => ({
+      a: (_tagName: string, attribs: Record<string, string>) => ({
         tagName: "a",
         attribs: {
           ...attribs,

@@ -80,6 +80,13 @@ if (typeof SpinupMail !== "function") {
     path.join(os.tmpdir(), "spinupmail-ts-consumer-")
   );
   cleanupPaths.push(tsConsumerDir);
+  const tsConsumerNodeModules = path.join(tsConsumerDir, "node_modules");
+  fs.mkdirSync(tsConsumerNodeModules, { recursive: true });
+  fs.symlinkSync(
+    extractedPackageRoot,
+    path.join(tsConsumerNodeModules, "spinupmail"),
+    "dir"
+  );
   fs.writeFileSync(
     path.join(tsConsumerDir, "index.ts"),
     `import { SpinupMail } from "spinupmail";
@@ -102,10 +109,6 @@ void spinupmail.domains.get();
           moduleResolution: "Bundler",
           strict: true,
           noEmit: true,
-          baseUrl: ".",
-          paths: {
-            spinupmail: [extractedPackageRoot],
-          },
         },
         include: ["./index.ts"],
       },

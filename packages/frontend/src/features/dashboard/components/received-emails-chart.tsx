@@ -21,9 +21,13 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const formatShortDate = (dateStr: string) => {
+const formatShortDate = (label: unknown) => {
+  if (typeof label !== "string" && typeof label !== "number") {
+    return "";
+  }
+
   return formatDayKey({
-    dayKey: dateStr,
+    dayKey: String(label),
     options: { month: "short", day: "numeric" },
   });
 };

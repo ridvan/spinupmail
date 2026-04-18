@@ -58,10 +58,10 @@ const buildMockUser = (twoFactorEnabled: boolean) => ({
 
 const buildAuthState = ({
   twoFactorEnabled,
-  refreshSession = vi.fn().mockResolvedValue(undefined),
+  refreshSession = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }: {
   twoFactorEnabled: boolean;
-  refreshSession?: ReturnType<typeof vi.fn>;
+  refreshSession?: () => Promise<void>;
 }): ReturnType<typeof useAuth> => ({
   session: null,
   user: buildMockUser(twoFactorEnabled),
@@ -174,7 +174,9 @@ describe("TwoFactorPanel", () => {
   });
 
   it("disables 2FA after confirmation input and refreshes session", async () => {
-    const refreshSession = vi.fn().mockResolvedValue(undefined);
+    const refreshSession = vi
+      .fn<() => Promise<void>>()
+      .mockResolvedValue(undefined);
     mockedUseAuth.mockReturnValue(
       buildAuthState({ twoFactorEnabled: true, refreshSession })
     );

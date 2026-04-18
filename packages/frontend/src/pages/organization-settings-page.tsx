@@ -55,7 +55,10 @@ export const OrganizationSettingsPage = () => {
   const updateMemberRoleMutation = useUpdateMemberRoleMutation();
   const removeMemberMutation = useRemoveMemberMutation();
 
-  const [organizationName, setOrganizationName] = React.useState("");
+  const [organizationNameDraft, setOrganizationNameDraft] = React.useState<{
+    organizationId: string | null;
+    value: string;
+  } | null>(null);
   const [inviteEmail, setInviteEmail] = React.useState("");
   const [inviteRole, setInviteRole] = React.useState<"member" | "admin">(
     "member"
@@ -69,12 +72,11 @@ export const OrganizationSettingsPage = () => {
   const invitations = canManage
     ? (invitationsQuery.data ?? activeOrganization?.invitations ?? [])
     : [];
-
-  React.useEffect(() => {
-    if (activeOrganization?.name) {
-      setOrganizationName(activeOrganization.name);
-    }
-  }, [activeOrganization?.name]);
+  const activeOrganizationId = activeOrganization?.id ?? null;
+  const organizationName =
+    organizationNameDraft?.organizationId === activeOrganizationId
+      ? organizationNameDraft.value
+      : (activeOrganization?.name ?? "");
 
   const handleError = (error: unknown, fallback: string) => {
     const message = toErrorMessage(error, fallback);
@@ -83,7 +85,10 @@ export const OrganizationSettingsPage = () => {
   };
 
   const handleOrganizationNameChange = (value: string) => {
-    setOrganizationName(value);
+    setOrganizationNameDraft({
+      organizationId: activeOrganizationId,
+      value,
+    });
   };
 
   const copyToClipboard = async (value: string, successMessage: string) => {

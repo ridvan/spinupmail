@@ -579,8 +579,14 @@ const AddressListContent = ({
       .withDefault("")
       .withOptions({ clearOnDefault: true, history: "replace" })
   );
-  const [searchInputValue, setSearchInputValue] =
-    React.useState(addressSearchValue);
+  const [searchInputDraft, setSearchInputDraft] = React.useState(() => ({
+    sourceValue: addressSearchValue,
+    value: addressSearchValue,
+  }));
+  const searchInputValue =
+    searchInputDraft.sourceValue === addressSearchValue
+      ? searchInputDraft.value
+      : addressSearchValue;
   const [sortBy, setSortBy] = React.useState<EmailAddressSortBy>("createdAt");
   const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">(
     "desc"
@@ -599,10 +605,6 @@ const AddressListContent = ({
     }
     return parsed;
   }, [pageParam]);
-
-  React.useEffect(() => {
-    setSearchInputValue(addressSearchValue);
-  }, [addressSearchValue]);
 
   React.useEffect(() => {
     const normalizedDraft = searchInputValue.trim();
@@ -851,7 +853,10 @@ const AddressListContent = ({
               searchIconRef.current?.stopAnimation();
             }}
             onChange={event => {
-              setSearchInputValue(event.target.value);
+              setSearchInputDraft({
+                sourceValue: addressSearchValue,
+                value: event.target.value,
+              });
             }}
             onFocus={() => {
               searchIconRef.current?.startAnimation();
@@ -872,7 +877,10 @@ const AddressListContent = ({
               className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
               aria-label="Clear address filter"
               onClick={() => {
-                setSearchInputValue("");
+                setSearchInputDraft({
+                  sourceValue: addressSearchValue,
+                  value: "",
+                });
                 void Promise.all([
                   setAddressSearchValue(""),
                   setPageParam("1"),
@@ -1043,7 +1051,10 @@ const AddressListContent = ({
                             size="sm"
                             className="cursor-pointer"
                             onClick={() => {
-                              setSearchInputValue("");
+                              setSearchInputDraft({
+                                sourceValue: addressSearchValue,
+                                value: "",
+                              });
                               void Promise.all([
                                 setAddressSearchValue(""),
                                 setPageParam("1"),

@@ -39,9 +39,6 @@ export function PopupSessionProvider({
   );
   const [pollState, setPollState] = useStorageItem(pollStateItem);
   const [focusIntent, setFocusIntent] = useStorageItem(focusIntentItem);
-  const [focusedEmailId, setFocusedEmailId] = React.useState<string | null>(
-    null
-  );
 
   React.useEffect(() => {
     void sendRuntimeMessage({
@@ -98,7 +95,6 @@ export function PopupSessionProvider({
       ...(previousSelectedAddressIds ?? {}),
       [focusIntent.organizationId]: focusIntent.addressId,
     }));
-    setFocusedEmailId(focusIntent.emailId);
     void setFocusIntent(null);
   }, [
     focusIntent,
@@ -159,7 +155,7 @@ export function PopupSessionProvider({
     }
 
     queryClient.clear();
-    setFocusedEmailId(null);
+    void setFocusIntent(null);
   });
 
   const toggleNotifications = React.useEffectEvent(async () => {
@@ -173,13 +169,13 @@ export function PopupSessionProvider({
   });
 
   const clearFocusedEmailId = React.useEffectEvent(() => {
-    setFocusedEmailId(null);
+    void setFocusIntent(null);
   });
 
   const value: PopupSessionValue = {
     activeOrganizationId,
     clearFocusedEmailId,
-    focusedEmailId,
+    focusedEmailId: focusIntent?.emailId ?? null,
     markEmailSeen,
     notificationEnabled: notificationSettings?.enabled ?? true,
     persistBootstrappedState,

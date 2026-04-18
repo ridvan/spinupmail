@@ -110,6 +110,7 @@ const buildContext = ({
 describe("email qualification plugin", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assertAllowedAuthEmailDomain.mockReset();
     mocks.qualifyEmailAddress.mockResolvedValue({
       ok: true,
       normalizedEmail: "person@example.com",

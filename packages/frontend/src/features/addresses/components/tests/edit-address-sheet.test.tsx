@@ -102,9 +102,9 @@ describe("EditAddressSheet", () => {
       screen.queryByText("Changing the username replaces this address")
     ).toBeNull();
     expect(
-      screen.queryByLabelText(
-        "I understand the consequences of changing username."
-      )
+      screen.queryByRole("checkbox", {
+        name: "I understand the consequences of changing username.",
+      })
     ).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Username"), {
@@ -115,9 +115,9 @@ describe("EditAddressSheet", () => {
       screen.getByText("Changing the username replaces this address")
     ).toBeTruthy();
     expect(
-      screen.getByLabelText(
-        "I understand the consequences of changing username."
-      )
+      screen.getByRole("checkbox", {
+        name: "I understand the consequences of changing username.",
+      })
     ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Username"), {
@@ -142,8 +142,10 @@ describe("EditAddressSheet", () => {
     expect(screen.getByText("Required")).toBeTruthy();
     expect(screen.queryByText("Unlimited")).toBeNull();
     expect(
-      (screen.getByLabelText("Delete all") as HTMLInputElement).checked
-    ).toBe(true);
+      screen
+        .getByRole("radio", { name: "Delete all" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
   });
 
   it("refreshes the inherited inbox limit when the parent default changes", () => {
@@ -239,7 +241,7 @@ describe("EditAddressSheet", () => {
     );
     renderEditAddressSheet(onOpenChange);
 
-    fireEvent.click(screen.getByLabelText("Delete all"));
+    fireEvent.click(screen.getByRole("radio", { name: "Delete all" }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>
@@ -271,11 +273,11 @@ describe("EditAddressSheet", () => {
       target: { value: "hello-2" },
     });
     fireEvent.click(
-      screen.getByLabelText(
-        "I understand the consequences of changing username."
-      )
+      screen.getByRole("checkbox", {
+        name: "I understand the consequences of changing username.",
+      })
     );
-    fireEvent.click(screen.getByLabelText("Delete all"));
+    fireEvent.click(screen.getByRole("radio", { name: "Delete all" }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() =>

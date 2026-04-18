@@ -5,6 +5,10 @@ const withCloudflareMock = vi.fn(
   (_bindings: unknown, options: Record<string, unknown>) => options
 );
 const drizzleAdapterMock = vi.fn(() => ({ adapter: "drizzle" }));
+const apiKeyMock = vi.fn((configuration: unknown) => ({
+  id: "api-key",
+  configuration,
+}));
 
 vi.mock("better-auth", () => ({
   betterAuth: betterAuthMock,
@@ -18,18 +22,13 @@ vi.mock("better-auth/adapters/drizzle", () => ({
   drizzleAdapter: drizzleAdapterMock,
 }));
 
+vi.mock("@better-auth/api-key", () => ({
+  apiKey: apiKeyMock,
+}));
+
 type AuthWithApiKeyPluginConfig = {
   plugins?: Array<{
     id?: string;
-    configurations?: Array<{
-      storage?: string;
-      fallbackToDatabase?: boolean;
-      rateLimit?: {
-        enabled?: boolean;
-        timeWindow?: number;
-        maxRequests?: number;
-      };
-    }>;
   }>;
   rateLimit?: {
     customRules?: {
@@ -105,14 +104,26 @@ const assertApiKeyPluginConfig = (
   }
 ) => {
   const apiKeyPlugin = auth.plugins?.find(plugin => plugin.id === "api-key");
+  const apiKeyPluginConfiguration = apiKeyMock.mock.calls.at(-1)?.[0] as
+    | {
+        storage?: string;
+        fallbackToDatabase?: boolean;
+        rateLimit?: {
+          enabled?: boolean;
+          timeWindow?: number;
+          maxRequests?: number;
+        };
+      }
+    | undefined;
 
-  expect(apiKeyPlugin?.configurations?.[0]?.rateLimit).toEqual({
+  expect(apiKeyPlugin).toBeDefined();
+  expect(apiKeyPluginConfiguration?.rateLimit).toEqual({
     enabled: true,
     timeWindow: expected.timeWindow,
     maxRequests: expected.maxRequests,
   });
-  expect(apiKeyPlugin?.configurations?.[0]?.storage).toBe("secondary-storage");
-  expect(apiKeyPlugin?.configurations?.[0]?.fallbackToDatabase).toBe(true);
+  expect(apiKeyPluginConfiguration?.storage).toBe("secondary-storage");
+  expect(apiKeyPluginConfiguration?.fallbackToDatabase).toBe(true);
   expect(
     resolveRateLimitRule(auth.rateLimit?.customRules?.["/sign-in/email"], {
       window: 10,
@@ -149,6 +160,29 @@ describe("createAuth", () => {
     betterAuthMock.mockClear();
     withCloudflareMock.mockClear();
     drizzleAdapterMock.mockClear();
+    apiKeyMock.mockClear();
+  });
+
+  it("does not load resend while building auth configuration", async () => {
+    let resendModuleLoaded = false;
+
+    vi.doMock("resend", () => {
+      resendModuleLoaded = true;
+      return {
+        Resend: vi.fn(),
+      };
+    });
+
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    expect(resendModuleLoaded).toBe(false);
+
+    createAuth({
+      BETTER_AUTH_SECRET: "test-secret",
+      BETTER_AUTH_BASE_URL: "https://api.spinupmail.test/api/auth",
+    } as CloudflareBindings);
+
+    expect(resendModuleLoaded).toBe(false);
   });
 
   it("configures local email qualification hooks and normalizedEmail writes", async () => {
