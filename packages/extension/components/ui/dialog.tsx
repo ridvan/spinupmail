@@ -55,6 +55,7 @@ export function DialogContent({
           <DialogPrimitive.Close
             render={
               <Button
+                aria-label="Close"
                 variant="ghost"
                 size="icon-sm"
                 className="absolute top-2 right-2"

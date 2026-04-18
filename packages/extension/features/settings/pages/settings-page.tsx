@@ -21,6 +21,7 @@ export function SettingsPage() {
     <div className="absolute inset-0 z-10 flex min-h-180 flex-col bg-background">
       <div className="flex items-center gap-2 border-b px-3 py-3">
         <Button
+          aria-label="Back to inbox"
           variant="ghost"
           size="icon-sm"
           onClick={() => navigate("/inbox")}

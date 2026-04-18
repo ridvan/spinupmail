@@ -6,20 +6,51 @@ type StorageItem<TValue> = {
   watch: (callback: (value: TValue) => void) => () => void;
 };
 
+type StorageValueUpdater<TValue> = TValue | ((value: TValue | null) => TValue);
+
 export function useStorageItem<TValue>(item: StorageItem<TValue>) {
   const [value, setValue] = React.useState<TValue | null>(null);
+  const valueRef = React.useRef<TValue | null>(null);
+
+  React.useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   React.useEffect(() => {
     let mounted = true;
+    let receivedWatchValue = false;
 
-    void item.getValue().then(nextValue => {
-      if (mounted) {
-        setValue(nextValue);
-      }
-    });
+    const applyValue = (nextValue: TValue) => {
+      valueRef.current = nextValue;
+      setValue(currentValue =>
+        Object.is(currentValue, nextValue) ? currentValue : nextValue
+      );
+    };
 
     const unwatch = item.watch(nextValue => {
-      setValue(nextValue);
+      receivedWatchValue = true;
+
+      if (!mounted) {
+        return;
+      }
+
+      applyValue(nextValue);
+    });
+
+    void item.getValue().then(nextValue => {
+      if (!mounted) {
+        return;
+      }
+
+      if (receivedWatchValue && !Object.is(valueRef.current, nextValue)) {
+        return;
+      }
+
+      if (Object.is(valueRef.current, nextValue)) {
+        return;
+      }
+
+      applyValue(nextValue);
     });
 
     return () => {
@@ -28,9 +59,20 @@ export function useStorageItem<TValue>(item: StorageItem<TValue>) {
     };
   }, [item]);
 
-  const setStoredValue = React.useEffectEvent(async (nextValue: TValue) => {
-    await item.setValue(nextValue);
-  });
+  const setStoredValue = React.useEffectEvent(
+    async (nextValueOrUpdater: StorageValueUpdater<TValue>) => {
+      const nextValue =
+        typeof nextValueOrUpdater === "function"
+          ? (nextValueOrUpdater as (value: TValue | null) => TValue)(
+              valueRef.current
+            )
+          : nextValueOrUpdater;
+
+      valueRef.current = nextValue;
+      setValue(nextValue);
+      await item.setValue(nextValue);
+    }
+  );
 
   return [value, setStoredValue] as const;
 }

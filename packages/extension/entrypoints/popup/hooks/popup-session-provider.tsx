@@ -92,16 +92,15 @@ export function PopupSessionProvider({
     }
 
     void setActiveOrganizationId(focusIntent.organizationId);
-    void setSelectedAddressIds({
-      ...(selectedAddressIds ?? {}),
+    void setSelectedAddressIds(previousSelectedAddressIds => ({
+      ...(previousSelectedAddressIds ?? {}),
       [focusIntent.organizationId]: focusIntent.addressId,
-    });
+    }));
     setFocusedEmailId(focusIntent.emailId);
     void setFocusIntent(null);
   }, [
     focusIntent,
     resolvedAuthState,
-    selectedAddressIds,
     setActiveOrganizationId,
     setFocusIntent,
     setSelectedAddressIds,
@@ -121,10 +120,10 @@ export function PopupSessionProvider({
 
   const setSelectedAddressForOrganization = React.useEffectEvent(
     async (organizationId: string, addressId: string) => {
-      await setSelectedAddressIds({
-        ...(selectedAddressIds ?? {}),
+      await setSelectedAddressIds(previousSelectedAddressIds => ({
+        ...(previousSelectedAddressIds ?? {}),
         [organizationId]: addressId,
-      });
+      }));
     }
   );
 
@@ -133,13 +132,17 @@ export function PopupSessionProvider({
       return;
     }
 
-    if (pollState.seenEmailIds.includes(emailId)) {
-      return;
-    }
+    await setPollState(previousPollState => {
+      const currentPollState = previousPollState ?? pollState;
 
-    await setPollState({
-      ...pollState,
-      seenEmailIds: [...pollState.seenEmailIds, emailId].slice(-500),
+      if (currentPollState.seenEmailIds.includes(emailId)) {
+        return currentPollState;
+      }
+
+      return {
+        ...currentPollState,
+        seenEmailIds: [...currentPollState.seenEmailIds, emailId].slice(-500),
+      };
     });
   });
 
