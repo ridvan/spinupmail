@@ -49,7 +49,13 @@ type BetterAuthApi = AuthInstance["api"] & {
       metadata?: unknown;
     };
     headers: Headers;
-  }) => Promise<{ key?: string } | null>;
+  }) => Promise<{ id?: string; key?: string } | null>;
+  deleteApiKey: (args: {
+    body: {
+      keyId: string;
+    };
+    headers: Headers;
+  }) => Promise<unknown>;
   listOrganizations: (args: { headers: Headers }) => Promise<
     Array<{
       id: string;
@@ -91,6 +97,11 @@ type BetterAuthApi = AuthInstance["api"] & {
 
 type ExtensionExchangeEnvelope = ExtensionAuthExchangeResponse & {
   issuedAt: string;
+};
+
+type PendingExtensionExchangeEnvelope = {
+  envelope: ExtensionExchangeEnvelope;
+  keyId: string;
 };
 
 type ExtensionStartRedirect = {
@@ -215,7 +226,7 @@ const createExchangeEnvelope = async ({
   env: CloudflareBindings;
   auth: AuthInstance;
   headers: Headers;
-}): Promise<ExtensionExchangeEnvelope> => {
+}): Promise<PendingExtensionExchangeEnvelope> => {
   const bootstrap = await buildExtensionBootstrap({ auth, headers });
   const authApi = auth.api as BetterAuthApi;
   const createdKey = await authApi.createApiKey({
@@ -226,15 +237,19 @@ const createExchangeEnvelope = async ({
     },
   });
 
+  const keyId = createdKey?.id?.trim();
   const apiKey = createdKey?.key?.trim();
-  if (!apiKey) {
+  if (!keyId || !apiKey) {
     throw new Error("Unable to create extension API key");
   }
 
   return {
-    apiKey,
-    bootstrap,
-    issuedAt: new Date().toISOString(),
+    envelope: {
+      apiKey,
+      bootstrap,
+      issuedAt: new Date().toISOString(),
+    },
+    keyId,
   };
 };
 
@@ -357,15 +372,26 @@ export const createGoogleExtensionCompleteRedirect = async ({
   }
 
   const code = createExchangeCode();
-  const envelope = await createExchangeEnvelope({ env, auth, headers });
+  const pendingExchange = await createExchangeEnvelope({ env, auth, headers });
 
-  await env.SUM_KV.put(
-    `${EXTENSION_HANDOFF_PREFIX}${code}`,
-    JSON.stringify(envelope),
-    {
-      expirationTtl: EXTENSION_HANDOFF_TTL_SECONDS,
-    }
-  );
+  try {
+    await env.SUM_KV.put(
+      `${EXTENSION_HANDOFF_PREFIX}${code}`,
+      JSON.stringify(pendingExchange.envelope),
+      {
+        expirationTtl: EXTENSION_HANDOFF_TTL_SECONDS,
+      }
+    );
+  } catch (error) {
+    const authApi = auth.api as BetterAuthApi;
+    await authApi.deleteApiKey({
+      headers,
+      body: {
+        keyId: pendingExchange.keyId,
+      },
+    });
+    throw error;
+  }
 
   const url = new URL(redirectUri);
   url.searchParams.set("code", code);

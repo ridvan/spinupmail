@@ -22,8 +22,10 @@ const buildAuth = () =>
         },
       })),
       createApiKey: vi.fn(async () => ({
+        id: "api-key-123",
         key: "ext-key-123",
       })),
+      deleteApiKey: vi.fn(async () => null),
       getInvitation: vi.fn(async () => ({
         email: "invitee@example.com",
         id: "inv-1",
@@ -207,6 +209,42 @@ describe("extension auth service", () => {
       });
 
       expect(exchangedAgain).toBeNull();
+    });
+  });
+
+  it("deletes the created API key when exchange persistence fails", async () => {
+    const auth = buildAuth();
+    const putError = new Error("KV write failed");
+    const headers = new Headers();
+    const kv = {
+      put: vi.fn(async () => {
+        throw putError;
+      }),
+    } as unknown as CloudflareBindings["SUM_KV"];
+
+    await expect(
+      createGoogleExtensionCompleteRedirect({
+        auth,
+        env: {
+          BETTER_AUTH_BASE_URL: "https://api.spinupmail.com/api/auth",
+          EXTENSION_REDIRECT_ORIGINS: allowedRedirectOrigin,
+          SUM_KV: kv,
+        } as unknown as CloudflareBindings,
+        headers,
+        redirectUri: allowedRedirectUri,
+      })
+    ).rejects.toThrow("KV write failed");
+
+    const authApi = auth.api as {
+      createApiKey: ReturnType<typeof vi.fn>;
+      deleteApiKey: ReturnType<typeof vi.fn>;
+    };
+    expect(authApi.createApiKey).toHaveBeenCalledTimes(1);
+    expect(authApi.deleteApiKey).toHaveBeenCalledWith({
+      headers,
+      body: {
+        keyId: "api-key-123",
+      },
     });
   });
 
