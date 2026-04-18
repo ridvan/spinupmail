@@ -56,6 +56,9 @@ export function InboxPage() {
       : null) ??
     addresses[0]?.id ??
     null;
+  const previousSelectedAddressIdRef = React.useRef<string | null>(
+    selectedAddressId
+  );
   const [selectedEmailState, setSelectedEmailState] = React.useState<{
     addressId: string | null;
     emailId: string | null;
@@ -69,6 +72,29 @@ export function InboxPage() {
     selectedEmailState.addressId === selectedAddressId
       ? selectedEmailState.emailId
       : null);
+
+  React.useEffect(() => {
+    setSelectedEmailState(currentState => {
+      const previousSelectedAddressId = previousSelectedAddressIdRef.current;
+      const shouldSyncAddressId =
+        currentState.addressId === null ||
+        currentState.addressId === previousSelectedAddressId;
+
+      if (
+        !shouldSyncAddressId ||
+        currentState.addressId === selectedAddressId
+      ) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        addressId: selectedAddressId,
+      };
+    });
+
+    previousSelectedAddressIdRef.current = selectedAddressId;
+  }, [selectedAddressId]);
 
   React.useEffect(() => {
     if (!resolvedOrganizationId || !selectedAddressId) {

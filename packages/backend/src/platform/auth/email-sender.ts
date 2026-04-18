@@ -574,7 +574,6 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
       }
     }
 
-    const resend = await createResendClient(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
     const flow: VerificationFlow = isChangeEmailVerification
       ? "change-email"
@@ -582,6 +581,7 @@ export const createResendVerificationEmailSender = (env?: EmailSenderEnv) => {
     const appVerificationUrl = buildAppVerificationUrl(url, flow, env);
 
     try {
+      const resend = await createResendClient(env.RESEND_API_KEY);
       await resend.emails.send({
         from: env.RESEND_FROM_EMAIL,
         to: user.email,
@@ -640,9 +640,9 @@ export const createResendResetPasswordEmailSender = (env?: EmailSenderEnv) => {
       return;
     }
 
-    const resend = await createResendClient(env.RESEND_API_KEY);
     const logoUrl = getEmailLogoUrl(env);
     try {
+      const resend = await createResendClient(env.RESEND_API_KEY);
       await resend.emails.send({
         from: env.RESEND_FROM_EMAIL,
         to: user.email,

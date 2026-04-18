@@ -168,4 +168,15 @@ export const formatDayKey = ({
   }).format(parsedDate);
 };
 
+export const formatDashboardDayLabel = (label: unknown): string => {
+  if (typeof label !== "string" && typeof label !== "number") {
+    return "";
+  }
+
+  return formatDayKey({
+    dayKey: String(label),
+    options: { month: "short", day: "numeric" },
+  });
+};
+
 export const getFormatterCacheSize = () => dateTimeFormatterCache.size;

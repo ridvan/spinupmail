@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEmailActivityQuery } from "@/features/dashboard/hooks/use-email-activity";
-import { formatDayKey } from "@/features/timezone/lib/date-format";
+import { formatDashboardDayLabel } from "@/features/timezone/lib/date-format";
 
 const chartConfig = {
   count: {
@@ -20,17 +20,6 @@ const chartConfig = {
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig;
-
-const formatShortDate = (label: unknown) => {
-  if (typeof label !== "string" && typeof label !== "number") {
-    return "";
-  }
-
-  return formatDayKey({
-    dayKey: String(label),
-    options: { month: "short", day: "numeric" },
-  });
-};
 
 const formatTickDate = (dateStr: string) => {
   const day = dateStr.split("-")[2] ?? "";
@@ -116,7 +105,7 @@ export const ReceivedEmailsChart = () => {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={formatShortDate}
+                    labelFormatter={formatDashboardDayLabel}
                     hideIndicator
                   />
                 }

@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAllAddressesQuery } from "@/features/addresses/hooks/use-addresses";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import {
-  formatDayKey,
+  formatDashboardDayLabel,
   getDayKey,
   getRecentDayKeys,
 } from "@/features/timezone/lib/date-format";
@@ -26,17 +26,6 @@ const chartConfig = {
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
-
-const formatShortDate = (label: unknown) => {
-  if (typeof label !== "string" && typeof label !== "number") {
-    return "";
-  }
-
-  return formatDayKey({
-    dayKey: String(label),
-    options: { month: "short", day: "numeric" },
-  });
-};
 
 const formatTickDate = (dateStr: string) => {
   const day = dateStr.split("-")[2] ?? "";
@@ -169,7 +158,7 @@ export const InboxGrowthChart = () => {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={formatShortDate}
+                    labelFormatter={formatDashboardDayLabel}
                     hideIndicator
                   />
                 }
