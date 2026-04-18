@@ -4,6 +4,11 @@ import {
 } from "@/lib/email-html";
 
 describe("email html handling", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("blocks remote image sources by default", () => {
     const host = document.createElement("div");
     const result = prepareEmailHtmlForRender({
@@ -57,5 +62,41 @@ describe("email html handling", () => {
     result.revoke();
     expect(createObjectUrlSpy).toHaveBeenCalled();
     expect(revokeSpy).toHaveBeenCalledWith("blob:spinupmail-asset");
+  });
+
+  it("hydrates authenticated internal srcset candidates into object URLs", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      blob: async () => new Blob(["hello"], { type: "image/png" }),
+      ok: true,
+    } as Response);
+    const createObjectUrlSpy = vi
+      .fn()
+      .mockReturnValueOnce("blob:spinupmail-asset-1")
+      .mockReturnValueOnce("blob:spinupmail-asset-2");
+    const revokeSpy = vi.fn();
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: createObjectUrlSpy,
+        revokeObjectURL: revokeSpy,
+      })
+    );
+
+    const result = await hydrateEmailHtmlAssets({
+      connection: {
+        apiKey: "key",
+        baseUrl: "https://api.spinupmail.com",
+      },
+      html: '<html><body><img srcset="/api/emails/email-1/attachments/att-1?inline=1 1x, /api/emails/email-1/attachments/att-2?inline=1 2x" /></body></html>',
+      organizationId: "org-1",
+    });
+
+    expect(result.html).toContain(
+      'srcset="blob:spinupmail-asset-1 1x, blob:spinupmail-asset-2 2x"'
+    );
+
+    result.revoke();
+    expect(revokeSpy).toHaveBeenCalledWith("blob:spinupmail-asset-1");
+    expect(revokeSpy).toHaveBeenCalledWith("blob:spinupmail-asset-2");
   });
 });

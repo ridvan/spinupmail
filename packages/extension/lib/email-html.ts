@@ -137,6 +137,20 @@ const parseSrcset = (value: string) =>
     })
     .filter(candidate => candidate.url.length > 0);
 
+const formatSrcset = (
+  candidates: Array<{
+    descriptor: string;
+    url: string;
+  }>
+) =>
+  candidates
+    .map(candidate =>
+      candidate.descriptor
+        ? `${candidate.url} ${candidate.descriptor}`
+        : candidate.url
+    )
+    .join(", ");
+
 const serializeSrcset = (
   value: string,
   allowRemoteContent: boolean,
@@ -273,11 +287,22 @@ const sanitizeHtmlDocument = ({
 };
 
 const collectInternalAssetTargets = (document: Document) => {
-  const targets: Array<{
-    attribute: "background" | "poster" | "src";
-    element: Element;
-    path: string;
-  }> = [];
+  const targets: Array<
+    | {
+        attribute: "background" | "poster" | "src";
+        element: Element;
+        kind: "attribute";
+        path: string;
+      }
+    | {
+        candidates: Array<{
+          descriptor: string;
+          url: string;
+        }>;
+        element: Element;
+        kind: "srcset";
+      }
+  > = [];
 
   document.querySelectorAll<HTMLElement>("*").forEach(element => {
     for (const attribute of REMOTE_ATTRIBUTES) {
@@ -289,6 +314,7 @@ const collectInternalAssetTargets = (document: Document) => {
         targets.push({
           attribute,
           element,
+          kind: "attribute",
           path: normalized,
         });
       }
@@ -299,8 +325,20 @@ const collectInternalAssetTargets = (document: Document) => {
     const srcset = element.getAttribute("srcset");
     if (!srcset) return;
 
-    const rewritten = parseSrcset(srcset).map(candidate => candidate.url);
-    if (!rewritten.some(isInternalApiPath)) return;
+    const candidates = parseSrcset(srcset);
+    if (
+      !candidates.some(candidate =>
+        isInternalApiPath(normalizeAssetUrl(candidate.url))
+      )
+    ) {
+      return;
+    }
+
+    targets.push({
+      candidates,
+      element,
+      kind: "srcset",
+    });
   });
 
   return targets;
@@ -322,6 +360,44 @@ export const hydrateEmailHtmlAssets = async ({
 
   await Promise.all(
     targets.map(async target => {
+      if (target.kind === "srcset") {
+        const rewrittenCandidates = await Promise.all(
+          target.candidates.map(async candidate => {
+            const normalized = normalizeAssetUrl(candidate.url);
+            if (!isInternalApiPath(normalized)) {
+              return candidate;
+            }
+
+            let objectUrl = assetCache.get(normalized);
+
+            if (!objectUrl) {
+              try {
+                const blob = await extensionApi.fetchBlob(connection, {
+                  organizationId,
+                  path: normalized,
+                });
+                objectUrl = URL.createObjectURL(blob);
+                assetCache.set(normalized, objectUrl);
+                objectUrls.push(objectUrl);
+              } catch {
+                objectUrl = resolveApiUrl(connection.baseUrl, normalized);
+              }
+            }
+
+            return {
+              ...candidate,
+              url: objectUrl,
+            };
+          })
+        );
+
+        target.element.setAttribute(
+          "srcset",
+          formatSrcset(rewrittenCandidates)
+        );
+        return;
+      }
+
       let objectUrl = assetCache.get(target.path);
 
       if (!objectUrl) {

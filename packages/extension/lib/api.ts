@@ -19,6 +19,7 @@ import {
   type ExtensionInvitation,
   emailDetailSchema,
 } from "@spinupmail/contracts";
+import { z } from "zod";
 import type { ExtensionConnection } from "@/lib/types";
 
 const parseApiError = async (response: Response) => {
@@ -71,6 +72,19 @@ const apiFetch = async <TSchema>(
 
   return parse((await response.json()) as unknown);
 };
+
+const createOrganizationResponseSchema = z.object({
+  organization: z.object({
+    id: z.string().min(1),
+    logo: z.string().nullable().optional(),
+    name: z.string().min(1),
+    slug: z.string().min(1),
+  }),
+  seededSampleEmailCount: z.number().int().nonnegative(),
+  starterAddressId: z.string().nullable(),
+  starterInboxProvisioned: z.boolean().optional(),
+  warning: z.string().optional(),
+});
 
 export const extensionApi = {
   async bootstrap(connection: ExtensionConnection) {
@@ -195,7 +209,7 @@ export const extensionApi = {
     return apiFetch(
       connection,
       "/api/organizations",
-      value => value as { organization?: { id: string; name: string } },
+      value => createOrganizationResponseSchema.parse(value),
       {
         body: JSON.stringify({ name }),
         method: "POST",

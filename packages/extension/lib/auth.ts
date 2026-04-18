@@ -9,8 +9,14 @@ import { getResolvedOrganizationId } from "@/lib/auth-state";
 import type { AuthState } from "@/lib/types";
 
 export const persistAuthState = async (state: AuthState) => {
+  const storedOrganizationId = await activeOrganizationIdItem.getValue();
+  const activeOrganizationId = state.bootstrap.organizations.some(
+    organization => organization.id === storedOrganizationId
+  )
+    ? storedOrganizationId
+    : null;
   const organizationId = getResolvedOrganizationId({
-    activeOrganizationId: await activeOrganizationIdItem.getValue(),
+    activeOrganizationId,
     bootstrap: state.bootstrap,
   });
 
