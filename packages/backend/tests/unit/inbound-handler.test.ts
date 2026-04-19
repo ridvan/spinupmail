@@ -112,7 +112,7 @@ describe("inbound email handler", () => {
       text: "Hello",
       attachments: [],
     });
-    mocks.sanitizeEmailHtml.mockReturnValue("<p>Hello</p>");
+    mocks.sanitizeEmailHtml.mockResolvedValue("<p>Hello</p>");
     mocks.capTextForStorage.mockImplementation(value => value);
     mocks.persistRawEmailToR2.mockResolvedValue(undefined);
     mocks.persistAttachments.mockResolvedValue(undefined);

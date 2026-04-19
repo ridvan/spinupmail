@@ -1,7 +1,6 @@
 import * as csstree from "css-tree";
 import render from "dom-serializer";
 import { parseDocument } from "htmlparser2";
-import { createRequire } from "node:module";
 
 const EMAIL_ALLOWED_TAGS = [
   "a",
@@ -115,9 +114,31 @@ type HtmlDocument = {
   children: HtmlNode[];
 };
 
-const require = createRequire(
-  import.meta.url ?? "file:///spinupmail/backend/src/shared/utils/email-html.ts"
-);
+type SanitizeHtmlFn = (
+  dirty: string,
+  options?: Record<string, unknown>
+) => string;
+
+let sanitizeHtmlPromise: Promise<SanitizeHtmlFn> | undefined;
+
+const loadSanitizeHtml = async (): Promise<SanitizeHtmlFn> => {
+  if (!sanitizeHtmlPromise) {
+    sanitizeHtmlPromise = import("sanitize-html").then(module => {
+      const sanitizeHtml =
+        typeof module === "function"
+          ? module
+          : ((module.default ?? null) as SanitizeHtmlFn | null);
+
+      if (!sanitizeHtml) {
+        throw new TypeError("sanitize-html export not found");
+      }
+
+      return sanitizeHtml;
+    });
+  }
+
+  return sanitizeHtmlPromise;
+};
 
 const buildList = <TData>(items: TData[]) =>
   new csstree.List<TData>().fromArray(items);
@@ -580,19 +601,8 @@ export const isSafeInlineImageContentType = (
   return SAFE_INLINE_IMAGE_CONTENT_TYPES.has(contentType.trim().toLowerCase());
 };
 
-export const sanitizeEmailHtml = (html: string) => {
-  const sanitizeHtmlModule = require("sanitize-html") as
-    | {
-        default?: (dirty: string, options?: Record<string, unknown>) => string;
-      }
-    | ((dirty: string, options?: Record<string, unknown>) => string);
-  const sanitizeHtml =
-    typeof sanitizeHtmlModule === "function"
-      ? sanitizeHtmlModule
-      : (sanitizeHtmlModule.default ??
-        (() => {
-          throw new TypeError("sanitize-html export not found");
-        }));
+export const sanitizeEmailHtml = async (html: string) => {
+  const sanitizeHtml = await loadSanitizeHtml();
   const sanitizedHtml = sanitizeHtml(html, {
     allowedTags: EMAIL_ALLOWED_TAGS,
     allowedAttributes: {

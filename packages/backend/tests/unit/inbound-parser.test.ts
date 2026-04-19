@@ -36,16 +36,16 @@ describe("inbound email parser", () => {
     expect(capTextForStorage("hello", 4)).toBeUndefined();
   });
 
-  it("sanitizes html and strips script tags", () => {
-    const html = sanitizeEmailHtml(
+  it("sanitizes html and strips script tags", async () => {
+    const html = await sanitizeEmailHtml(
       '<a href="https://example.com">link</a><script>alert(1)</script>'
     );
     expect(html).toContain('rel="noopener noreferrer nofollow"');
     expect(html).not.toContain("<script>");
   });
 
-  it("preserves safe email styles while dropping unsafe CSS constructs", () => {
-    const html = sanitizeEmailHtml(
+  it("preserves safe email styles while dropping unsafe CSS constructs", async () => {
+    const html = await sanitizeEmailHtml(
       [
         "<html><head>",
         "<style>",

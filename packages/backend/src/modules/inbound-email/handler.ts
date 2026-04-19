@@ -269,7 +269,7 @@ export const handleIncomingEmail = async (
         includeAttachments: attachmentsEnabled,
       });
       const sanitizedHtml = parsedBodies.html
-        ? sanitizeEmailHtml(parsedBodies.html)
+        ? await sanitizeEmailHtml(parsedBodies.html)
         : undefined;
 
       bodyHtml = capTextForStorage(sanitizedHtml, maxBodyBytes);
