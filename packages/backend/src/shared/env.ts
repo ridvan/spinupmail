@@ -25,6 +25,10 @@ const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
 const AUTH_RATE_LIMIT_WINDOW_DEFAULT = 60;
 const AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT = 60 * 60;
 const AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX_DEFAULT = 2;
+const INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS_DEFAULT = 6 * 60 * 60;
+const INTEGRATION_QUEUE_BASE_DELAY_SECONDS_DEFAULT = 30;
+const INTEGRATION_QUEUE_MAX_DELAY_SECONDS_DEFAULT = 30 * 60;
+const INTEGRATION_QUEUE_JITTER_SECONDS_DEFAULT = 10;
 const readProcessEnv = (key: string) => {
   if (typeof process === "undefined" || !process.env) return undefined;
   return process.env[key];
@@ -141,6 +145,63 @@ export const getForcedMailPrefix = (
     .replace(/^[._+-]+|[._+-]+$/g, "");
 
   return normalized || undefined;
+};
+
+export const getIntegrationSecretEncryptionKey = (
+  env?: Pick<
+    CloudflareBindings,
+    "INTEGRATION_SECRET_ENCRYPTION_KEY" | "TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY"
+  >
+) => {
+  const configured =
+    env?.INTEGRATION_SECRET_ENCRYPTION_KEY ??
+    env?.TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY ??
+    readProcessEnv("INTEGRATION_SECRET_ENCRYPTION_KEY") ??
+    readProcessEnv("TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY");
+  const trimmed = configured?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+export const getIntegrationQueueRetryConfig = (
+  env?: Pick<
+    CloudflareBindings,
+    | "INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS"
+    | "INTEGRATION_QUEUE_BASE_DELAY_SECONDS"
+    | "INTEGRATION_QUEUE_MAX_DELAY_SECONDS"
+    | "INTEGRATION_QUEUE_JITTER_SECONDS"
+    | "TELEGRAM_QUEUE_RETRY_WINDOW_SECONDS"
+    | "TELEGRAM_QUEUE_BASE_DELAY_SECONDS"
+    | "TELEGRAM_QUEUE_MAX_DELAY_SECONDS"
+    | "TELEGRAM_QUEUE_JITTER_SECONDS"
+  >
+) => {
+  const retryWindowSeconds =
+    parsePositiveInteger(
+      env?.INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS?.trim() ??
+        env?.TELEGRAM_QUEUE_RETRY_WINDOW_SECONDS?.trim()
+    ) ?? INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS_DEFAULT;
+  const baseDelaySeconds =
+    parsePositiveInteger(
+      env?.INTEGRATION_QUEUE_BASE_DELAY_SECONDS?.trim() ??
+        env?.TELEGRAM_QUEUE_BASE_DELAY_SECONDS?.trim()
+    ) ?? INTEGRATION_QUEUE_BASE_DELAY_SECONDS_DEFAULT;
+  const maxDelaySeconds =
+    parsePositiveInteger(
+      env?.INTEGRATION_QUEUE_MAX_DELAY_SECONDS?.trim() ??
+        env?.TELEGRAM_QUEUE_MAX_DELAY_SECONDS?.trim()
+    ) ?? INTEGRATION_QUEUE_MAX_DELAY_SECONDS_DEFAULT;
+  const jitterSeconds =
+    parsePositiveInteger(
+      env?.INTEGRATION_QUEUE_JITTER_SECONDS?.trim() ??
+        env?.TELEGRAM_QUEUE_JITTER_SECONDS?.trim()
+    ) ?? INTEGRATION_QUEUE_JITTER_SECONDS_DEFAULT;
+
+  return {
+    retryWindowSeconds,
+    baseDelaySeconds,
+    maxDelaySeconds: Math.max(maxDelaySeconds, baseDelaySeconds),
+    jitterSeconds,
+  };
 };
 
 export const getMaxTotalAttachmentStoragePerOrganization = (

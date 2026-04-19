@@ -55,6 +55,8 @@ const baseAddress = {
   address: "hello@example.com",
   localPart: "hello",
   domain: "example.com",
+  integrations: [],
+  emailCount: 0,
   allowedFromDomains: [],
   maxReceivedEmailCount: null,
   maxReceivedEmailAction: null,

@@ -53,12 +53,202 @@ export const organizationStatsResponseSchema = z.object({
   items: z.array(organizationStatsItemSchema),
 });
 
+export const integrationProviderSchema = z.enum(["telegram"]);
+export const integrationStatusSchema = z.enum(["active", "archived"]);
+export const integrationEventTypeSchema = z.enum(["email.received"]);
+export const integrationDispatchStatusSchema = z.enum([
+  "pending",
+  "processing",
+  "retry_scheduled",
+  "sent",
+  "failed_permanent",
+  "failed_dlq",
+]);
+
+export const INTEGRATION_MAX_PER_ORGANIZATION = 3;
+
+export const TELEGRAM_BOT_NAME_MAX_LENGTH = 30;
+export const TELEGRAM_BOT_TOKEN_MAX_LENGTH = 256;
+export const TELEGRAM_CHAT_ID_MAX_LENGTH = 128;
+
+export const TELEGRAM_BOT_TOKEN_REGEX = /^\d{6,}:[A-Za-z0-9_-]{30,}$/;
+export const TELEGRAM_CHAT_ID_NUMERIC_REGEX = /^-?\d{5,20}$/;
+export const TELEGRAM_CHAT_USERNAME_REGEX = /^@[A-Za-z][A-Za-z0-9_]{4,31}$/;
+
+export const telegramIntegrationPublicConfigSchema = z.object({
+  telegramBotId: z.string().min(1),
+  botUsername: z.string().min(1),
+  chatId: z.string().min(1),
+  chatLabel: z.string().nullable(),
+});
+
+export const telegramIntegrationSecretConfigSchema = z.object({
+  botToken: z
+    .string()
+    .trim()
+    .min(1, "Bot token is required")
+    .max(
+      TELEGRAM_BOT_TOKEN_MAX_LENGTH,
+      `Bot token must be at most ${TELEGRAM_BOT_TOKEN_MAX_LENGTH} characters`
+    )
+    .regex(
+      TELEGRAM_BOT_TOKEN_REGEX,
+      "Bot token must look like 123456:ABC... (digits before ':' and at least 30 token characters)"
+    ),
+  chatId: z
+    .string()
+    .trim()
+    .min(1, "Chat ID is required")
+    .max(
+      TELEGRAM_CHAT_ID_MAX_LENGTH,
+      `Chat ID must be at most ${TELEGRAM_CHAT_ID_MAX_LENGTH} characters`
+    )
+    .refine(
+      value =>
+        TELEGRAM_CHAT_ID_NUMERIC_REGEX.test(value) ||
+        TELEGRAM_CHAT_USERNAME_REGEX.test(value),
+      "Chat ID must be a numeric ID like -1001234567890 or a username like @my_channel"
+    ),
+});
+
+export const telegramIntegrationValidationSummarySchema = z.object({
+  name: z.string().min(1),
+  publicConfig: telegramIntegrationPublicConfigSchema,
+});
+
+const organizationIntegrationCommonSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  status: integrationStatusSchema,
+  supportedEventTypes: z.array(integrationEventTypeSchema),
+  mailboxCount: z.number().int().nonnegative(),
+  lastValidatedAt: z.string().nullable(),
+  lastValidatedAtMs: z.number().nullable(),
+  createdAt: z.string().nullable(),
+  createdAtMs: z.number().nullable(),
+  updatedAt: z.string().nullable(),
+  updatedAtMs: z.number().nullable(),
+});
+
+export const organizationIntegrationSummarySchema = z.discriminatedUnion(
+  "provider",
+  [
+    organizationIntegrationCommonSchema.extend({
+      provider: z.literal("telegram"),
+      publicConfig: telegramIntegrationPublicConfigSchema,
+    }),
+  ]
+);
+
+export const organizationIntegrationSchema = z.discriminatedUnion("provider", [
+  organizationIntegrationCommonSchema.extend({
+    provider: z.literal("telegram"),
+    publicConfig: telegramIntegrationPublicConfigSchema,
+    createdByUserId: z.string().min(1),
+    activeSecretVersion: z.number().int().positive(),
+  }),
+]);
+
+export const integrationSubscriptionSchema = z.object({
+  integrationId: z.string().min(1),
+  eventType: integrationEventTypeSchema,
+});
+
+export const addressIntegrationSchema = z.object({
+  id: z.string().min(1),
+  provider: integrationProviderSchema,
+  name: z.string().min(1),
+  eventType: integrationEventTypeSchema,
+});
+
+export const validateIntegrationConnectionRequestSchema = z.discriminatedUnion(
+  "provider",
+  [
+    z.object({
+      provider: z.literal("telegram"),
+      name: z
+        .string()
+        .trim()
+        .min(1, "Integration name is required")
+        .max(
+          TELEGRAM_BOT_NAME_MAX_LENGTH,
+          `Integration name must be at most ${TELEGRAM_BOT_NAME_MAX_LENGTH} characters`
+        ),
+      config: telegramIntegrationSecretConfigSchema,
+    }),
+  ]
+);
+
+export const validateIntegrationConnectionResponseSchema = z.discriminatedUnion(
+  "provider",
+  [
+    z.object({
+      provider: z.literal("telegram"),
+      name: z.string().min(1),
+      publicConfig: telegramIntegrationPublicConfigSchema,
+      validationSummary: telegramIntegrationValidationSummarySchema,
+    }),
+  ]
+);
+
+export const createIntegrationRequestSchema =
+  validateIntegrationConnectionRequestSchema;
+
+export const listIntegrationsResponseSchema = z.object({
+  items: z.array(organizationIntegrationSummarySchema),
+});
+
+export const deleteIntegrationResponseSchema = z.object({
+  id: z.string().min(1),
+  deleted: z.literal(true),
+  clearedMailboxCount: z.number().int().nonnegative(),
+  deletedDispatchCount: z.number().int().nonnegative(),
+});
+
+export const integrationDispatchSchema = z.object({
+  id: z.string().min(1),
+  integrationId: z.string().min(1),
+  provider: integrationProviderSchema,
+  eventType: integrationEventTypeSchema,
+  status: integrationDispatchStatusSchema,
+  attemptCount: z.number().int().nonnegative(),
+  createdAt: z.string().nullable(),
+  createdAtMs: z.number().nullable(),
+  nextAttemptAt: z.string().nullable(),
+  nextAttemptAtMs: z.number().nullable(),
+  deliveredAt: z.string().nullable(),
+  deliveredAtMs: z.number().nullable(),
+  lastError: z.string().nullable(),
+  lastErrorCode: z.string().nullable(),
+  lastErrorStatus: z.number().nullable(),
+});
+
+export const listIntegrationDispatchesResponseSchema = z.object({
+  items: z.array(integrationDispatchSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
+
+export const listIntegrationDispatchesParamsSchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().optional(),
+});
+
+export const replayIntegrationDispatchResponseSchema = z.object({
+  id: z.string().min(1),
+  status: integrationDispatchStatusSchema,
+  replayed: z.literal(true),
+});
+
 export const emailAddressSchema = z.object({
   id: z.string().min(1),
   address: z.string().min(1),
   localPart: z.string().min(1),
   domain: z.string().min(1),
   meta: z.unknown().optional(),
+  integrations: z.array(addressIntegrationSchema),
   emailCount: z.number().int().nonnegative(),
   allowedFromDomains: z.array(z.string().min(1)).optional(),
   blockedSenderDomains: z.array(z.string().min(1)).optional(),
@@ -113,6 +303,7 @@ export const createEmailAddressRequestSchema = z.object({
   ttlMinutes: z.number().int().positive().optional(),
   meta: z.unknown().optional(),
   domain: z.string().min(1).optional(),
+  integrationSubscriptions: z.array(integrationSubscriptionSchema).optional(),
   allowedFromDomains: z.array(z.string().min(1)).optional(),
   blockedSenderDomains: z.array(z.string().min(1)).optional(),
   inboundRatePolicy: inboundRatePolicySchema.optional(),
@@ -126,6 +317,7 @@ export const updateEmailAddressRequestSchema = z.object({
   ttlMinutes: z.number().int().positive().nullable().optional(),
   meta: z.unknown().optional(),
   domain: z.string().min(1).optional(),
+  integrationSubscriptions: z.array(integrationSubscriptionSchema).optional(),
   allowedFromDomains: z.array(z.string().min(1)).optional(),
   blockedSenderDomains: z.array(z.string().min(1)).nullable().optional(),
   inboundRatePolicy: inboundRatePolicySchema.nullable().optional(),
@@ -308,6 +500,56 @@ export type DomainConfig = z.infer<typeof domainConfigSchema>;
 export type OrganizationStatsItem = z.infer<typeof organizationStatsItemSchema>;
 export type OrganizationStatsResponse = z.infer<
   typeof organizationStatsResponseSchema
+>;
+export type IntegrationProvider = z.infer<typeof integrationProviderSchema>;
+export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;
+export type IntegrationEventType = z.infer<typeof integrationEventTypeSchema>;
+export type IntegrationDispatchStatus = z.infer<
+  typeof integrationDispatchStatusSchema
+>;
+export type TelegramIntegrationPublicConfig = z.infer<
+  typeof telegramIntegrationPublicConfigSchema
+>;
+export type TelegramIntegrationSecretConfig = z.infer<
+  typeof telegramIntegrationSecretConfigSchema
+>;
+export type TelegramIntegrationValidationSummary = z.infer<
+  typeof telegramIntegrationValidationSummarySchema
+>;
+export type OrganizationIntegrationSummary = z.infer<
+  typeof organizationIntegrationSummarySchema
+>;
+export type OrganizationIntegration = z.infer<
+  typeof organizationIntegrationSchema
+>;
+export type IntegrationSubscription = z.infer<
+  typeof integrationSubscriptionSchema
+>;
+export type AddressIntegration = z.infer<typeof addressIntegrationSchema>;
+export type ValidateIntegrationConnectionRequest = z.infer<
+  typeof validateIntegrationConnectionRequestSchema
+>;
+export type ValidateIntegrationConnectionResponse = z.infer<
+  typeof validateIntegrationConnectionResponseSchema
+>;
+export type CreateIntegrationRequest = z.infer<
+  typeof createIntegrationRequestSchema
+>;
+export type ListIntegrationsResponse = z.infer<
+  typeof listIntegrationsResponseSchema
+>;
+export type DeleteIntegrationResponse = z.infer<
+  typeof deleteIntegrationResponseSchema
+>;
+export type IntegrationDispatch = z.infer<typeof integrationDispatchSchema>;
+export type ListIntegrationDispatchesResponse = z.infer<
+  typeof listIntegrationDispatchesResponseSchema
+>;
+export type ListIntegrationDispatchesParams = z.infer<
+  typeof listIntegrationDispatchesParamsSchema
+>;
+export type ReplayIntegrationDispatchResponse = z.infer<
+  typeof replayIntegrationDispatchResponseSchema
 >;
 export type EmailAddress = z.infer<typeof emailAddressSchema>;
 export type EmailAddressListResponse = z.infer<

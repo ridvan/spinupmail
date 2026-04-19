@@ -29,6 +29,17 @@ beforeAll(() => {
     });
   }
 
+  if (
+    typeof Element !== "undefined" &&
+    !("getAnimations" in Element.prototype)
+  ) {
+    Object.defineProperty(Element.prototype, "getAnimations", {
+      configurable: true,
+      writable: true,
+      value: () => [],
+    });
+  }
+
   server.listen({ onUnhandledRequest: "error" });
 });
 

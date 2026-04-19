@@ -115,12 +115,14 @@ export const createEmailAddressesRouter = () => {
       return undefined;
     }),
     async c => {
+      const session = c.get("session");
       const organizationId = c.get("organizationId");
       const addressId = c.req.param("id");
       const payload = c.req.valid("json");
 
       const result = await updateEmailAddress({
         env: c.env,
+        session,
         organizationId,
         addressId,
         payload,

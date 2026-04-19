@@ -1,0 +1,601 @@
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  addressIntegrationSubscriptions,
+  emailAddresses,
+  emails,
+  integrationDeliveryAttempts,
+  integrationDispatches,
+  organizationIntegrationSecrets,
+  organizationIntegrations,
+} from "@/db";
+import type { AppDb } from "@/platform/db/client";
+
+const integrationSelect = {
+  id: organizationIntegrations.id,
+  organizationId: organizationIntegrations.organizationId,
+  provider: organizationIntegrations.provider,
+  name: organizationIntegrations.name,
+  status: organizationIntegrations.status,
+  createdByUserId: organizationIntegrations.createdByUserId,
+  publicConfigJson: organizationIntegrations.publicConfigJson,
+  activeSecretVersion: organizationIntegrations.activeSecretVersion,
+  lastValidatedAt: organizationIntegrations.lastValidatedAt,
+  createdAt: organizationIntegrations.createdAt,
+  updatedAt: organizationIntegrations.updatedAt,
+};
+
+const integrationDispatchSelect = {
+  id: integrationDispatches.id,
+  organizationId: integrationDispatches.organizationId,
+  integrationId: integrationDispatches.integrationId,
+  subscriptionId: integrationDispatches.subscriptionId,
+  provider: integrationDispatches.provider,
+  eventType: integrationDispatches.eventType,
+  sourceEmailId: integrationDispatches.sourceEmailId,
+  payloadJson: integrationDispatches.payloadJson,
+  idempotencyKey: integrationDispatches.idempotencyKey,
+  status: integrationDispatches.status,
+  attemptCount: integrationDispatches.attemptCount,
+  maxAttemptWindowMs: integrationDispatches.maxAttemptWindowMs,
+  nextAttemptAt: integrationDispatches.nextAttemptAt,
+  processingStartedAt: integrationDispatches.processingStartedAt,
+  deliveredAt: integrationDispatches.deliveredAt,
+  lastError: integrationDispatches.lastError,
+  lastErrorCode: integrationDispatches.lastErrorCode,
+  lastErrorStatus: integrationDispatches.lastErrorStatus,
+  lastErrorRetryAfterSeconds: integrationDispatches.lastErrorRetryAfterSeconds,
+  queueMessageId: integrationDispatches.queueMessageId,
+  createdAt: integrationDispatches.createdAt,
+  updatedAt: integrationDispatches.updatedAt,
+};
+
+export const listIntegrationsByOrganization = ({
+  db,
+  organizationId,
+}: {
+  db: AppDb;
+  organizationId: string;
+}) =>
+  db
+    .select({
+      ...integrationSelect,
+      mailboxCount: sql<number>`count(distinct ${addressIntegrationSubscriptions.addressId})`,
+    })
+    .from(organizationIntegrations)
+    .leftJoin(
+      addressIntegrationSubscriptions,
+      and(
+        eq(
+          addressIntegrationSubscriptions.integrationId,
+          organizationIntegrations.id
+        ),
+        eq(addressIntegrationSubscriptions.enabled, true)
+      )
+    )
+    .where(eq(organizationIntegrations.organizationId, organizationId))
+    .groupBy(organizationIntegrations.id)
+    .orderBy(organizationIntegrations.createdAt);
+
+export const countIntegrationsByOrganization = ({
+  db,
+  organizationId,
+}: {
+  db: AppDb;
+  organizationId: string;
+}) =>
+  db
+    .select({
+      count: count(),
+    })
+    .from(organizationIntegrations)
+    .where(eq(organizationIntegrations.organizationId, organizationId))
+    .get();
+
+export const findIntegrationByIdAndOrganization = ({
+  db,
+  id,
+  organizationId,
+}: {
+  db: AppDb;
+  id: string;
+  organizationId: string;
+}) =>
+  db
+    .select(integrationSelect)
+    .from(organizationIntegrations)
+    .where(
+      and(
+        eq(organizationIntegrations.id, id),
+        eq(organizationIntegrations.organizationId, organizationId)
+      )
+    )
+    .get();
+
+export const findIntegrationsByIdsAndOrganization = ({
+  db,
+  ids,
+  organizationId,
+}: {
+  db: AppDb;
+  ids: string[];
+  organizationId: string;
+}) =>
+  ids.length === 0
+    ? Promise.resolve([])
+    : db
+        .select(integrationSelect)
+        .from(organizationIntegrations)
+        .where(
+          and(
+            inArray(organizationIntegrations.id, ids),
+            eq(organizationIntegrations.organizationId, organizationId)
+          )
+        );
+
+export const insertIntegration = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof organizationIntegrations.$inferInsert;
+}) => db.insert(organizationIntegrations).values(values).run();
+
+export const insertIntegrationSecret = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof organizationIntegrationSecrets.$inferInsert;
+}) => db.insert(organizationIntegrationSecrets).values(values).run();
+
+export const findActiveIntegrationSecret = ({
+  db,
+  integrationId,
+  version,
+}: {
+  db: AppDb;
+  integrationId: string;
+  version: number;
+}) =>
+  db
+    .select({
+      integrationId: organizationIntegrationSecrets.integrationId,
+      version: organizationIntegrationSecrets.version,
+      encryptedConfigJson: organizationIntegrationSecrets.encryptedConfigJson,
+      createdAt: organizationIntegrationSecrets.createdAt,
+    })
+    .from(organizationIntegrationSecrets)
+    .where(
+      and(
+        eq(organizationIntegrationSecrets.integrationId, integrationId),
+        eq(organizationIntegrationSecrets.version, version)
+      )
+    )
+    .get();
+
+export const deleteIntegrationByIdAndOrganization = ({
+  db,
+  id,
+  organizationId,
+}: {
+  db: AppDb;
+  id: string;
+  organizationId: string;
+}) =>
+  db
+    .delete(organizationIntegrations)
+    .where(
+      and(
+        eq(organizationIntegrations.id, id),
+        eq(organizationIntegrations.organizationId, organizationId)
+      )
+    )
+    .run();
+
+export const countEnabledSubscriptionsForIntegration = ({
+  db,
+  integrationId,
+  organizationId,
+}: {
+  db: AppDb;
+  integrationId: string;
+  organizationId: string;
+}) =>
+  db
+    .select({
+      count: count(),
+    })
+    .from(addressIntegrationSubscriptions)
+    .where(
+      and(
+        eq(addressIntegrationSubscriptions.integrationId, integrationId),
+        eq(addressIntegrationSubscriptions.organizationId, organizationId),
+        eq(addressIntegrationSubscriptions.enabled, true)
+      )
+    )
+    .get();
+
+export const deleteSubscriptionsForIntegration = ({
+  db,
+  integrationId,
+  organizationId,
+}: {
+  db: AppDb;
+  integrationId: string;
+  organizationId: string;
+}) =>
+  db
+    .delete(addressIntegrationSubscriptions)
+    .where(
+      and(
+        eq(addressIntegrationSubscriptions.integrationId, integrationId),
+        eq(addressIntegrationSubscriptions.organizationId, organizationId)
+      )
+    )
+    .run();
+
+export const listAddressSubscriptionsByAddressIds = ({
+  db,
+  organizationId,
+  addressIds,
+}: {
+  db: AppDb;
+  organizationId: string;
+  addressIds: string[];
+}) =>
+  addressIds.length === 0
+    ? Promise.resolve([])
+    : db
+        .select({
+          id: addressIntegrationSubscriptions.id,
+          addressId: addressIntegrationSubscriptions.addressId,
+          integrationId: addressIntegrationSubscriptions.integrationId,
+          eventType: addressIntegrationSubscriptions.eventType,
+          enabled: addressIntegrationSubscriptions.enabled,
+          integrationName: organizationIntegrations.name,
+          integrationProvider: organizationIntegrations.provider,
+          integrationStatus: organizationIntegrations.status,
+        })
+        .from(addressIntegrationSubscriptions)
+        .innerJoin(
+          organizationIntegrations,
+          eq(
+            organizationIntegrations.id,
+            addressIntegrationSubscriptions.integrationId
+          )
+        )
+        .where(
+          and(
+            inArray(addressIntegrationSubscriptions.addressId, addressIds),
+            eq(addressIntegrationSubscriptions.organizationId, organizationId)
+          )
+        );
+
+export const deleteAddressSubscriptionsByAddressAndEventType = ({
+  db,
+  organizationId,
+  addressId,
+  eventType,
+}: {
+  db: AppDb;
+  organizationId: string;
+  addressId: string;
+  eventType: string;
+}) =>
+  db
+    .delete(addressIntegrationSubscriptions)
+    .where(
+      and(
+        eq(addressIntegrationSubscriptions.organizationId, organizationId),
+        eq(addressIntegrationSubscriptions.addressId, addressId),
+        eq(addressIntegrationSubscriptions.eventType, eventType)
+      )
+    )
+    .run();
+
+export const insertAddressSubscriptions = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: (typeof addressIntegrationSubscriptions.$inferInsert)[];
+}) =>
+  values.length === 0
+    ? Promise.resolve()
+    : db.insert(addressIntegrationSubscriptions).values(values).run();
+
+export const findEmailReceivedSourceById = ({
+  db,
+  organizationId,
+  emailId,
+}: {
+  db: AppDb;
+  organizationId: string;
+  emailId: string;
+}) =>
+  db
+    .select({
+      emailId: emails.id,
+      messageId: emails.messageId,
+      from: emails.from,
+      sender: emails.sender,
+      subject: emails.subject,
+      bodyHtml: emails.bodyHtml,
+      bodyText: emails.bodyText,
+      raw: emails.raw,
+      receivedAt: emails.receivedAt,
+      addressId: emailAddresses.id,
+      address: emailAddresses.address,
+      organizationId: emailAddresses.organizationId,
+    })
+    .from(emails)
+    .innerJoin(emailAddresses, eq(emailAddresses.id, emails.addressId))
+    .where(
+      and(
+        eq(emails.id, emailId),
+        eq(emailAddresses.organizationId, organizationId)
+      )
+    )
+    .get();
+
+export const listEnabledSubscriptionsForAddressAndEvent = ({
+  db,
+  organizationId,
+  addressId,
+  eventType,
+}: {
+  db: AppDb;
+  organizationId: string;
+  addressId: string;
+  eventType: string;
+}) =>
+  db
+    .select({
+      subscriptionId: addressIntegrationSubscriptions.id,
+      eventType: addressIntegrationSubscriptions.eventType,
+      integrationId: organizationIntegrations.id,
+      provider: organizationIntegrations.provider,
+      name: organizationIntegrations.name,
+      publicConfigJson: organizationIntegrations.publicConfigJson,
+      activeSecretVersion: organizationIntegrations.activeSecretVersion,
+      status: organizationIntegrations.status,
+    })
+    .from(addressIntegrationSubscriptions)
+    .innerJoin(
+      organizationIntegrations,
+      eq(
+        organizationIntegrations.id,
+        addressIntegrationSubscriptions.integrationId
+      )
+    )
+    .where(
+      and(
+        eq(addressIntegrationSubscriptions.organizationId, organizationId),
+        eq(addressIntegrationSubscriptions.addressId, addressId),
+        eq(addressIntegrationSubscriptions.eventType, eventType),
+        eq(addressIntegrationSubscriptions.enabled, true),
+        eq(organizationIntegrations.status, "active")
+      )
+    );
+
+export const insertIntegrationDispatch = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof integrationDispatches.$inferInsert;
+}) => db.insert(integrationDispatches).values(values).run();
+
+export const findDispatchById = ({ db, id }: { db: AppDb; id: string }) =>
+  db
+    .select(integrationDispatchSelect)
+    .from(integrationDispatches)
+    .where(eq(integrationDispatches.id, id))
+    .get();
+
+export const findDispatchByIdIntegrationAndOrganization = ({
+  db,
+  id,
+  integrationId,
+  organizationId,
+}: {
+  db: AppDb;
+  id: string;
+  integrationId: string;
+  organizationId: string;
+}) =>
+  db
+    .select(integrationDispatchSelect)
+    .from(integrationDispatches)
+    .where(
+      and(
+        eq(integrationDispatches.id, id),
+        eq(integrationDispatches.integrationId, integrationId),
+        eq(integrationDispatches.organizationId, organizationId)
+      )
+    )
+    .get();
+
+export const markDispatchProcessing = ({
+  db,
+  id,
+  attemptCount,
+  queueMessageId,
+}: {
+  db: AppDb;
+  id: string;
+  attemptCount: number;
+  queueMessageId: string;
+}) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status: "processing",
+      attemptCount,
+      processingStartedAt: new Date(),
+      queueMessageId,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const markDispatchSent = ({ db, id }: { db: AppDb; id: string }) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status: "sent",
+      deliveredAt: new Date(),
+      nextAttemptAt: null,
+      lastError: null,
+      lastErrorCode: null,
+      lastErrorStatus: null,
+      lastErrorRetryAfterSeconds: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const markDispatchRetryScheduled = ({
+  db,
+  id,
+  nextAttemptAt,
+  lastError,
+  lastErrorCode,
+  lastErrorStatus,
+  lastErrorRetryAfterSeconds,
+}: {
+  db: AppDb;
+  id: string;
+  nextAttemptAt: Date;
+  lastError: string;
+  lastErrorCode: string;
+  lastErrorStatus?: number | null;
+  lastErrorRetryAfterSeconds?: number | null;
+}) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status: "retry_scheduled",
+      nextAttemptAt,
+      lastError,
+      lastErrorCode,
+      lastErrorStatus: lastErrorStatus ?? null,
+      lastErrorRetryAfterSeconds: lastErrorRetryAfterSeconds ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const markDispatchFailed = ({
+  db,
+  id,
+  status,
+  lastError,
+  lastErrorCode,
+  lastErrorStatus,
+  lastErrorRetryAfterSeconds,
+}: {
+  db: AppDb;
+  id: string;
+  status: "failed_permanent" | "failed_dlq";
+  lastError: string;
+  lastErrorCode: string;
+  lastErrorStatus?: number | null;
+  lastErrorRetryAfterSeconds?: number | null;
+}) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status,
+      nextAttemptAt: null,
+      lastError,
+      lastErrorCode,
+      lastErrorStatus: lastErrorStatus ?? null,
+      lastErrorRetryAfterSeconds: lastErrorRetryAfterSeconds ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const markDispatchPendingForReplay = ({
+  db,
+  id,
+}: {
+  db: AppDb;
+  id: string;
+}) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status: "pending",
+      nextAttemptAt: new Date(),
+      processingStartedAt: null,
+      deliveredAt: null,
+      lastError: null,
+      lastErrorCode: null,
+      lastErrorStatus: null,
+      lastErrorRetryAfterSeconds: null,
+      queueMessageId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const insertDeliveryAttempt = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof integrationDeliveryAttempts.$inferInsert;
+}) => db.insert(integrationDeliveryAttempts).values(values).run();
+
+export const listDispatchesByIntegrationAndOrganization = ({
+  db,
+  organizationId,
+  integrationId,
+  page,
+  pageSize,
+}: {
+  db: AppDb;
+  organizationId: string;
+  integrationId: string;
+  page: number;
+  pageSize: number;
+}) =>
+  db
+    .select(integrationDispatchSelect)
+    .from(integrationDispatches)
+    .where(
+      and(
+        eq(integrationDispatches.organizationId, organizationId),
+        eq(integrationDispatches.integrationId, integrationId)
+      )
+    )
+    .orderBy(
+      desc(integrationDispatches.createdAt),
+      desc(integrationDispatches.id)
+    )
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+export const countDispatchesByIntegrationAndOrganization = ({
+  db,
+  organizationId,
+  integrationId,
+}: {
+  db: AppDb;
+  organizationId: string;
+  integrationId: string;
+}) =>
+  db
+    .select({
+      count: count(),
+    })
+    .from(integrationDispatches)
+    .where(
+      and(
+        eq(integrationDispatches.organizationId, organizationId),
+        eq(integrationDispatches.integrationId, integrationId)
+      )
+    )
+    .get();

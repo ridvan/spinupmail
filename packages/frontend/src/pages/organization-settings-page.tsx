@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import {
   OrganizationInvitationsCard,
+  OrganizationIntegrationsCard,
   OrganizationMembersCard,
   OrganizationProfileCard,
 } from "@/features/organization/components/organization-settings";
@@ -22,6 +23,13 @@ import {
   useUpdateMemberRoleMutation,
   useUpdateOrganizationMutation,
 } from "@/features/organization/hooks/use-organizations";
+import {
+  useCreateIntegrationMutation,
+  useDeleteIntegrationMutation,
+  useIntegrationsQuery,
+  useReplayIntegrationDispatchMutation,
+  useValidateIntegrationMutation,
+} from "@/features/organization/hooks/use-integrations";
 
 const buildInvitationUrl = (invitationId: string) => {
   const base = window.location.origin;
@@ -54,6 +62,12 @@ export const OrganizationSettingsPage = () => {
   const cancelInvitationMutation = useCancelInvitationMutation();
   const updateMemberRoleMutation = useUpdateMemberRoleMutation();
   const removeMemberMutation = useRemoveMemberMutation();
+  const integrationsQuery = useIntegrationsQuery(canManage);
+  const validateIntegrationMutation = useValidateIntegrationMutation();
+  const createIntegrationMutation = useCreateIntegrationMutation();
+  const deleteIntegrationMutation = useDeleteIntegrationMutation();
+  const replayIntegrationDispatchMutation =
+    useReplayIntegrationDispatchMutation();
 
   const [organizationNameDraft, setOrganizationNameDraft] = React.useState<{
     organizationId: string | null;
@@ -253,6 +267,46 @@ export const OrganizationSettingsPage = () => {
             void handleToggleAdmin(memberId, role)
           }
           onRemoveMember={memberId => void handleRemoveMember(memberId)}
+        />
+      </section>
+
+      <section
+        id="organization-integrations"
+        className="scroll-mt-24 md:scroll-mt-28"
+        aria-label="Organization integrations"
+      >
+        <OrganizationIntegrationsCard
+          canManage={canManage}
+          integrations={integrationsQuery.data ?? []}
+          isLoading={canManage && integrationsQuery.isLoading}
+          validationError={
+            validateIntegrationMutation.error instanceof Error
+              ? validateIntegrationMutation.error.message
+              : null
+          }
+          createError={
+            createIntegrationMutation.error instanceof Error
+              ? createIntegrationMutation.error.message
+              : (integrationsQuery.error?.message ?? null)
+          }
+          isValidating={validateIntegrationMutation.isPending}
+          isCreating={createIntegrationMutation.isPending}
+          isArchiving={deleteIntegrationMutation.isPending}
+          onValidate={payload =>
+            validateIntegrationMutation.mutateAsync(payload)
+          }
+          onCreate={payload =>
+            createIntegrationMutation.mutateAsync(payload).then(() => undefined)
+          }
+          onDelete={integrationId =>
+            deleteIntegrationMutation.mutateAsync(integrationId)
+          }
+          onReplayDispatch={({ integrationId, dispatchId }) =>
+            replayIntegrationDispatchMutation.mutateAsync({
+              integrationId,
+              dispatchId,
+            })
+          }
         />
       </section>
 

@@ -2,6 +2,7 @@ import type {
   ExecutionContext,
   ForwardableEmailMessage,
 } from "@cloudflare/workers-types";
+import { dispatchEmailReceivedEvent } from "@/modules/integrations/service";
 import { getDb } from "@/platform/db/client";
 import {
   EMAIL_BODY_MAX_BYTES_DEFAULT,
@@ -501,6 +502,22 @@ export const handleIncomingEmail = async (
     );
 
     ctx.waitUntil(updateAddressLastReceivedAt(db, addressRow.id, receivedAt));
+
+    ctx.waitUntil(
+      dispatchEmailReceivedEvent({
+        env,
+        organizationId,
+        addressId: addressRow.id,
+        emailId,
+        attachmentCount: attachments.length,
+      }).catch(error => {
+        logInboundError("[email] Integration dispatch failed", {
+          ...logFields(),
+          organizationId,
+          error,
+        });
+      })
+    );
 
     const forwardTo = env.EMAIL_FORWARD_TO?.trim();
     if (forwardTo) {

@@ -12,6 +12,13 @@ import {
   useUpdateMemberRoleMutation,
   useUpdateOrganizationMutation,
 } from "@/features/organization/hooks/use-organizations";
+import {
+  useCreateIntegrationMutation,
+  useDeleteIntegrationMutation,
+  useIntegrationsQuery,
+  useReplayIntegrationDispatchMutation,
+  useValidateIntegrationMutation,
+} from "@/features/organization/hooks/use-integrations";
 import { renderWithRouter } from "@/test/router-utils";
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
@@ -27,6 +34,14 @@ vi.mock("@/features/organization/hooks/use-organizations", () => ({
   useCancelInvitationMutation: vi.fn(),
   useUpdateMemberRoleMutation: vi.fn(),
   useRemoveMemberMutation: vi.fn(),
+}));
+
+vi.mock("@/features/organization/hooks/use-integrations", () => ({
+  useIntegrationsQuery: vi.fn(),
+  useValidateIntegrationMutation: vi.fn(),
+  useCreateIntegrationMutation: vi.fn(),
+  useDeleteIntegrationMutation: vi.fn(),
+  useReplayIntegrationDispatchMutation: vi.fn(),
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
@@ -48,12 +63,29 @@ const mockedUseUpdateMemberRoleMutation = vi.mocked(
   useUpdateMemberRoleMutation
 );
 const mockedUseRemoveMemberMutation = vi.mocked(useRemoveMemberMutation);
+const mockedUseIntegrationsQuery = vi.mocked(useIntegrationsQuery);
+const mockedUseValidateIntegrationMutation = vi.mocked(
+  useValidateIntegrationMutation
+);
+const mockedUseCreateIntegrationMutation = vi.mocked(
+  useCreateIntegrationMutation
+);
+const mockedUseDeleteIntegrationMutation = vi.mocked(
+  useDeleteIntegrationMutation
+);
+const mockedUseReplayIntegrationDispatchMutation = vi.mocked(
+  useReplayIntegrationDispatchMutation
+);
 
 const updateOrganizationMutateAsync = vi.fn();
 const inviteMemberMutateAsync = vi.fn();
 const cancelInvitationMutateAsync = vi.fn();
 const updateMemberRoleMutateAsync = vi.fn();
 const removeMemberMutateAsync = vi.fn();
+const validateIntegrationMutateAsync = vi.fn();
+const createIntegrationMutateAsync = vi.fn();
+const deleteIntegrationMutateAsync = vi.fn();
+const replayIntegrationDispatchMutateAsync = vi.fn();
 
 const baseActiveOrganization = {
   id: "org-1",
@@ -118,6 +150,58 @@ describe("OrganizationSettingsPage", () => {
     cancelInvitationMutateAsync.mockResolvedValue({ success: true });
     updateMemberRoleMutateAsync.mockResolvedValue({ success: true });
     removeMemberMutateAsync.mockResolvedValue({ success: true });
+    validateIntegrationMutateAsync.mockResolvedValue({
+      provider: "telegram",
+      name: "Ops bot",
+      publicConfig: {
+        chatId: "-100123",
+        chatLabel: "Ops Room",
+        telegramBotId: "101",
+        botUsername: "spinupmail_bot",
+      },
+      validationSummary: {
+        name: "Ops bot",
+        publicConfig: {
+          chatId: "-100123",
+          chatLabel: "Ops Room",
+          telegramBotId: "101",
+          botUsername: "spinupmail_bot",
+        },
+      },
+    });
+    createIntegrationMutateAsync.mockResolvedValue({
+      id: "integration-1",
+      provider: "telegram",
+      name: "Ops bot",
+      status: "active",
+      supportedEventTypes: ["email.received"],
+      mailboxCount: 0,
+      publicConfig: {
+        telegramBotId: "101",
+        botUsername: "spinupmail_bot",
+        chatId: "-100123",
+        chatLabel: "Ops Room",
+      },
+      lastValidatedAt: null,
+      lastValidatedAtMs: null,
+      createdAt: null,
+      createdAtMs: null,
+      updatedAt: null,
+      updatedAtMs: null,
+      createdByUserId: "user-1",
+      activeSecretVersion: 1,
+    });
+    deleteIntegrationMutateAsync.mockResolvedValue({
+      id: "integration-1",
+      deleted: true,
+      clearedMailboxCount: 0,
+      deletedDispatchCount: 0,
+    });
+    replayIntegrationDispatchMutateAsync.mockResolvedValue({
+      id: "dispatch-1",
+      status: "pending",
+      replayed: true,
+    });
 
     mockedUseAuth.mockReturnValue({
       user: {
@@ -169,6 +253,34 @@ describe("OrganizationSettingsPage", () => {
       mutateAsync: removeMemberMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useRemoveMemberMutation>);
+
+    mockedUseIntegrationsQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useIntegrationsQuery>);
+
+    mockedUseValidateIntegrationMutation.mockReturnValue({
+      mutateAsync: validateIntegrationMutateAsync,
+      isPending: false,
+      error: null,
+    } as unknown as ReturnType<typeof useValidateIntegrationMutation>);
+
+    mockedUseCreateIntegrationMutation.mockReturnValue({
+      mutateAsync: createIntegrationMutateAsync,
+      isPending: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCreateIntegrationMutation>);
+
+    mockedUseDeleteIntegrationMutation.mockReturnValue({
+      mutateAsync: deleteIntegrationMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteIntegrationMutation>);
+
+    mockedUseReplayIntegrationDispatchMutation.mockReturnValue({
+      mutateAsync: replayIntegrationDispatchMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useReplayIntegrationDispatchMutation>);
   });
 
   it("shows loading state", () => {
@@ -280,6 +392,19 @@ describe("OrganizationSettingsPage", () => {
     expect(document.getElementById("organization-profile")).toBeTruthy();
     expect(document.getElementById("organization-members")).toBeTruthy();
     expect(document.getElementById("organization-invitations")).toBeTruthy();
+  });
+
+  it("shows integration placeholders without required errors on initial render", () => {
+    renderPage();
+
+    expect(screen.getByPlaceholderText("Ops alerts")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("123456789:AAExampleBotToken")
+    ).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("-1001234567890 or @ops_room")
+    ).toBeTruthy();
+    expect(screen.queryByText("Integration name is required")).toBeNull();
   });
 
   it("copies organization id and invitation links to clipboard", async () => {

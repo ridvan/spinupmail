@@ -6,6 +6,7 @@ import {
   getMaxReceivedEmailCountFromMeta,
   parseAddressMeta,
 } from "@/shared/validation";
+import type { AddressIntegration } from "@spinupmail/contracts";
 
 export const toEmailAddressListItem = (row: {
   id: string;
@@ -13,6 +14,7 @@ export const toEmailAddressListItem = (row: {
   localPart: string;
   domain: string;
   meta: string | null;
+  integrations?: AddressIntegration[];
   emailCount: number;
   createdAt: Date;
   expiresAt: Date | null;
@@ -40,6 +42,7 @@ export const toEmailAddressListItem = (row: {
     inboundRatePolicy,
     maxReceivedEmailCount,
     maxReceivedEmailAction,
+    integrations: row.integrations ?? [],
     createdAt: row.createdAt ? row.createdAt.toISOString() : null,
     createdAtMs: row.createdAt ? row.createdAt.getTime() : null,
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,

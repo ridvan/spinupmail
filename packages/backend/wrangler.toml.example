@@ -40,10 +40,22 @@ preview_bucket_name = "YOUR_R2_PREVIEW_BUCKET_NAME"
 [[send_email]]
 name = "EMAIL"
 
+[[queues.producers]]
+binding = "INTEGRATION_DISPATCH_QUEUE"
+queue = "spinupmail-integration-dispatches"
+
+[[queues.consumers]]
+queue = "spinupmail-integration-dispatches"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 2
+dead_letter_queue = "spinupmail-integration-dispatches-dlq"
+
 [vars]
 EMAIL_DOMAINS = "example.com,example-test.com"
 FORCED_MAIL_PREFIX = "" # e.g. if set to "temp", all addresses will start with "temp-"
 AUTH_ALLOWED_EMAIL_DOMAIN = "example.com"
+DASHBOARD_BASE_URL = "https://app.example.com" # optional: used for Telegram "Open in Dashboard" button
 EXTENSION_REDIRECT_ORIGINS = "https://your-chromium-extension-id.chromiumapp.org"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
 MAX_RECEIVED_EMAILS_PER_ORGANIZATION = "1000"
@@ -57,7 +69,8 @@ AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW = "3600"
 AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX = "2"
 RESEND_FROM_EMAIL = "Spinupmail <verify@example.com>"
 # Configure secrets via `wrangler secret put`:
-# BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY
+# BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY, INTEGRATION_SECRET_ENCRYPTION_KEY
+# INTEGRATION_SECRET_ENCRYPTION_KEY must be a base64-encoded 32-byte AES-GCM key.
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"
 # Max body text/html bytes persisted per email row (oversized bodies are dropped)
@@ -73,3 +86,7 @@ EMAIL_STORE_HEADERS_IN_DB = "false"
 EMAIL_STORE_RAW_IN_DB = "false"
 # Optional debug mode: store raw MIME in private R2 for authenticated retrieval
 EMAIL_STORE_RAW_IN_R2 = "false"
+INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS = "21600"
+INTEGRATION_QUEUE_BASE_DELAY_SECONDS = "30"
+INTEGRATION_QUEUE_MAX_DELAY_SECONDS = "1800"
+INTEGRATION_QUEUE_JITTER_SECONDS = "10"

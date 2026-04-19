@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   checkInboundAbusePreflight: vi.fn(),
   recordAcceptedInboundEmailAbuse: vi.fn(),
   getDb: vi.fn(),
+  dispatchEmailReceivedEvent: vi.fn(),
 }));
 
 vi.mock("@/platform/db/client", () => ({
@@ -67,6 +68,10 @@ vi.mock("@/modules/inbound-email/policy", () => ({
 vi.mock("@/modules/inbound-email/abuse", () => ({
   checkInboundAbusePreflight: mocks.checkInboundAbusePreflight,
   recordAcceptedInboundEmailAbuse: mocks.recordAcceptedInboundEmailAbuse,
+}));
+
+vi.mock("@/modules/integrations/service", () => ({
+  dispatchEmailReceivedEvent: mocks.dispatchEmailReceivedEvent,
 }));
 
 const buildMessage = () => {
@@ -142,6 +147,7 @@ describe("inbound email handler", () => {
       },
     });
     mocks.recordAcceptedInboundEmailAbuse.mockResolvedValue(undefined);
+    mocks.dispatchEmailReceivedEvent.mockResolvedValue({ queuedCount: 0 });
     mocks.validateAddressAvailability.mockReturnValue({ allowed: true });
   });
 
@@ -560,8 +566,36 @@ describe("inbound email handler", () => {
     });
     expect(mocks.persistRawEmailToR2).toHaveBeenCalledTimes(1);
     expect(mocks.persistAttachments).toHaveBeenCalledTimes(1);
-    expect(ctx.waitUntil).toHaveBeenCalledTimes(3);
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(4);
     expect(message.forward).toHaveBeenCalledWith("dest@example.com");
+  });
+
+  it("dispatches the generic email.received event after a successful insert", async () => {
+    const message = buildMessage();
+    const ctx = buildCtx();
+    mocks.findAddressByRecipient.mockResolvedValue({
+      id: "address-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      meta: null,
+      expiresAt: null,
+    });
+
+    await handleIncomingEmail(
+      message as never,
+      {} as CloudflareBindings,
+      ctx as never
+    );
+
+    expect(mocks.dispatchEmailReceivedEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: "org-1",
+        addressId: "address-1",
+        emailId: expect.any(String),
+        attachmentCount: 0,
+      })
+    );
+    expect(ctx.waitUntil).toHaveBeenCalledTimes(3);
   });
 
   it("normalizes bigint rawSize values before insert", async () => {

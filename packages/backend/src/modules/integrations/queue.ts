@@ -1,0 +1,1 @@
+export { handleIntegrationDispatchQueueBatch } from "./service";

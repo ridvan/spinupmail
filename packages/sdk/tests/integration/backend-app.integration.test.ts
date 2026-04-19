@@ -100,6 +100,7 @@ describe("SpinupMail SDK backend app integration", () => {
           localPart: "sdk",
           domain: "spinupmail.dev",
           meta: {},
+          integrations: [],
           emailCount: 0,
           allowedFromDomains: [],
           blockedSenderDomains: [],

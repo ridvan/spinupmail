@@ -63,6 +63,32 @@ export const queryKeys = {
     ] as const,
   domains: (organizationId: string | null) =>
     ["app", "organizations", organizationId, "domains"] as const,
+  integrations: (organizationId: string | null) =>
+    ["app", "organizations", organizationId, "integrations"] as const,
+  integrationDispatchesBase: (organizationId: string | null) =>
+    [
+      "app",
+      "organizations",
+      organizationId,
+      "integrations",
+      "dispatches",
+    ] as const,
+  integrationDispatches: (
+    organizationId: string | null,
+    integrationId: string | null,
+    page: number,
+    pageSize: number
+  ) =>
+    [
+      "app",
+      "organizations",
+      organizationId,
+      "integrations",
+      "dispatches",
+      integrationId,
+      page,
+      pageSize,
+    ] as const,
   apiKeys: ["app", "api-keys"] as const,
   emailsBase: (organizationId: string | null, addressId: string | null) =>
     ["app", "organizations", organizationId, "emails", addressId] as const,

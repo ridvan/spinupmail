@@ -81,13 +81,19 @@ import {
   getCalendarDayDiff,
   getDayKey,
 } from "@/features/timezone/lib/date-format";
-import type { EmailAddress, EmailAddressSortBy } from "@/lib/api";
+import type {
+  EmailAddress,
+  EmailAddressSortBy,
+  OrganizationIntegrationSummary,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type AddressListProps = {
   domains: string[];
   forcedLocalPartPrefix?: string | null;
   maxReceivedEmailsPerAddress?: number;
+  canManageIntegrations?: boolean;
+  integrations?: OrganizationIntegrationSummary[];
 };
 
 const PAGE_SIZE = 10;
@@ -508,6 +514,7 @@ const AllowedSendersBadgeSkeleton = () => (
 type AddressTableRowProps = {
   address: EmailAddress;
   timeZone: string;
+  canManageIntegrations: boolean;
   isDeletePending: boolean;
   onEdit: (address: EmailAddress) => void;
   onDelete: (address: EmailAddress) => void;
@@ -517,10 +524,13 @@ const AddressTableRow = React.memo(
   ({
     address,
     timeZone,
+    canManageIntegrations,
     isDeletePending,
     onEdit,
     onDelete,
   }: AddressTableRowProps) => {
+    const addressIntegrations = address.integrations ?? [];
+
     return (
       <TableRow className="group/row transition-colors hover:bg-muted/30">
         <TableCell className="max-w-56 font-medium">
@@ -547,6 +557,24 @@ const AddressTableRow = React.memo(
         <TableCell className="max-w-72">
           <AllowedSendersBadges domains={address.allowedFromDomains} />
         </TableCell>
+        <TableCell>
+          {addressIntegrations.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {addressIntegrations.map(integration => (
+                <Badge
+                  key={`${address.id}:${integration.id}`}
+                  variant="secondary"
+                >
+                  {integration.name}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {canManageIntegrations ? "Not connected" : "None"}
+            </span>
+          )}
+        </TableCell>
         <AddressRowActions
           address={address}
           isDeletePending={isDeletePending}
@@ -562,6 +590,8 @@ const AddressListContent = ({
   domains,
   forcedLocalPartPrefix = null,
   maxReceivedEmailsPerAddress,
+  canManageIntegrations = false,
+  integrations = [],
 }: AddressListProps) => {
   const { effectiveTimeZone } = useTimezone();
   const location = useLocation();
@@ -955,6 +985,11 @@ const AddressListContent = ({
                         Allowed Senders
                       </span>
                     </TableHead>
+                    <TableHead>
+                      <span className="inline-flex h-8 items-center text-xs font-medium">
+                        Integrations
+                      </span>
+                    </TableHead>
                     <TableHead className="text-right">
                       <span className="inline-flex h-8 items-center text-xs font-medium pr-1.5">
                         Actions
@@ -988,6 +1023,9 @@ const AddressListContent = ({
                           <TableCell className="max-w-72">
                             <AllowedSendersBadgeSkeleton />
                           </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-5 w-24 rounded-sm" />
+                          </TableCell>
                           <TableCell className="space-x-2 text-right">
                             <Button
                               type="button"
@@ -1015,7 +1053,7 @@ const AddressListContent = ({
                     <TableRow>
                       <TableCell
                         className="h-20 text-center text-destructive"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         {addressesQuery.error.message}
                       </TableCell>
@@ -1026,6 +1064,7 @@ const AddressListContent = ({
                         key={address.id}
                         address={address}
                         timeZone={effectiveTimeZone}
+                        canManageIntegrations={canManageIntegrations}
                         isDeletePending={deleteMutation.isPending}
                         onEdit={handleEditAddress}
                         onDelete={handleDeleteAddress}
@@ -1035,7 +1074,7 @@ const AddressListContent = ({
                     <TableRow>
                       <TableCell
                         className="h-20 text-center text-muted-foreground"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         <div className="flex flex-col items-center gap-2">
                           <p>
@@ -1070,7 +1109,7 @@ const AddressListContent = ({
                     <TableRow>
                       <TableCell
                         className="h-20 text-center text-muted-foreground"
-                        colSpan={5}
+                        colSpan={6}
                       >
                         No addresses available on this page.
                       </TableCell>
@@ -1237,6 +1276,8 @@ const AddressListContent = ({
         domains={domains}
         forcedLocalPartPrefix={forcedLocalPartPrefix}
         maxReceivedEmailsPerAddress={maxReceivedEmailsPerAddress}
+        canManageIntegrations={canManageIntegrations}
+        integrations={integrations}
         errorMessage={editSheetErrorMessage}
         isLoading={isEditSheetLoading}
         isNotFound={isNotFoundError(editingAddressQuery.error)}
@@ -1251,12 +1292,16 @@ export const AddressList = ({
   domains,
   forcedLocalPartPrefix = null,
   maxReceivedEmailsPerAddress,
+  canManageIntegrations = false,
+  integrations = [],
 }: AddressListProps) => (
   <NuqsAdapter>
     <AddressListContent
       domains={domains}
       forcedLocalPartPrefix={forcedLocalPartPrefix}
       maxReceivedEmailsPerAddress={maxReceivedEmailsPerAddress}
+      canManageIntegrations={canManageIntegrations}
+      integrations={integrations}
     />
   </NuqsAdapter>
 );

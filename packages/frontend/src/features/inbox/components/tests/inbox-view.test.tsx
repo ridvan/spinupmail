@@ -30,6 +30,7 @@ describe("InboxView", () => {
               lastReceivedAtMs: null,
               maxReceivedEmailCount: null,
               maxReceivedEmailAction: null,
+              integrations: [],
             },
           ]}
           addressesLoading={false}
@@ -93,6 +94,7 @@ describe("InboxView", () => {
               lastReceivedAtMs: null,
               maxReceivedEmailCount: null,
               maxReceivedEmailAction: null,
+              integrations: [],
             },
           ]}
           addressesLoading={false}
@@ -146,6 +148,7 @@ describe("InboxView", () => {
               lastReceivedAtMs: null,
               maxReceivedEmailCount: null,
               maxReceivedEmailAction: null,
+              integrations: [],
             },
           ]}
           addressesLoading={false}
@@ -208,6 +211,7 @@ describe("InboxView", () => {
                 lastReceivedAtMs: Date.parse("2026-03-09T13:05:00.000Z"),
                 maxReceivedEmailCount: null,
                 maxReceivedEmailAction: null,
+                integrations: [],
               },
               {
                 id: "address-2",
@@ -223,6 +227,7 @@ describe("InboxView", () => {
                 lastReceivedAtMs: Date.parse("2026-03-08T10:00:00.000Z"),
                 maxReceivedEmailCount: null,
                 maxReceivedEmailAction: null,
+                integrations: [],
               },
             ]}
             addressesLoading={false}

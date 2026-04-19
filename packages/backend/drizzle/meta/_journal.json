@@ -50,6 +50,13 @@
       "when": 1776512232856,
       "tag": "0006_noisy_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1776617206918,
+      "tag": "0007_strong_arachne",
+      "breakpoints": true
     }
   ]
 }

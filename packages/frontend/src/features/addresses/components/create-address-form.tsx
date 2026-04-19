@@ -62,6 +62,7 @@ import {
 } from "@/features/addresses/schemas/address-form";
 import { useCreateAddressMutation } from "@/features/addresses/hooks/use-addresses";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
+import type { OrganizationIntegrationSummary } from "@/lib/api";
 
 type CreateAddressFormProps = {
   domains: string[];
@@ -69,6 +70,8 @@ type CreateAddressFormProps = {
   forcedLocalPartPrefix?: string | null;
   maxReceivedEmailsPerAddress?: number;
   maxReceivedEmailsPerOrganization?: number;
+  canManageIntegrations?: boolean;
+  integrations?: OrganizationIntegrationSummary[];
 };
 
 type CreateAddressFormValues = {
@@ -76,6 +79,7 @@ type CreateAddressFormValues = {
   ttlMinutes: number | undefined;
   domain: string;
   allowedFromDomains: string[];
+  integrationIds: string[];
   maxReceivedEmailCount: number | undefined;
   maxReceivedEmailAction: "cleanAll" | "rejectNew" | "";
   acceptedRiskNotice: boolean;
@@ -228,6 +232,7 @@ const createAddressSchema = (
         values => values.every(domain => domainRegex.test(domain)),
         "Use valid hostnames like `example.com`"
       ),
+    integrationIds: z.array(z.string()),
     maxReceivedEmailCount: z
       .union([
         z
@@ -260,6 +265,8 @@ export const CreateAddressForm = ({
   isDomainsLoading = false,
   forcedLocalPartPrefix = null,
   maxReceivedEmailsPerAddress = DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS,
+  canManageIntegrations = false,
+  integrations = [],
 }: CreateAddressFormProps) => {
   const resolvedMaxReceivedEmailsPerAddress =
     maxReceivedEmailsPerAddress ?? DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS;
@@ -269,6 +276,15 @@ export const CreateAddressForm = ({
     resolvedMaxReceivedEmailsPerAddress
   );
   const availableDomains = useMemo(() => uniqueDomains(domains), [domains]);
+  const availableIntegrations = useMemo(
+    () =>
+      integrations.filter(
+        integration =>
+          integration.status === "active" &&
+          integration.supportedEventTypes.includes("email.received")
+      ),
+    [integrations]
+  );
   const defaultDomain = availableDomains[0] ?? "";
   const localPartMaxLength = getCustomLocalPartMaxLength(
     ADDRESS_LOCAL_PART_MAX_LENGTH,
@@ -292,6 +308,7 @@ export const CreateAddressForm = ({
     ttlMinutes: undefined,
     domain: defaultDomain,
     allowedFromDomains: [],
+    integrationIds: [],
     maxReceivedEmailCount: resolvedMaxReceivedEmailsPerAddress,
     maxReceivedEmailAction: "",
     acceptedRiskNotice: false,
@@ -320,6 +337,12 @@ export const CreateAddressForm = ({
           domain: selectedDomain,
           allowedFromDomains:
             allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
+          integrationSubscriptions: canManageIntegrations
+            ? value.integrationIds.map(integrationId => ({
+                integrationId,
+                eventType: "email.received" as const,
+              }))
+            : undefined,
           maxReceivedEmailCount:
             value.maxReceivedEmailCount ?? resolvedMaxReceivedEmailsPerAddress,
           maxReceivedEmailAction:
@@ -356,6 +379,7 @@ export const CreateAddressForm = ({
         localPart: "",
         ttlMinutes: undefined,
         allowedFromDomains: [],
+        integrationIds: [],
         maxReceivedEmailCount: resolvedMaxReceivedEmailsPerAddress,
         maxReceivedEmailAction: "",
       });
@@ -652,6 +676,68 @@ export const CreateAddressForm = ({
                     }}
                   />
                 </div>
+
+                {canManageIntegrations ? (
+                  <form.Field
+                    name="integrationIds"
+                    children={field => (
+                      <Field>
+                        <FieldLabel>Integrations</FieldLabel>
+                        <div className="space-y-2 rounded-md border border-border/70 bg-background/70 p-3">
+                          {availableIntegrations.length > 0 ? (
+                            availableIntegrations.map(integration => {
+                              const checked = field.state.value.includes(
+                                integration.id
+                              );
+
+                              return (
+                                <label
+                                  key={integration.id}
+                                  className="flex cursor-pointer items-start gap-3"
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    className="mt-0.5"
+                                    onCheckedChange={nextChecked =>
+                                      field.handleChange(
+                                        nextChecked
+                                          ? [
+                                              ...field.state.value,
+                                              integration.id,
+                                            ]
+                                          : field.state.value.filter(
+                                              value => value !== integration.id
+                                            )
+                                      )
+                                    }
+                                  />
+                                  <span className="space-y-0.5 text-sm">
+                                    <span className="block font-medium">
+                                      {integration.name}
+                                    </span>
+                                    <span className="block text-muted-foreground">
+                                      Telegram to{" "}
+                                      {integration.publicConfig.chatLabel ??
+                                        integration.publicConfig.chatId}
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            })
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              No active integrations available yet.
+                            </p>
+                          )}
+                        </div>
+                        <FieldDescription>
+                          Forward `email.received` events from this address to
+                          one or more active integrations.
+                        </FieldDescription>
+                      </Field>
+                    )}
+                  />
+                ) : null}
               </div>
 
               <div className="order-2 self-start rounded-lg border border-border bg-muted/35 p-4 xl:col-start-2 xl:row-span-2 xl:order-0">

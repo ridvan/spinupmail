@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  integrationEventTypeSchema,
+  integrationSubscriptionSchema,
+} from "@spinupmail/contracts";
 
 export const ADDRESS_LOCAL_PART_MAX_LENGTH = 30;
 export const ADDRESS_TTL_MAX_MINUTES = 43_200;
@@ -72,6 +76,17 @@ const inboundRatePolicySchema = z
   })
   .partial();
 
+const integrationSubscriptionsSchema = z
+  .array(integrationSubscriptionSchema)
+  .refine(
+    items =>
+      items.every(
+        item =>
+          item.eventType === integrationEventTypeSchema.enum["email.received"]
+      ),
+    "Only email.received subscriptions are currently supported"
+  );
+
 export const createEmailAddressBodySchema = z
   .object({
     localPart: z
@@ -104,6 +119,7 @@ export const createEmailAddressBodySchema = z
     maxReceivedEmailAction: z
       .enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)
       .optional(),
+    integrationSubscriptions: integrationSubscriptionsSchema.optional(),
     acceptedRiskNotice: z.boolean().refine(value => value, {
       message: "acceptedRiskNotice must be true",
     }),
@@ -155,6 +171,7 @@ export const updateEmailAddressBodySchema = z
     maxReceivedEmailAction: z
       .enum(ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)
       .optional(),
+    integrationSubscriptions: integrationSubscriptionsSchema.optional(),
   })
   .passthrough();
 

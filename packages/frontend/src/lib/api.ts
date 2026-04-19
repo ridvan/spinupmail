@@ -1,8 +1,32 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 type ApiError = {
-  error: string;
+  error: string | { message?: string; name?: string } | Record<string, unknown>;
   details?: string;
+};
+
+const normalizeApiErrorValue = (value: unknown): string | null => {
+  if (typeof value === "string" && value.trim()) return value;
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+
+    if (typeof record.error === "string" && record.error.trim()) {
+      return record.error;
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 };
 
 export const resolveApiUrl = (path: string) => `${API_BASE}${path}`;
@@ -37,7 +61,10 @@ const apiFetch = async <T>(
     let message = response.statusText || "Request failed";
     try {
       const payload = (await response.clone().json()) as ApiError;
-      message = payload.error || message;
+      message =
+        normalizeApiErrorValue(payload.error) ??
+        normalizeApiErrorValue(payload.details) ??
+        message;
     } catch {
       const text = await response.text();
       if (text) message = text;
@@ -52,7 +79,10 @@ const readErrorMessage = async (response: Response) => {
   let message = response.statusText || "Request failed";
   try {
     const payload = (await response.clone().json()) as ApiError;
-    message = payload.error || payload.details || message;
+    message =
+      normalizeApiErrorValue(payload.error) ??
+      normalizeApiErrorValue(payload.details) ??
+      message;
   } catch {
     const text = await response.text();
     if (text) message = text;
@@ -84,6 +114,7 @@ export type EmailAddress = {
   localPart: string;
   domain: string;
   meta?: unknown;
+  integrations: AddressIntegration[];
   emailCount: number;
   allowedFromDomains?: string[];
   blockedSenderDomains?: string[];
@@ -206,6 +237,105 @@ export type OrganizationStatsItem = {
   memberCount: number;
   addressCount: number;
   emailCount: number;
+};
+
+export type IntegrationProvider = "telegram";
+export type IntegrationStatus = "active" | "archived";
+export type IntegrationEventType = "email.received";
+
+export type TelegramIntegrationPublicConfig = {
+  telegramBotId: string;
+  botUsername: string;
+  chatId: string;
+  chatLabel: string | null;
+};
+
+export type AddressIntegration = {
+  id: string;
+  provider: IntegrationProvider;
+  name: string;
+  eventType: IntegrationEventType;
+};
+
+export type OrganizationIntegrationSummary = {
+  id: string;
+  provider: "telegram";
+  name: string;
+  status: IntegrationStatus;
+  supportedEventTypes: IntegrationEventType[];
+  mailboxCount: number;
+  publicConfig: TelegramIntegrationPublicConfig;
+  lastValidatedAt: string | null;
+  lastValidatedAtMs: number | null;
+  createdAt: string | null;
+  createdAtMs: number | null;
+  updatedAt: string | null;
+  updatedAtMs: number | null;
+};
+
+export type OrganizationIntegration = OrganizationIntegrationSummary & {
+  createdByUserId: string;
+  activeSecretVersion: number;
+};
+
+export type ValidatedIntegrationConnection = {
+  provider: "telegram";
+  name: string;
+  publicConfig: TelegramIntegrationPublicConfig;
+  validationSummary: {
+    name: string;
+    publicConfig: TelegramIntegrationPublicConfig;
+  };
+};
+
+export type IntegrationDispatchStatus =
+  | "pending"
+  | "processing"
+  | "retry_scheduled"
+  | "sent"
+  | "failed_permanent"
+  | "failed_dlq";
+
+export type IntegrationDispatch = {
+  id: string;
+  integrationId: string;
+  provider: IntegrationProvider;
+  eventType: IntegrationEventType;
+  status: IntegrationDispatchStatus;
+  attemptCount: number;
+  createdAt: string | null;
+  createdAtMs: number | null;
+  nextAttemptAt: string | null;
+  nextAttemptAtMs: number | null;
+  deliveredAt: string | null;
+  deliveredAtMs: number | null;
+  lastError: string | null;
+  lastErrorCode: string | null;
+  lastErrorStatus: number | null;
+};
+
+export type IntegrationDispatchListResponse = {
+  items: IntegrationDispatch[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
+export type TelegramIntegrationRequest = {
+  provider: "telegram";
+  name: string;
+  config: {
+    botToken: string;
+    chatId: string;
+  };
+};
+
+export type DeleteIntegrationResponse = {
+  id: string;
+  deleted: true;
+  clearedMailboxCount: number;
+  deletedDispatchCount: number;
 };
 
 export const listEmailAddresses = async (options?: {
@@ -417,6 +547,10 @@ export const createEmailAddress = async (
     inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number;
     maxReceivedEmailAction?: "cleanAll" | "rejectNew";
+    integrationSubscriptions?: {
+      integrationId: string;
+      eventType: IntegrationEventType;
+    }[];
     acceptedRiskNotice: boolean;
   },
   options?: { organizationId?: string | null }
@@ -456,6 +590,10 @@ export const updateEmailAddress = async (
     inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number | null;
     maxReceivedEmailAction?: "cleanAll" | "rejectNew";
+    integrationSubscriptions?: {
+      integrationId: string;
+      eventType: IntegrationEventType;
+    }[];
   },
   options?: { organizationId?: string | null }
 ) => {
@@ -468,6 +606,97 @@ export const updateEmailAddress = async (
     options?.organizationId
   );
 };
+
+export const listIntegrations = async (options?: {
+  signal?: AbortSignal;
+  organizationId?: string | null;
+}) =>
+  apiFetch<{ items: OrganizationIntegrationSummary[] }>(
+    "/api/integrations",
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  ).then(result => result.items);
+
+export const validateIntegration = async (
+  payload: TelegramIntegrationRequest,
+  options?: { organizationId?: string | null }
+) =>
+  apiFetch<ValidatedIntegrationConnection>(
+    "/api/integrations/validate",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options?.organizationId
+  );
+
+export const createIntegration = async (
+  payload: TelegramIntegrationRequest,
+  options?: { organizationId?: string | null }
+) =>
+  apiFetch<OrganizationIntegration>(
+    "/api/integrations",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options?.organizationId
+  );
+
+export const deleteIntegration = async (
+  integrationId: string,
+  options?: { organizationId?: string | null }
+) =>
+  apiFetch<DeleteIntegrationResponse>(
+    `/api/integrations/${encodeURIComponent(integrationId)}`,
+    {
+      method: "DELETE",
+    },
+    options?.organizationId
+  );
+
+export const listIntegrationDispatches = async (
+  integrationId: string,
+  options?: {
+    signal?: AbortSignal;
+    page?: number;
+    pageSize?: number;
+    organizationId?: string | null;
+  }
+) =>
+  apiFetch<IntegrationDispatchListResponse>(
+    `/api/integrations/${encodeURIComponent(integrationId)}/dispatches${(() => {
+      const query = new URLSearchParams();
+      if (options?.page) query.set("page", String(options.page));
+      if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+      return query.size > 0 ? `?${query.toString()}` : "";
+    })()}`,
+    {
+      signal: options?.signal,
+    },
+    options?.organizationId
+  );
+
+export const replayIntegrationDispatch = async (
+  integrationId: string,
+  dispatchId: string,
+  options?: {
+    organizationId?: string | null;
+  }
+) =>
+  apiFetch<{
+    id: string;
+    status: IntegrationDispatchStatus;
+    replayed: true;
+  }>(
+    `/api/integrations/${encodeURIComponent(integrationId)}/dispatches/${encodeURIComponent(dispatchId)}/replay`,
+    {
+      method: "POST",
+    },
+    options?.organizationId
+  );
 
 export const listEmails = async (options: {
   addressId?: string;

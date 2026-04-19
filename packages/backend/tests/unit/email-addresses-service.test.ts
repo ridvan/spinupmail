@@ -3,6 +3,10 @@ const mocks = vi.hoisted(() => ({
   countRecentAddressActivity: vi.fn(),
   findAddressByIdAndOrganization: vi.fn(),
   findAddressByValue: vi.fn(),
+  getAddressIntegrationsByAddressIds: vi.fn(),
+  syncAddressIntegrationSubscriptions: vi.fn(),
+  validateAddressIntegrationSubscriptions: vi.fn(),
+  getOrganizationMemberRole: vi.fn(),
   insertAddress: vi.fn(),
   listRecentAddressActivityPage: vi.fn(),
   deleteAddressByIdAndOrganization: vi.fn(),
@@ -25,6 +29,20 @@ vi.mock("@/modules/email-addresses/repo", () => ({
   updateAddressByIdAndOrganization: mocks.updateAddressByIdAndOrganization,
 }));
 
+vi.mock("@/modules/integrations/service", () => ({
+  getAddressIntegrationsByAddressIds: mocks.getAddressIntegrationsByAddressIds,
+  syncAddressIntegrationSubscriptions:
+    mocks.syncAddressIntegrationSubscriptions,
+  validateAddressIntegrationSubscriptions:
+    mocks.validateAddressIntegrationSubscriptions,
+}));
+
+vi.mock("@/modules/organizations/access", () => ({
+  getOrganizationMemberRole: mocks.getOrganizationMemberRole,
+  isOrganizationAdminRole: (role: string | null | undefined) =>
+    role === "owner" || role === "admin",
+}));
+
 vi.mock("@/modules/emails/repo", () => ({
   deleteEmailSearchEntriesByAddressId:
     mocks.deleteEmailSearchEntriesByAddressId,
@@ -41,6 +59,11 @@ import {
   updateEmailAddress,
 } from "@/modules/email-addresses/service";
 
+const session = {
+  session: { id: "session-1", userId: "user-1" },
+  user: { id: "user-1", emailVerified: true },
+} as const;
+
 describe("email addresses service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,6 +72,13 @@ describe("email addresses service", () => {
     mocks.countRecentAddressActivity.mockResolvedValue({ count: 0 });
     mocks.listRecentAddressActivityPage.mockResolvedValue([]);
     mocks.updateAddressByIdAndOrganization.mockResolvedValue(undefined);
+    mocks.getAddressIntegrationsByAddressIds.mockResolvedValue(new Map());
+    mocks.syncAddressIntegrationSubscriptions.mockResolvedValue(undefined);
+    mocks.validateAddressIntegrationSubscriptions.mockResolvedValue({
+      ok: true,
+      subscriptions: undefined,
+    });
+    mocks.getOrganizationMemberRole.mockResolvedValue("admin");
     mocks.deleteAddressByIdAndOrganization.mockResolvedValue(undefined);
     mocks.deleteEmailSearchEntriesByAddressId.mockResolvedValue(undefined);
     mocks.deleteR2ObjectsByPrefix.mockResolvedValue(undefined);
@@ -141,6 +171,7 @@ describe("email addresses service", () => {
         },
         maxReceivedEmailCount: 20,
         maxReceivedEmailAction: "rejectNew",
+        integrations: [],
         emailCount: 0,
         createdAt: "2026-03-28T12:34:56.000Z",
         createdAtMs: Date.parse("2026-03-28T12:34:56.000Z"),
@@ -460,6 +491,7 @@ describe("email addresses service", () => {
       env: {
         EMAIL_DOMAINS: "spinupmail.com",
       } as CloudflareBindings,
+      session,
       organizationId: "org-1",
       addressId: "address-1",
       payload: {
@@ -504,6 +536,7 @@ describe("email addresses service", () => {
         inboundRatePolicy: null,
         maxReceivedEmailCount: 100,
         maxReceivedEmailAction: "cleanAll",
+        integrations: [],
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
         expiresAt: null,
@@ -532,6 +565,7 @@ describe("email addresses service", () => {
         EMAIL_DOMAINS: "spinupmail.com",
         MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
       } as CloudflareBindings,
+      session,
       organizationId: "org-1",
       addressId: "address-1",
       payload: {
@@ -570,6 +604,7 @@ describe("email addresses service", () => {
         EMAIL_DOMAINS: "spinupmail.com",
         MAX_RECEIVED_EMAILS_PER_ADDRESS: "25",
       } as CloudflareBindings,
+      session,
       organizationId: "org-1",
       addressId: "address-1",
       payload: {
@@ -609,6 +644,7 @@ describe("email addresses service", () => {
         inboundRatePolicy: null,
         maxReceivedEmailCount: 100,
         maxReceivedEmailAction: "rejectNew",
+        integrations: [],
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
         expiresAt: null,
@@ -640,6 +676,7 @@ describe("email addresses service", () => {
       env: {
         EMAIL_DOMAINS: "spinupmail.com",
       } as CloudflareBindings,
+      session,
       organizationId: "org-1",
       addressId: "address-1",
       payload: {
@@ -679,6 +716,7 @@ describe("email addresses service", () => {
         EMAIL_DOMAINS: "spinupmail.com",
         FORCED_MAIL_PREFIX: "temp",
       } as CloudflareBindings,
+      session,
       organizationId: "org-1",
       addressId: "address-1",
       payload: {
@@ -718,6 +756,7 @@ describe("email addresses service", () => {
         inboundRatePolicy: null,
         maxReceivedEmailCount: 100,
         maxReceivedEmailAction: "cleanAll",
+        integrations: [],
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),
         expiresAt: null,
