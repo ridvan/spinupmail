@@ -1,3 +1,19 @@
+import type {
+  AddressIntegration,
+  CreateIntegrationRequest,
+  DeleteIntegrationResponse,
+  IntegrationDispatch,
+  IntegrationDispatchStatus,
+  IntegrationEventType,
+  IntegrationProvider,
+  IntegrationStatus,
+  ListIntegrationDispatchesResponse,
+  OrganizationIntegration,
+  OrganizationIntegrationSummary,
+  TelegramIntegrationPublicConfig,
+  ValidateIntegrationConnectionResponse,
+} from "@spinupmail/contracts";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 type ApiError = {
@@ -106,6 +122,23 @@ const parseFilenameFromDisposition = (headerValue: string | null) => {
   if (fallbackMatch?.[1]) return fallbackMatch[1];
 
   return null;
+};
+
+const buildQueryString = (query: URLSearchParams) =>
+  query.size > 0 ? `?${query.toString()}` : "";
+
+export type {
+  AddressIntegration,
+  DeleteIntegrationResponse,
+  IntegrationDispatch,
+  IntegrationDispatchStatus,
+  IntegrationEventType,
+  IntegrationProvider,
+  IntegrationStatus,
+  ListIntegrationDispatchesResponse,
+  OrganizationIntegration,
+  OrganizationIntegrationSummary,
+  TelegramIntegrationPublicConfig,
 };
 
 export type EmailAddress = {
@@ -239,104 +272,8 @@ export type OrganizationStatsItem = {
   emailCount: number;
 };
 
-export type IntegrationProvider = "telegram";
-export type IntegrationStatus = "active" | "archived";
-export type IntegrationEventType = "email.received";
-
-export type TelegramIntegrationPublicConfig = {
-  telegramBotId: string;
-  botUsername: string;
-  chatId: string;
-  chatLabel: string | null;
-};
-
-export type AddressIntegration = {
-  id: string;
-  provider: IntegrationProvider;
-  name: string;
-  eventType: IntegrationEventType;
-};
-
-export type OrganizationIntegrationSummary = {
-  id: string;
-  provider: "telegram";
-  name: string;
-  status: IntegrationStatus;
-  supportedEventTypes: IntegrationEventType[];
-  mailboxCount: number;
-  publicConfig: TelegramIntegrationPublicConfig;
-  lastValidatedAt: string | null;
-  lastValidatedAtMs: number | null;
-  createdAt: string | null;
-  createdAtMs: number | null;
-  updatedAt: string | null;
-  updatedAtMs: number | null;
-};
-
-export type OrganizationIntegration = OrganizationIntegrationSummary & {
-  createdByUserId: string;
-  activeSecretVersion: number;
-};
-
-export type ValidatedIntegrationConnection = {
-  provider: "telegram";
-  name: string;
-  publicConfig: TelegramIntegrationPublicConfig;
-  validationSummary: {
-    name: string;
-    publicConfig: TelegramIntegrationPublicConfig;
-  };
-};
-
-export type IntegrationDispatchStatus =
-  | "pending"
-  | "processing"
-  | "retry_scheduled"
-  | "sent"
-  | "failed_permanent"
-  | "failed_dlq";
-
-export type IntegrationDispatch = {
-  id: string;
-  integrationId: string;
-  provider: IntegrationProvider;
-  eventType: IntegrationEventType;
-  status: IntegrationDispatchStatus;
-  attemptCount: number;
-  createdAt: string | null;
-  createdAtMs: number | null;
-  nextAttemptAt: string | null;
-  nextAttemptAtMs: number | null;
-  deliveredAt: string | null;
-  deliveredAtMs: number | null;
-  lastError: string | null;
-  lastErrorCode: string | null;
-  lastErrorStatus: number | null;
-};
-
-export type IntegrationDispatchListResponse = {
-  items: IntegrationDispatch[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-};
-
-export type TelegramIntegrationRequest = {
-  provider: "telegram";
-  name: string;
-  config: {
-    botToken: string;
-    chatId: string;
-  };
-};
-
-export type DeleteIntegrationResponse = {
-  id: string;
-  deleted: true;
-  clearedMailboxCount: number;
-  deletedDispatchCount: number;
-};
+export type ValidatedIntegrationConnection =
+  ValidateIntegrationConnectionResponse;
 
 export const listEmailAddresses = async (options?: {
   page?: number;
@@ -353,7 +290,7 @@ export const listEmailAddresses = async (options?: {
   if (options?.search) query.set("search", options.search);
   if (options?.sortBy) query.set("sortBy", options.sortBy);
   if (options?.sortDirection) query.set("sortDirection", options.sortDirection);
-  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const suffix = buildQueryString(query);
 
   return apiFetch<EmailAddressListResponse>(
     `/api/email-addresses${suffix}`,
@@ -436,7 +373,7 @@ export const listRecentAddressActivity = async (options?: {
   if (options?.search) query.set("search", options.search);
   if (options?.sortBy) query.set("sortBy", options.sortBy);
   if (options?.sortDirection) query.set("sortDirection", options.sortDirection);
-  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const suffix = buildQueryString(query);
 
   return apiFetch<{
     items: EmailAddress[];
@@ -501,7 +438,7 @@ export const listEmailActivity = async (options?: {
   const query = new URLSearchParams();
   if (options?.days) query.set("days", String(options.days));
   if (options?.timezone) query.set("timezone", options.timezone);
-  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const suffix = buildQueryString(query);
   const data = await apiFetch<EmailActivityResponse>(
     `/api/organizations/stats/email-activity${suffix}`,
     { signal: options?.signal },
@@ -620,7 +557,7 @@ export const listIntegrations = async (options?: {
   ).then(result => result.items);
 
 export const validateIntegration = async (
-  payload: TelegramIntegrationRequest,
+  payload: CreateIntegrationRequest,
   options?: { organizationId?: string | null }
 ) =>
   apiFetch<ValidatedIntegrationConnection>(
@@ -633,7 +570,7 @@ export const validateIntegration = async (
   );
 
 export const createIntegration = async (
-  payload: TelegramIntegrationRequest,
+  payload: CreateIntegrationRequest,
   options?: { organizationId?: string | null }
 ) =>
   apiFetch<OrganizationIntegration>(
@@ -666,12 +603,12 @@ export const listIntegrationDispatches = async (
     organizationId?: string | null;
   }
 ) =>
-  apiFetch<IntegrationDispatchListResponse>(
+  apiFetch<ListIntegrationDispatchesResponse>(
     `/api/integrations/${encodeURIComponent(integrationId)}/dispatches${(() => {
       const query = new URLSearchParams();
       if (options?.page) query.set("page", String(options.page));
       if (options?.pageSize) query.set("pageSize", String(options.pageSize));
-      return query.size > 0 ? `?${query.toString()}` : "";
+      return buildQueryString(query);
     })()}`,
     {
       signal: options?.signal,

@@ -16,6 +16,9 @@ export const AddressManagementPage = () => {
   const canManageIntegrations =
     currentMember?.role === "owner" || currentMember?.role === "admin";
   const integrationsQuery = useIntegrationsQuery(canManageIntegrations);
+  const integrations = canManageIntegrations
+    ? (integrationsQuery.data ?? [])
+    : [];
 
   return (
     <div className="space-y-6">
@@ -44,7 +47,7 @@ export const AddressManagementPage = () => {
             domainsQuery.data?.maxReceivedEmailsPerAddress
           }
           canManageIntegrations={canManageIntegrations}
-          integrations={integrationsQuery.data ?? []}
+          integrations={integrations}
         />
       </section>
 
@@ -60,7 +63,7 @@ export const AddressManagementPage = () => {
             domainsQuery.data?.maxReceivedEmailsPerAddress
           }
           canManageIntegrations={canManageIntegrations}
-          integrations={integrationsQuery.data ?? []}
+          integrations={integrations}
         />
       </section>
     </div>

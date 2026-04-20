@@ -8,7 +8,7 @@ import {
   organizationIntegrationSecrets,
   organizationIntegrations,
 } from "@/db";
-import type { AppDb } from "@/platform/db/client";
+import type { AppDatabase, AppDb } from "@/platform/db/client";
 
 const integrationSelect = {
   id: organizationIntegrations.id,
@@ -277,7 +277,7 @@ export const deleteAddressSubscriptionsByAddressAndEventType = ({
   addressId,
   eventType,
 }: {
-  db: AppDb;
+  db: AppDatabase;
   organizationId: string;
   addressId: string;
   eventType: string;
@@ -293,16 +293,90 @@ export const deleteAddressSubscriptionsByAddressAndEventType = ({
     )
     .run();
 
+export const buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement = ({
+  db,
+  organizationId,
+  addressId,
+  eventType,
+}: {
+  db: AppDb;
+  organizationId: string;
+  addressId: string;
+  eventType: string;
+}) =>
+  db.$client
+    .prepare(
+      `
+      DELETE FROM address_integration_subscriptions
+      WHERE organization_id = ?
+        AND address_id = ?
+        AND event_type = ?
+    `
+    )
+    .bind(organizationId, addressId, eventType);
+
 export const insertAddressSubscriptions = ({
   db,
   values,
 }: {
-  db: AppDb;
+  db: AppDatabase;
   values: (typeof addressIntegrationSubscriptions.$inferInsert)[];
 }) =>
   values.length === 0
     ? Promise.resolve()
     : db.insert(addressIntegrationSubscriptions).values(values).run();
+
+export const buildInsertAddressSubscriptionsStatements = ({
+  db,
+  values,
+  organizationId,
+  addressId,
+}: {
+  db: AppDb;
+  values: (typeof addressIntegrationSubscriptions.$inferInsert)[];
+  organizationId: string;
+  addressId: string;
+}) =>
+  values.map(value =>
+    db.$client
+      .prepare(
+        `
+        INSERT INTO address_integration_subscriptions (
+          id,
+          organization_id,
+          address_id,
+          integration_id,
+          event_type,
+          enabled,
+          created_at,
+          updated_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1
+          FROM email_addresses
+          WHERE organization_id = ?
+            AND id = ?
+        )
+      `
+      )
+      .bind(
+        value.id,
+        value.organizationId,
+        value.addressId,
+        value.integrationId,
+        value.eventType,
+        value.enabled ? 1 : 0,
+        value.createdAt instanceof Date
+          ? value.createdAt.getTime()
+          : value.createdAt,
+        value.updatedAt instanceof Date
+          ? value.updatedAt.getTime()
+          : value.updatedAt,
+        organizationId,
+        addressId
+      )
+  );
 
 export const findEmailReceivedSourceById = ({
   db,
@@ -536,6 +610,48 @@ export const markDispatchPendingForReplay = ({
       lastErrorStatus: null,
       lastErrorRetryAfterSeconds: null,
       queueMessageId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(integrationDispatches.id, id))
+    .run();
+
+export const restoreDispatchAfterReplayEnqueueFailure = ({
+  db,
+  id,
+  status,
+  nextAttemptAt,
+  processingStartedAt,
+  deliveredAt,
+  lastError,
+  lastErrorCode,
+  lastErrorStatus,
+  lastErrorRetryAfterSeconds,
+  queueMessageId,
+}: {
+  db: AppDb;
+  id: string;
+  status: "failed_permanent" | "failed_dlq";
+  nextAttemptAt: Date | null;
+  processingStartedAt: Date | null;
+  deliveredAt: Date | null;
+  lastError: string | null;
+  lastErrorCode: string | null;
+  lastErrorStatus: number | null;
+  lastErrorRetryAfterSeconds: number | null;
+  queueMessageId: string | null;
+}) =>
+  db
+    .update(integrationDispatches)
+    .set({
+      status,
+      nextAttemptAt,
+      processingStartedAt,
+      deliveredAt,
+      lastError,
+      lastErrorCode,
+      lastErrorStatus,
+      lastErrorRetryAfterSeconds,
+      queueMessageId,
       updatedAt: new Date(),
     })
     .where(eq(integrationDispatches.id, id))

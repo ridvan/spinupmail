@@ -5,6 +5,8 @@ import {
   getAllowedDomains,
   getExtensionRedirectOrigins,
   getForcedMailPrefix,
+  getIntegrationQueueRetryConfig,
+  getIntegrationSecretEncryptionKey,
   getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
   getMaxAddressesPerOrganization,
@@ -65,6 +67,34 @@ describe("shared env helpers", () => {
     expect(
       getForcedMailPrefix({
         FORCED_MAIL_PREFIX: " !!! ",
+      } as CloudflareBindings)
+    ).toBeUndefined();
+  });
+
+  it("uses only integration env names for integration settings", () => {
+    expect(
+      getIntegrationSecretEncryptionKey({
+        INTEGRATION_SECRET_ENCRYPTION_KEY: " integration-key ",
+      } as CloudflareBindings)
+    ).toBe("integration-key");
+
+    expect(
+      getIntegrationQueueRetryConfig({
+        INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS: "120",
+        INTEGRATION_QUEUE_BASE_DELAY_SECONDS: "15",
+        INTEGRATION_QUEUE_MAX_DELAY_SECONDS: "90",
+        INTEGRATION_QUEUE_JITTER_SECONDS: "5",
+      } as CloudflareBindings)
+    ).toEqual({
+      retryWindowSeconds: 120,
+      baseDelaySeconds: 15,
+      maxDelaySeconds: 90,
+      jitterSeconds: 5,
+    });
+
+    expect(
+      getIntegrationSecretEncryptionKey({
+        INTEGRATION_SECRET_ENCRYPTION_KEY: "   ",
       } as CloudflareBindings)
     ).toBeUndefined();
   });

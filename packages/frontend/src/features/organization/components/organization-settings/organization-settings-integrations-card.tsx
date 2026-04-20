@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { TelegramIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -386,6 +387,7 @@ export const OrganizationIntegrationsCard = ({
   const [submitAttempted, setSubmitAttempted] = React.useState(false);
   const [validated, setValidated] =
     React.useState<ValidatedIntegrationConnection | null>(null);
+  const [isBotTokenVisible, setIsBotTokenVisible] = React.useState(false);
   const [integrationToArchive, setIntegrationToArchive] =
     React.useState<OrganizationIntegrationSummary | null>(null);
   const [expandedIntegrationIds, setExpandedIntegrationIds] = React.useState<
@@ -410,6 +412,7 @@ export const OrganizationIntegrationsCard = ({
     (submitAttempted || touchedFields[field]) && Boolean(draftErrors[field]);
 
   const handleDraftChange = (field: DraftField, value: string) => {
+    setValidated(null);
     setDraft(current => ({
       ...current,
       [field]: value,
@@ -462,6 +465,7 @@ export const OrganizationIntegrationsCard = ({
         botToken: "",
         chatId: "",
       });
+      setIsBotTokenVisible(false);
       setTouchedFields({
         name: false,
         botToken: false,
@@ -545,16 +549,39 @@ export const OrganizationIntegrationsCard = ({
                       <FieldLabel htmlFor="integration-bot-token">
                         Bot token
                       </FieldLabel>
-                      <Input
-                        id="integration-bot-token"
-                        placeholder="123456789:AAExampleBotToken"
-                        value={draft.botToken}
-                        maxLength={TELEGRAM_BOT_TOKEN_MAX_LENGTH}
-                        onBlur={() => handleFieldBlur("botToken")}
-                        onChange={event =>
-                          handleDraftChange("botToken", event.target.value)
-                        }
-                      />
+                      <div className="relative">
+                        <Input
+                          id="integration-bot-token"
+                          type={isBotTokenVisible ? "text" : "password"}
+                          autoComplete="new-password"
+                          className="pr-10"
+                          placeholder="123456789:AAExampleBotToken"
+                          value={draft.botToken}
+                          maxLength={TELEGRAM_BOT_TOKEN_MAX_LENGTH}
+                          onBlur={() => handleFieldBlur("botToken")}
+                          onChange={event =>
+                            handleDraftChange("botToken", event.target.value)
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex w-9 items-center justify-center"
+                          aria-label={
+                            isBotTokenVisible
+                              ? "Hide bot token"
+                              : "Show bot token"
+                          }
+                          onClick={() =>
+                            setIsBotTokenVisible(current => !current)
+                          }
+                        >
+                          {isBotTokenVisible ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </button>
+                      </div>
                       {showFieldError("botToken") ? (
                         <FieldError
                           errors={[{ message: draftErrors.botToken! }]}
@@ -764,14 +791,22 @@ export const OrganizationIntegrationsCard = ({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (!integrationToArchive) return;
-                const result = await onDelete(integrationToArchive.id);
-                toast.success(
-                  result.deletedDispatchCount > 0 ||
-                    result.clearedMailboxCount > 0
-                    ? `Integration deleted. Removed ${result.clearedMailboxCount} mailbox assignments and ${result.deletedDispatchCount} dispatches.`
-                    : "Integration deleted."
-                );
-                setIntegrationToArchive(null);
+                try {
+                  const result = await onDelete(integrationToArchive.id);
+                  toast.success(
+                    result.deletedDispatchCount > 0 ||
+                      result.clearedMailboxCount > 0
+                      ? `Integration deleted. Removed ${result.clearedMailboxCount} mailbox assignments and ${result.deletedDispatchCount} dispatches.`
+                      : "Integration deleted."
+                  );
+                  setIntegrationToArchive(null);
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Unable to delete integration"
+                  );
+                }
               }}
             >
               Delete

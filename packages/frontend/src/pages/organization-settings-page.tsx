@@ -62,7 +62,7 @@ export const OrganizationSettingsPage = () => {
   const cancelInvitationMutation = useCancelInvitationMutation();
   const updateMemberRoleMutation = useUpdateMemberRoleMutation();
   const removeMemberMutation = useRemoveMemberMutation();
-  const integrationsQuery = useIntegrationsQuery(canManage);
+  const integrationsQuery = useIntegrationsQuery(Boolean(activeOrganization));
   const validateIntegrationMutation = useValidateIntegrationMutation();
   const createIntegrationMutation = useCreateIntegrationMutation();
   const deleteIntegrationMutation = useDeleteIntegrationMutation();

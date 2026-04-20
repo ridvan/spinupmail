@@ -4,12 +4,15 @@ const mocks = vi.hoisted(() => ({
   findAddressByIdAndOrganization: vi.fn(),
   findAddressByValue: vi.fn(),
   getAddressIntegrationsByAddressIds: vi.fn(),
-  syncAddressIntegrationSubscriptions: vi.fn(),
   validateAddressIntegrationSubscriptions: vi.fn(),
   getOrganizationMemberRole: vi.fn(),
+  buildInsertAddressStatement: vi.fn(),
   insertAddress: vi.fn(),
+  buildUpdateAddressByIdAndOrganizationStatement: vi.fn(),
   listRecentAddressActivityPage: vi.fn(),
   deleteAddressByIdAndOrganization: vi.fn(),
+  buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement: vi.fn(),
+  buildInsertAddressSubscriptionsStatements: vi.fn(),
   deleteEmailSearchEntriesByAddressId: vi.fn(),
   deleteR2ObjectsByPrefix: vi.fn(),
   updateAddressByIdAndOrganization: vi.fn(),
@@ -23,7 +26,10 @@ vi.mock("@/modules/email-addresses/repo", () => ({
   countRecentAddressActivity: mocks.countRecentAddressActivity,
   findAddressByValue: mocks.findAddressByValue,
   findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
+  buildInsertAddressStatement: mocks.buildInsertAddressStatement,
   insertAddress: mocks.insertAddress,
+  buildUpdateAddressByIdAndOrganizationStatement:
+    mocks.buildUpdateAddressByIdAndOrganizationStatement,
   listRecentAddressActivityPage: mocks.listRecentAddressActivityPage,
   deleteAddressByIdAndOrganization: mocks.deleteAddressByIdAndOrganization,
   updateAddressByIdAndOrganization: mocks.updateAddressByIdAndOrganization,
@@ -31,10 +37,15 @@ vi.mock("@/modules/email-addresses/repo", () => ({
 
 vi.mock("@/modules/integrations/service", () => ({
   getAddressIntegrationsByAddressIds: mocks.getAddressIntegrationsByAddressIds,
-  syncAddressIntegrationSubscriptions:
-    mocks.syncAddressIntegrationSubscriptions,
   validateAddressIntegrationSubscriptions:
     mocks.validateAddressIntegrationSubscriptions,
+}));
+
+vi.mock("@/modules/integrations/repo", () => ({
+  buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement:
+    mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement,
+  buildInsertAddressSubscriptionsStatements:
+    mocks.buildInsertAddressSubscriptionsStatements,
 }));
 
 vi.mock("@/modules/organizations/access", () => ({
@@ -69,11 +80,22 @@ describe("email addresses service", () => {
     vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
     mocks.insertAddress.mockResolvedValue(true);
+    mocks.buildInsertAddressStatement.mockReturnValue(
+      "insert-address-statement"
+    );
+    mocks.buildUpdateAddressByIdAndOrganizationStatement.mockReturnValue(
+      "update-address-statement"
+    );
     mocks.countRecentAddressActivity.mockResolvedValue({ count: 0 });
     mocks.listRecentAddressActivityPage.mockResolvedValue([]);
     mocks.updateAddressByIdAndOrganization.mockResolvedValue(undefined);
+    mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement.mockReturnValue(
+      "delete-subscriptions-statement"
+    );
+    mocks.buildInsertAddressSubscriptionsStatements.mockReturnValue([
+      "insert-subscription-statement",
+    ]);
     mocks.getAddressIntegrationsByAddressIds.mockResolvedValue(new Map());
-    mocks.syncAddressIntegrationSubscriptions.mockResolvedValue(undefined);
     mocks.validateAddressIntegrationSubscriptions.mockResolvedValue({
       ok: true,
       subscriptions: undefined,
@@ -279,6 +301,55 @@ describe("email addresses service", () => {
       maxReceivedEmailCount: 25,
       maxReceivedEmailAction: "cleanAll",
     });
+  });
+
+  it("creates an address with integration subscriptions using a D1 batch", async () => {
+    const batch = vi.fn().mockResolvedValue([{ meta: { changes: 1 } }, {}, {}]);
+    const db = { $client: { batch } };
+
+    mocks.getDb.mockReturnValueOnce(db);
+    mocks.validateAddressIntegrationSubscriptions.mockResolvedValueOnce({
+      ok: true,
+      subscriptions: [
+        {
+          integrationId: "integration-1",
+          eventType: "email.received",
+        },
+      ],
+    });
+
+    const result = await createEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+      } as CloudflareBindings,
+      session,
+      organizationId: "org-1",
+      payload: {
+        localPart: "demo-team",
+        acceptedRiskNotice: true,
+        integrationSubscriptions: [
+          {
+            integrationId: "integration-1",
+            eventType: "email.received",
+          },
+        ],
+      },
+    });
+
+    expect(mocks.insertAddress).not.toHaveBeenCalled();
+    expect(mocks.buildInsertAddressStatement).toHaveBeenCalledTimes(1);
+    expect(
+      mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      mocks.buildInsertAddressSubscriptionsStatements
+    ).toHaveBeenCalledTimes(1);
+    expect(batch).toHaveBeenCalledWith([
+      "insert-address-statement",
+      "delete-subscriptions-statement",
+      "insert-subscription-statement",
+    ]);
+    expect(result.status).toBe(200);
   });
 
   it("returns the organization address limit error when no insert slot is available", async () => {
@@ -765,6 +836,67 @@ describe("email addresses service", () => {
         lastReceivedAtMs: null,
       },
     });
+  });
+
+  it("updates an address with integration subscriptions using a D1 batch", async () => {
+    const batch = vi.fn().mockResolvedValue([{}, {}, {}]);
+    const db = { $client: { batch } };
+
+    mocks.getDb.mockReturnValueOnce(db);
+    mocks.findAddressByIdAndOrganization.mockResolvedValueOnce({
+      id: "address-1",
+      address: "project@spinupmail.com",
+      localPart: "project",
+      domain: "spinupmail.com",
+      meta: null,
+      emailCount: 2,
+      createdAt: new Date("2026-03-20T10:00:00.000Z"),
+      expiresAt: null,
+      lastReceivedAt: null,
+    });
+    mocks.validateAddressIntegrationSubscriptions.mockResolvedValueOnce({
+      ok: true,
+      subscriptions: [
+        {
+          integrationId: "integration-1",
+          eventType: "email.received",
+        },
+      ],
+    });
+
+    const result = await updateEmailAddress({
+      env: {
+        EMAIL_DOMAINS: "spinupmail.com",
+      } as CloudflareBindings,
+      session,
+      organizationId: "org-1",
+      addressId: "address-1",
+      payload: {
+        integrationSubscriptions: [
+          {
+            integrationId: "integration-1",
+            eventType: "email.received",
+          },
+        ],
+      },
+    });
+
+    expect(mocks.updateAddressByIdAndOrganization).not.toHaveBeenCalled();
+    expect(
+      mocks.buildUpdateAddressByIdAndOrganizationStatement
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      mocks.buildInsertAddressSubscriptionsStatements
+    ).toHaveBeenCalledTimes(1);
+    expect(batch).toHaveBeenCalledWith([
+      "update-address-statement",
+      "delete-subscriptions-statement",
+      "insert-subscription-statement",
+    ]);
+    expect(result.status).toBe(200);
   });
 
   it("fails deletion when R2 cleanup fails and leaves db cleanup untouched", async () => {

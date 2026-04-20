@@ -20,6 +20,7 @@ import type {
 const TELEGRAM_API_BASE_URL = "https://api.telegram.org";
 const TELEGRAM_DASHBOARD_BUTTON_TEXT = "Open in Dashboard";
 const TELEGRAM_SEND_MESSAGE_MAX_LENGTH = 4096;
+const TELEGRAM_API_TIMEOUT_MS = 8_000;
 const TELEGRAM_RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 type TelegramApiErrorOptions = {
@@ -158,13 +159,28 @@ const callTelegramApi = async <TResult>({
   method: string;
   payload?: Record<string, unknown>;
 }) => {
-  const response = await fetch(buildTelegramApiUrl(botToken, method), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload ?? {}),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TELEGRAM_API_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(buildTelegramApiUrl(botToken, method), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload ?? {}),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Telegram request timed out", { cause: error });
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   let body: Record<string, unknown> | null = null;
   try {
@@ -217,6 +233,26 @@ const toSafeText = (value: string | null | undefined, fallback: string) => {
   return normalized ? normalized : fallback;
 };
 
+const truncateTelegramHtml = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 1) return "…".slice(0, maxLength);
+
+  let truncated = Array.from(value)
+    .slice(0, maxLength - 1)
+    .join("");
+
+  while (
+    /&(?:#\d*|#x[0-9a-fA-F]*|[a-zA-Z0-9]*)?$/.test(truncated) ||
+    /<[^>]*$/.test(truncated)
+  ) {
+    const next = Array.from(truncated).slice(0, -1).join("");
+    if (next === truncated) break;
+    truncated = next;
+  }
+
+  return `${truncated.trimEnd()}…`;
+};
+
 const formatTelegramMessageHtml = (payload: EmailReceivedPayload) => {
   const lines = [
     "<b>📬 New Email Received</b>",
@@ -230,14 +266,7 @@ const formatTelegramMessageHtml = (payload: EmailReceivedPayload) => {
     escapeTelegramHtml(toSafeText(payload.preview, "No preview available.")),
   ];
   const formatted = lines.join("\n").trim();
-
-  if (formatted.length <= TELEGRAM_SEND_MESSAGE_MAX_LENGTH) {
-    return formatted;
-  }
-
-  return `${formatted
-    .slice(0, TELEGRAM_SEND_MESSAGE_MAX_LENGTH - 1)
-    .trimEnd()}…`;
+  return truncateTelegramHtml(formatted, TELEGRAM_SEND_MESSAGE_MAX_LENGTH);
 };
 
 const toTelegramFailure = (error: unknown): ClassifiedIntegrationFailure => {

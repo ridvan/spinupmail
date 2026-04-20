@@ -1,7 +1,9 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  foreignKey,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -35,6 +37,10 @@ export const organizationIntegrations = sqliteTable(
       .notNull(),
   },
   table => [
+    uniqueIndex("organization_integrations_org_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
     index("organization_integrations_org_provider_status_idx").on(
       table.organizationId,
       table.provider,
@@ -66,7 +72,11 @@ export const organizationIntegrationSecrets = sqliteTable(
       .notNull(),
   },
   table => [
-    uniqueIndex("organization_integration_secrets_pk").on(
+    primaryKey({
+      name: "organization_integration_secrets_pk",
+      columns: [table.integrationId, table.version],
+    }),
+    uniqueIndex("organization_integration_secrets_integration_version_uidx").on(
       table.integrationId,
       table.version
     ),
@@ -80,12 +90,8 @@ export const addressIntegrationSubscriptions = sqliteTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    addressId: text("address_id")
-      .notNull()
-      .references(() => emailAddresses.id, { onDelete: "cascade" }),
-    integrationId: text("integration_id")
-      .notNull()
-      .references(() => organizationIntegrations.id, { onDelete: "cascade" }),
+    addressId: text("address_id").notNull(),
+    integrationId: text("integration_id").notNull(),
     eventType: text("event_type").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true).notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
@@ -96,6 +102,10 @@ export const addressIntegrationSubscriptions = sqliteTable(
       .notNull(),
   },
   table => [
+    uniqueIndex("address_integration_subscriptions_org_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
     uniqueIndex("address_integration_subscriptions_address_event_uidx").on(
       table.addressId,
       table.integrationId,
@@ -110,6 +120,17 @@ export const addressIntegrationSubscriptions = sqliteTable(
       table.integrationId,
       table.eventType
     ),
+    foreignKey({
+      columns: [table.organizationId, table.addressId],
+      foreignColumns: [emailAddresses.organizationId, emailAddresses.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.integrationId],
+      foreignColumns: [
+        organizationIntegrations.organizationId,
+        organizationIntegrations.id,
+      ],
+    }).onDelete("cascade"),
   ]
 );
 
@@ -120,14 +141,8 @@ export const integrationDispatches = sqliteTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    integrationId: text("integration_id")
-      .notNull()
-      .references(() => organizationIntegrations.id, { onDelete: "cascade" }),
-    subscriptionId: text("subscription_id")
-      .notNull()
-      .references(() => addressIntegrationSubscriptions.id, {
-        onDelete: "cascade",
-      }),
+    integrationId: text("integration_id").notNull(),
+    subscriptionId: text("subscription_id").notNull(),
     provider: text("provider").notNull(),
     eventType: text("event_type").notNull(),
     sourceEmailId: text("source_email_id")
@@ -156,6 +171,10 @@ export const integrationDispatches = sqliteTable(
       .notNull(),
   },
   table => [
+    uniqueIndex("integration_dispatches_org_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
     uniqueIndex("integration_dispatches_idempotency_key_uidx").on(
       table.idempotencyKey
     ),
@@ -169,7 +188,25 @@ export const integrationDispatches = sqliteTable(
       table.status,
       table.createdAt
     ),
+    index("integration_dispatches_status_next_attempt_idx").on(
+      table.status,
+      table.nextAttemptAt
+    ),
     index("integration_dispatches_source_email_idx").on(table.sourceEmailId),
+    foreignKey({
+      columns: [table.organizationId, table.integrationId],
+      foreignColumns: [
+        organizationIntegrations.organizationId,
+        organizationIntegrations.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.subscriptionId],
+      foreignColumns: [
+        addressIntegrationSubscriptions.organizationId,
+        addressIntegrationSubscriptions.id,
+      ],
+    }).onDelete("cascade"),
   ]
 );
 
@@ -177,15 +214,11 @@ export const integrationDeliveryAttempts = sqliteTable(
   "integration_delivery_attempts",
   {
     id: text("id").primaryKey(),
-    dispatchId: text("dispatch_id")
-      .notNull()
-      .references(() => integrationDispatches.id, { onDelete: "cascade" }),
+    dispatchId: text("dispatch_id").notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    integrationId: text("integration_id")
-      .notNull()
-      .references(() => organizationIntegrations.id, { onDelete: "cascade" }),
+    integrationId: text("integration_id").notNull(),
     attemptNumber: integer("attempt_number").notNull(),
     outcome: text("outcome").notNull(),
     error: text("error"),
@@ -206,6 +239,20 @@ export const integrationDeliveryAttempts = sqliteTable(
       table.integrationId,
       table.startedAt
     ),
+    foreignKey({
+      columns: [table.organizationId, table.dispatchId],
+      foreignColumns: [
+        integrationDispatches.organizationId,
+        integrationDispatches.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.integrationId],
+      foreignColumns: [
+        organizationIntegrations.organizationId,
+        organizationIntegrations.id,
+      ],
+    }).onDelete("cascade"),
   ]
 );
 

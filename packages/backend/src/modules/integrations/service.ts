@@ -12,6 +12,7 @@ import {
   validateIntegrationConnectionRequestSchema,
 } from "@spinupmail/contracts";
 import { getDb } from "@/platform/db/client";
+import type { AppDb } from "@/platform/db/client";
 import {
   getOrganizationMemberRole,
   isOrganizationAdminRole,
@@ -33,18 +34,18 @@ import {
   type IntegrationProvider,
 } from "./types";
 import {
+  buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement,
+  buildInsertAddressSubscriptionsStatements,
   countIntegrationsByOrganization,
   countDispatchesByIntegrationAndOrganization,
   countEnabledSubscriptionsForIntegration,
   deleteIntegrationByIdAndOrganization,
-  deleteAddressSubscriptionsByAddressAndEventType,
   findActiveIntegrationSecret,
   findDispatchById,
   findDispatchByIdIntegrationAndOrganization,
   findEmailReceivedSourceById,
   findIntegrationByIdAndOrganization,
   findIntegrationsByIdsAndOrganization,
-  insertAddressSubscriptions,
   insertDeliveryAttempt,
   insertIntegration,
   insertIntegrationDispatch,
@@ -58,6 +59,7 @@ import {
   markDispatchProcessing,
   markDispatchRetryScheduled,
   markDispatchSent,
+  restoreDispatchAfterReplayEnqueueFailure,
 } from "./repo";
 
 const INTEGRATION_DISPATCH_PAGE_DEFAULT = 1;
@@ -243,8 +245,19 @@ const buildRetryDelaySeconds = (
   );
   const jitterSeconds =
     config.jitterSeconds > 0
-      ? crypto.getRandomValues(new Uint32Array(1))[0] %
-        (config.jitterSeconds + 1)
+      ? (() => {
+          const upperBound = config.jitterSeconds + 1;
+          const maxUint32 = 0x1_0000_0000;
+          const limit = maxUint32 - (maxUint32 % upperBound);
+
+          while (true) {
+            const candidate = crypto.getRandomValues(new Uint32Array(1))[0]!;
+            if (candidate < limit) {
+              const quotient = Math.floor(candidate / upperBound);
+              return candidate - quotient * upperBound;
+            }
+          }
+        })()
       : 0;
 
   return Math.min(
@@ -279,7 +292,7 @@ export const getAddressIntegrationsByAddressIds = async ({
   organizationId,
   addressIds,
 }: {
-  db: ReturnType<typeof getDb>;
+  db: AppDb;
   organizationId: string;
   addressIds: string[];
 }) => {
@@ -298,34 +311,37 @@ export const syncAddressIntegrationSubscriptions = async ({
   addressId,
   subscriptions,
 }: {
-  db: ReturnType<typeof getDb>;
+  db: AppDb;
   organizationId: string;
   addressId: string;
   subscriptions: IntegrationSubscription[];
 }) => {
-  await deleteAddressSubscriptionsByAddressAndEventType({
-    db,
+  const nextSubscriptions = uniqueIntegrationSubscriptions(subscriptions);
+  const values = nextSubscriptions.map(subscription => ({
+    id: crypto.randomUUID(),
     organizationId,
     addressId,
-    eventType: EMAIL_RECEIVED_EVENT_TYPE,
-  });
+    integrationId: subscription.integrationId,
+    eventType: subscription.eventType,
+    enabled: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
 
-  const nextSubscriptions = uniqueIntegrationSubscriptions(subscriptions);
-  if (nextSubscriptions.length === 0) return;
-
-  await insertAddressSubscriptions({
-    db,
-    values: nextSubscriptions.map(subscription => ({
-      id: crypto.randomUUID(),
+  await db.$client.batch([
+    buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
+      db,
       organizationId,
       addressId,
-      integrationId: subscription.integrationId,
-      eventType: subscription.eventType,
-      enabled: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })),
-  });
+      eventType: EMAIL_RECEIVED_EVENT_TYPE,
+    }),
+    ...buildInsertAddressSubscriptionsStatements({
+      db,
+      values,
+      organizationId,
+      addressId,
+    }),
+  ]);
 };
 
 export const validateAddressIntegrationSubscriptions = async ({
@@ -847,10 +863,36 @@ export const replayIntegrationDispatch = async ({
     db: adminCheck.db,
     id: dispatch.id,
   });
-  await enqueueDispatchById({
-    env,
-    dispatchId: dispatch.id,
-  });
+  try {
+    await enqueueDispatchById({
+      env,
+      dispatchId: dispatch.id,
+    });
+  } catch (error) {
+    try {
+      await restoreDispatchAfterReplayEnqueueFailure({
+        db: adminCheck.db,
+        id: dispatch.id,
+        status: dispatch.status as "failed_permanent" | "failed_dlq",
+        nextAttemptAt: dispatch.nextAttemptAt,
+        processingStartedAt: dispatch.processingStartedAt,
+        deliveredAt: dispatch.deliveredAt,
+        lastError: dispatch.lastError,
+        lastErrorCode: dispatch.lastErrorCode,
+        lastErrorStatus: dispatch.lastErrorStatus,
+        lastErrorRetryAfterSeconds: dispatch.lastErrorRetryAfterSeconds,
+        queueMessageId: dispatch.queueMessageId,
+      });
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [error, rollbackError],
+        "Failed to enqueue integration dispatch replay",
+        { cause: rollbackError }
+      );
+    }
+
+    throw error;
+  }
 
   const replayed = await findDispatchByIdIntegrationAndOrganization({
     db: adminCheck.db,

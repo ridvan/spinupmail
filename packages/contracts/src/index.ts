@@ -228,7 +228,7 @@ export const listIntegrationDispatchesResponseSchema = z.object({
   page: z.number().int().positive(),
   pageSize: z.number().int().positive(),
   totalItems: z.number().int().nonnegative(),
-  totalPages: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
 });
 
 export const listIntegrationDispatchesParamsSchema = z.object({

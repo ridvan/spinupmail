@@ -78,14 +78,16 @@ export const createApp = (options: AppFactoryOptions = {}) => {
 
 export const createWorkerHandler = (options: WorkerHandlerOptions = {}) => {
   const app = createApp(options);
+  const queueHandler =
+    options.queueHandler ??
+    ((args: { batch: MessageBatch; env: CloudflareBindings }) =>
+      handleIntegrationDispatchQueueBatch(args));
+
   return {
     fetch: app.fetch,
     email: options.emailHandler ?? handleIncomingEmail,
-    queue: options.queueHandler
-      ? (batch: MessageBatch, env: CloudflareBindings) =>
-          options.queueHandler?.({ batch, env })
-      : (batch: MessageBatch, env: CloudflareBindings) =>
-          handleIntegrationDispatchQueueBatch({ batch, env }),
+    queue: (batch: MessageBatch, env: CloudflareBindings) =>
+      queueHandler({ batch, env }),
   };
 };
 

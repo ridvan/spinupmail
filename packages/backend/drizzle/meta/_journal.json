@@ -57,6 +57,13 @@
       "when": 1776617206918,
       "tag": "0007_strong_arachne",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1776718017141,
+      "tag": "0008_daily_nicolaos",
+      "breakpoints": true
     }
   ]
 }

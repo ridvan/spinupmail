@@ -1,9 +1,12 @@
 import { getDb } from "@/platform/db/client";
 import {
   getAddressIntegrationsByAddressIds,
-  syncAddressIntegrationSubscriptions,
   validateAddressIntegrationSubscriptions,
 } from "@/modules/integrations/service";
+import {
+  buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement,
+  buildInsertAddressSubscriptionsStatements,
+} from "@/modules/integrations/repo";
 import {
   getAllowedDomains,
   getForcedMailPrefix,
@@ -49,6 +52,8 @@ import {
   type UpdateEmailAddressBody,
 } from "./schemas";
 import {
+  buildInsertAddressStatement,
+  buildUpdateAddressByIdAndOrganizationStatement,
   countAddressesByOrganization,
   countRecentAddressActivity,
   deleteAddressByIdAndOrganization,
@@ -599,21 +604,69 @@ export const createEmailAddress = async ({
   const id = crypto.randomUUID();
 
   try {
-    const inserted = await insertAddress(
-      db,
-      {
-        id,
-        organizationId,
-        userId: session.user.id,
-        address,
-        localPart,
-        domain,
-        meta: meta ?? undefined,
-        expiresAt,
-      },
-      addressLimit
-    );
-    if (!inserted) {
+    const created =
+      integrationSubscriptionsValidation.subscriptions === undefined
+        ? await insertAddress(
+            db,
+            {
+              id,
+              organizationId,
+              userId: session.user.id,
+              address,
+              localPart,
+              domain,
+              meta: meta ?? undefined,
+              expiresAt,
+            },
+            addressLimit
+          )
+        : await (async () => {
+            const subscriptionValues =
+              integrationSubscriptionsValidation.subscriptions.map(
+                subscription => ({
+                  id: crypto.randomUUID(),
+                  organizationId,
+                  addressId: id,
+                  integrationId: subscription.integrationId,
+                  eventType: subscription.eventType,
+                  enabled: true,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                })
+              );
+
+            const results = await db.$client.batch([
+              buildInsertAddressStatement({
+                db,
+                values: {
+                  id,
+                  organizationId,
+                  userId: session.user.id,
+                  address,
+                  localPart,
+                  domain,
+                  meta: meta ?? undefined,
+                  expiresAt,
+                },
+                maxAddressesPerOrganization: addressLimit,
+              }),
+              buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
+                db,
+                organizationId,
+                addressId: id,
+                eventType: "email.received",
+              }),
+              ...buildInsertAddressSubscriptionsStatements({
+                db,
+                values: subscriptionValues,
+                organizationId,
+                addressId: id,
+              }),
+            ]);
+
+            return Number(results[0]?.meta?.changes ?? 0) > 0;
+          })();
+    if (!created) {
       return {
         status: 409 as const,
         body: {
@@ -633,15 +686,6 @@ export const createEmailAddress = async ({
         ...(existing?.id ? { id: existing.id } : {}),
       },
     };
-  }
-
-  if (integrationSubscriptionsValidation.subscriptions !== undefined) {
-    await syncAddressIntegrationSubscriptions({
-      db,
-      organizationId,
-      addressId: id,
-      subscriptions: integrationSubscriptionsValidation.subscriptions,
-    });
   }
 
   const integrationsByAddressId = await getAddressIntegrationsByAddressIds({
@@ -978,18 +1022,59 @@ export const updateEmailAddress = async ({
   }
 
   try {
-    await updateAddressByIdAndOrganization({
-      db,
-      addressId: existing.id,
-      organizationId,
-      values: {
-        address,
-        localPart,
-        domain: domainFromBody,
-        meta: metaForStorage,
-        expiresAt,
-      },
-    });
+    if (integrationSubscriptionsValidation.subscriptions === undefined) {
+      await updateAddressByIdAndOrganization({
+        db,
+        addressId: existing.id,
+        organizationId,
+        values: {
+          address,
+          localPart,
+          domain: domainFromBody,
+          meta: metaForStorage,
+          expiresAt,
+        },
+      });
+    } else {
+      const subscriptionValues =
+        integrationSubscriptionsValidation.subscriptions.map(subscription => ({
+          id: crypto.randomUUID(),
+          organizationId,
+          addressId: existing.id,
+          integrationId: subscription.integrationId,
+          eventType: subscription.eventType,
+          enabled: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+
+      await db.$client.batch([
+        buildUpdateAddressByIdAndOrganizationStatement({
+          db,
+          addressId: existing.id,
+          organizationId,
+          values: {
+            address,
+            localPart,
+            domain: domainFromBody,
+            meta: metaForStorage,
+            expiresAt,
+          },
+        }),
+        buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
+          db,
+          organizationId,
+          addressId: existing.id,
+          eventType: "email.received",
+        }),
+        ...buildInsertAddressSubscriptionsStatements({
+          db,
+          values: subscriptionValues,
+          organizationId,
+          addressId: existing.id,
+        }),
+      ]);
+    }
   } catch (error) {
     if (!isAddressConflictError(error)) throw error;
 
@@ -1002,15 +1087,6 @@ export const updateEmailAddress = async ({
         ...(conflict?.id ? { id: conflict.id } : {}),
       },
     };
-  }
-
-  if (integrationSubscriptionsValidation.subscriptions !== undefined) {
-    await syncAddressIntegrationSubscriptions({
-      db,
-      organizationId,
-      addressId: existing.id,
-      subscriptions: integrationSubscriptionsValidation.subscriptions,
-    });
   }
 
   const integrationsByAddressId = await getAddressIntegrationsByAddressIds({

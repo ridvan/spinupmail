@@ -81,14 +81,19 @@ export const decryptSecret = async ({
   }
 
   const key = await importEncryptionKey(encodedKey);
-  const plaintext = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: decodeBase64(payload.iv),
-    },
-    key,
-    decodeBase64(payload.ciphertext)
-  );
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: decodeBase64(payload.iv),
+      },
+      key,
+      decodeBase64(payload.ciphertext)
+    );
+  } catch {
+    throw new Error("Decryption failed");
+  }
 
   return new TextDecoder().decode(plaintext);
 };

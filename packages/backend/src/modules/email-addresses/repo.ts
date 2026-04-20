@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { emailAddresses } from "@/db";
-import type { AppDb } from "@/platform/db/client";
+import type { AppDatabase, AppDb } from "@/platform/db/client";
 
 const addressListSelect = {
   id: emailAddresses.id,
@@ -234,7 +234,7 @@ export const findAutoCreatedAddressByOrganization = (
     .get();
 
 export const insertAddress = (
-  db: AppDb,
+  db: AppDatabase,
   values: {
     id: string;
     organizationId: string;
@@ -281,13 +281,69 @@ export const insertAddress = (
     )
     .then(result => result.meta.changes > 0);
 
+export const buildInsertAddressStatement = ({
+  db,
+  values,
+  maxAddressesPerOrganization,
+}: {
+  db: AppDb;
+  values: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    address: string;
+    localPart: string;
+    domain: string;
+    meta?: string;
+    expiresAt?: Date;
+    autoCreated?: boolean;
+  };
+  maxAddressesPerOrganization: number;
+}) =>
+  db.$client
+    .prepare(
+      `
+      insert into email_addresses (
+        id,
+        organization_id,
+        user_id,
+        address,
+        local_part,
+        domain,
+        meta,
+        expires_at,
+        auto_created
+      )
+      select
+        ?, ?, ?, ?, ?, ?, ?, ?, ?
+      where (
+        select count(*)
+        from email_addresses
+        where organization_id = ?
+      ) < ?
+    `
+    )
+    .bind(
+      values.id,
+      values.organizationId,
+      values.userId,
+      values.address,
+      values.localPart,
+      values.domain,
+      values.meta ?? null,
+      values.expiresAt ? values.expiresAt.getTime() : null,
+      values.autoCreated ? 1 : 0,
+      values.organizationId,
+      maxAddressesPerOrganization
+    );
+
 export const updateAddressByIdAndOrganization = ({
   db,
   addressId,
   organizationId,
   values,
 }: {
-  db: AppDb;
+  db: AppDatabase;
   addressId: string;
   organizationId: string;
   values: {
@@ -308,6 +364,47 @@ export const updateAddressByIdAndOrganization = ({
       )
     )
     .run();
+
+export const buildUpdateAddressByIdAndOrganizationStatement = ({
+  db,
+  addressId,
+  organizationId,
+  values,
+}: {
+  db: AppDb;
+  addressId: string;
+  organizationId: string;
+  values: {
+    address: string;
+    localPart: string;
+    domain: string;
+    meta: string | null;
+    expiresAt: Date | null;
+  };
+}) =>
+  db.$client
+    .prepare(
+      `
+      UPDATE email_addresses
+      SET
+        address = ?,
+        local_part = ?,
+        domain = ?,
+        meta = ?,
+        expires_at = ?
+      WHERE id = ?
+        AND organization_id = ?
+    `
+    )
+    .bind(
+      values.address,
+      values.localPart,
+      values.domain,
+      values.meta,
+      values.expiresAt ? values.expiresAt.getTime() : null,
+      addressId,
+      organizationId
+    );
 
 export const deleteAddressByIdAndOrganization = (
   db: AppDb,

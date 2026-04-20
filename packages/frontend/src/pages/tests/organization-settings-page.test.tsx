@@ -353,6 +353,7 @@ describe("OrganizationSettingsPage", () => {
 
     renderPage();
 
+    expect(mockedUseIntegrationsQuery).toHaveBeenCalledWith(true);
     expect(screen.getAllByText("View only").length).toBeGreaterThan(0);
     expect(
       screen.getByText(

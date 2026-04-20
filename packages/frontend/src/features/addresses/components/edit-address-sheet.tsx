@@ -228,6 +228,10 @@ const EditAddressSheetForm = ({
       ),
     [integrations]
   );
+  const availableIntegrationIds = React.useMemo(
+    () => new Set(availableIntegrations.map(integration => integration.id)),
+    [availableIntegrations]
+  );
   const localPartMaxLength = getCustomLocalPartMaxLength(
     ADDRESS_LOCAL_PART_MAX_LENGTH,
     forcedLocalPartPrefix
@@ -248,14 +252,24 @@ const EditAddressSheetForm = ({
         | undefined,
       allowedFromDomains: address.allowedFromDomains ?? ([] as string[]),
       integrationIds: address.integrations
-        .filter(integration => integration.eventType === "email.received")
+        .filter(
+          integration =>
+            integration.eventType === "email.received" &&
+            availableIntegrationIds.has(integration.id)
+        )
         .map(integration => integration.id),
       maxReceivedEmailCount:
         address.maxReceivedEmailCount ?? maxReceivedEmailsPerAddress,
       maxReceivedEmailAction: address.maxReceivedEmailAction ?? "cleanAll",
       usernameChangeConfirmed: false,
     }),
-    [address, domains, forcedLocalPartPrefix, maxReceivedEmailsPerAddress]
+    [
+      address,
+      availableIntegrationIds,
+      domains,
+      forcedLocalPartPrefix,
+      maxReceivedEmailsPerAddress,
+    ]
   );
 
   const form = useForm({

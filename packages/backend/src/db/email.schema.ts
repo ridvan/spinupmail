@@ -34,6 +34,10 @@ export const emailAddresses = sqliteTable(
   },
   table => [
     index("email_addresses_domain_idx").on(table.domain),
+    uniqueIndex("email_addresses_org_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
     index("email_addresses_org_created_idx").on(
       table.organizationId,
       table.createdAt

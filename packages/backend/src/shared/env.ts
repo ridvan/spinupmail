@@ -34,6 +34,15 @@ const readProcessEnv = (key: string) => {
   return process.env[key];
 };
 
+const firstNonBlank = (...values: Array<string | null | undefined>) => {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+
+  return undefined;
+};
+
 const clampKvBackedRateLimitWindow = (windowSeconds: number) =>
   Math.max(windowSeconds, CLOUDFLARE_KV_MINIMUM_TTL_SECONDS);
 
@@ -148,18 +157,12 @@ export const getForcedMailPrefix = (
 };
 
 export const getIntegrationSecretEncryptionKey = (
-  env?: Pick<
-    CloudflareBindings,
-    "INTEGRATION_SECRET_ENCRYPTION_KEY" | "TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY"
-  >
+  env?: Pick<CloudflareBindings, "INTEGRATION_SECRET_ENCRYPTION_KEY">
 ) => {
-  const configured =
-    env?.INTEGRATION_SECRET_ENCRYPTION_KEY ??
-    env?.TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY ??
-    readProcessEnv("INTEGRATION_SECRET_ENCRYPTION_KEY") ??
-    readProcessEnv("TELEGRAM_BOT_TOKEN_ENCRYPTION_KEY");
-  const trimmed = configured?.trim();
-  return trimmed ? trimmed : undefined;
+  return firstNonBlank(
+    env?.INTEGRATION_SECRET_ENCRYPTION_KEY,
+    readProcessEnv("INTEGRATION_SECRET_ENCRYPTION_KEY")
+  );
 };
 
 export const getIntegrationQueueRetryConfig = (
@@ -169,32 +172,20 @@ export const getIntegrationQueueRetryConfig = (
     | "INTEGRATION_QUEUE_BASE_DELAY_SECONDS"
     | "INTEGRATION_QUEUE_MAX_DELAY_SECONDS"
     | "INTEGRATION_QUEUE_JITTER_SECONDS"
-    | "TELEGRAM_QUEUE_RETRY_WINDOW_SECONDS"
-    | "TELEGRAM_QUEUE_BASE_DELAY_SECONDS"
-    | "TELEGRAM_QUEUE_MAX_DELAY_SECONDS"
-    | "TELEGRAM_QUEUE_JITTER_SECONDS"
   >
 ) => {
   const retryWindowSeconds =
-    parsePositiveInteger(
-      env?.INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS?.trim() ??
-        env?.TELEGRAM_QUEUE_RETRY_WINDOW_SECONDS?.trim()
-    ) ?? INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS_DEFAULT;
+    parsePositiveInteger(env?.INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS?.trim()) ??
+    INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS_DEFAULT;
   const baseDelaySeconds =
-    parsePositiveInteger(
-      env?.INTEGRATION_QUEUE_BASE_DELAY_SECONDS?.trim() ??
-        env?.TELEGRAM_QUEUE_BASE_DELAY_SECONDS?.trim()
-    ) ?? INTEGRATION_QUEUE_BASE_DELAY_SECONDS_DEFAULT;
+    parsePositiveInteger(env?.INTEGRATION_QUEUE_BASE_DELAY_SECONDS?.trim()) ??
+    INTEGRATION_QUEUE_BASE_DELAY_SECONDS_DEFAULT;
   const maxDelaySeconds =
-    parsePositiveInteger(
-      env?.INTEGRATION_QUEUE_MAX_DELAY_SECONDS?.trim() ??
-        env?.TELEGRAM_QUEUE_MAX_DELAY_SECONDS?.trim()
-    ) ?? INTEGRATION_QUEUE_MAX_DELAY_SECONDS_DEFAULT;
+    parsePositiveInteger(env?.INTEGRATION_QUEUE_MAX_DELAY_SECONDS?.trim()) ??
+    INTEGRATION_QUEUE_MAX_DELAY_SECONDS_DEFAULT;
   const jitterSeconds =
-    parsePositiveInteger(
-      env?.INTEGRATION_QUEUE_JITTER_SECONDS?.trim() ??
-        env?.TELEGRAM_QUEUE_JITTER_SECONDS?.trim()
-    ) ?? INTEGRATION_QUEUE_JITTER_SECONDS_DEFAULT;
+    parsePositiveInteger(env?.INTEGRATION_QUEUE_JITTER_SECONDS?.trim()) ??
+    INTEGRATION_QUEUE_JITTER_SECONDS_DEFAULT;
 
   return {
     retryWindowSeconds,
