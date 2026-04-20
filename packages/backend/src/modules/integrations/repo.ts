@@ -140,6 +140,51 @@ export const insertIntegration = ({
   values: typeof organizationIntegrations.$inferInsert;
 }) => db.insert(organizationIntegrations).values(values).run();
 
+export const buildInsertIntegrationStatement = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof organizationIntegrations.$inferInsert;
+}) =>
+  db.$client
+    .prepare(
+      `
+      INSERT INTO organization_integrations (
+        id,
+        organization_id,
+        provider,
+        name,
+        status,
+        created_by_user_id,
+        public_config_json,
+        active_secret_version,
+        last_validated_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+    )
+    .bind(
+      values.id,
+      values.organizationId,
+      values.provider,
+      values.name,
+      values.status,
+      values.createdByUserId,
+      values.publicConfigJson,
+      values.activeSecretVersion,
+      values.lastValidatedAt instanceof Date
+        ? values.lastValidatedAt.getTime()
+        : values.lastValidatedAt,
+      values.createdAt instanceof Date
+        ? values.createdAt.getTime()
+        : values.createdAt,
+      values.updatedAt instanceof Date
+        ? values.updatedAt.getTime()
+        : values.updatedAt
+    );
+
 export const insertIntegrationSecret = ({
   db,
   values,
@@ -147,6 +192,33 @@ export const insertIntegrationSecret = ({
   db: AppDb;
   values: typeof organizationIntegrationSecrets.$inferInsert;
 }) => db.insert(organizationIntegrationSecrets).values(values).run();
+
+export const buildInsertIntegrationSecretStatement = ({
+  db,
+  values,
+}: {
+  db: AppDb;
+  values: typeof organizationIntegrationSecrets.$inferInsert;
+}) =>
+  db.$client
+    .prepare(
+      `
+      INSERT INTO organization_integration_secrets (
+        integration_id,
+        version,
+        encrypted_config_json,
+        created_at
+      ) VALUES (?, ?, ?, ?)
+    `
+    )
+    .bind(
+      values.integrationId,
+      values.version,
+      values.encryptedConfigJson,
+      values.createdAt instanceof Date
+        ? values.createdAt.getTime()
+        : values.createdAt
+    );
 
 export const findActiveIntegrationSecret = ({
   db,

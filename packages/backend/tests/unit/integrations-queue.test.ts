@@ -238,4 +238,48 @@ describe("integration dispatch queue handler", () => {
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it("acks and marks permanent failure when stored integration config is invalid", async () => {
+    const { message, ack, retry } = buildMessage();
+    mocks.findIntegrationByIdAndOrganization.mockResolvedValueOnce({
+      id: "integration-1",
+      organizationId: "org-1",
+      provider: "telegram",
+      activeSecretVersion: 1,
+      publicConfigJson: "{bad json",
+    });
+
+    await handleIntegrationDispatchQueueBatch({
+      batch: buildBatch(message),
+      env: {
+        INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+          "base64"
+        ),
+      } as CloudflareBindings,
+    });
+
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.insertDeliveryAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        values: expect.objectContaining({
+          dispatchId: "dispatch-1",
+          outcome: "failed",
+          error: "Stored integration public config is invalid",
+          errorCode: "integration_public_config_invalid",
+        }),
+      })
+    );
+    expect(mocks.markDispatchFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        id: "dispatch-1",
+        status: "failed_permanent",
+        lastError: "Stored integration public config is invalid",
+        lastErrorCode: "integration_public_config_invalid",
+      })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
 });

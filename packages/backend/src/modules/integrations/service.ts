@@ -36,6 +36,8 @@ import {
 import {
   buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement,
   buildInsertAddressSubscriptionsStatements,
+  buildInsertIntegrationSecretStatement,
+  buildInsertIntegrationStatement,
   countIntegrationsByOrganization,
   countDispatchesByIntegrationAndOrganization,
   countEnabledSubscriptionsForIntegration,
@@ -47,9 +49,7 @@ import {
   findIntegrationByIdAndOrganization,
   findIntegrationsByIdsAndOrganization,
   insertDeliveryAttempt,
-  insertIntegration,
   insertIntegrationDispatch,
-  insertIntegrationSecret,
   listAddressSubscriptionsByAddressIds,
   listDispatchesByIntegrationAndOrganization,
   listEnabledSubscriptionsForAddressAndEvent,
@@ -258,6 +258,36 @@ const buildPreview = (value: string | null | undefined) => {
 
 const parseDispatchPayload = (value: string): EmailReceivedPayload => {
   return JSON.parse(value) as EmailReceivedPayload;
+};
+
+class IntegrationDispatchPreparationError extends Error {
+  code: string;
+
+  constructor(message: string, code: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "IntegrationDispatchPreparationError";
+    this.code = code;
+  }
+}
+
+const classifyIntegrationDispatchFailure = ({
+  adapter,
+  error,
+}: {
+  adapter: ReturnType<typeof getIntegrationAdapter>;
+  error: unknown;
+}) => {
+  if (error instanceof IntegrationDispatchPreparationError) {
+    return {
+      code: error.code,
+      message: error.message,
+      status: null,
+      retryAfterSeconds: null,
+      retryable: false,
+    };
+  }
+
+  return adapter.classifyFailure(error);
 };
 
 const buildRetryDelaySeconds = (
@@ -586,32 +616,35 @@ export const createIntegration = async ({
       plaintext: JSON.stringify(validated.secretConfig),
       encodedKey: encryptionKey,
     });
+    const now = new Date();
 
-    await insertIntegration({
-      db: adminCheck.db,
-      values: {
-        id: createdId,
-        organizationId,
-        provider: body.provider,
-        name: body.name,
-        status: "active",
-        createdByUserId: session.user.id,
-        publicConfigJson,
-        activeSecretVersion: 1,
-        lastValidatedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-    await insertIntegrationSecret({
-      db: adminCheck.db,
-      values: {
-        integrationId: createdId,
-        version: 1,
-        encryptedConfigJson,
-        createdAt: new Date(),
-      },
-    });
+    await adminCheck.db.$client.batch([
+      buildInsertIntegrationStatement({
+        db: adminCheck.db,
+        values: {
+          id: createdId,
+          organizationId,
+          provider: body.provider,
+          name: body.name,
+          status: "active",
+          createdByUserId: session.user.id,
+          publicConfigJson,
+          activeSecretVersion: 1,
+          lastValidatedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        },
+      }),
+      buildInsertIntegrationSecretStatement({
+        db: adminCheck.db,
+        values: {
+          integrationId: createdId,
+          version: 1,
+          encryptedConfigJson,
+          createdAt: now,
+        },
+      }),
+    ]);
 
     const created = await findIntegrationByIdAndOrganization({
       db: adminCheck.db,
@@ -1138,20 +1171,51 @@ const processDispatchQueueMessage = async ({
     queueMessageId: message.id,
   });
 
+  const startedAt = new Date();
   const adapter = getIntegrationAdapter(
     integration.provider as IntegrationProvider
   );
-  const publicConfig = JSON.parse(integration.publicConfigJson);
-  const secretConfig = JSON.parse(
-    await decryptSecret({
-      encrypted: secret.encryptedConfigJson,
-      encodedKey: encryptionKey,
-    })
-  );
-  const dispatchPayload = parseDispatchPayload(dispatch.payloadJson);
-  const startedAt = new Date();
 
   try {
+    const publicConfig = (() => {
+      try {
+        return JSON.parse(integration.publicConfigJson);
+      } catch (error) {
+        throw new IntegrationDispatchPreparationError(
+          "Stored integration public config is invalid",
+          "integration_public_config_invalid",
+          error
+        );
+      }
+    })();
+    const secretConfig = await (async () => {
+      try {
+        return JSON.parse(
+          await decryptSecret({
+            encrypted: secret.encryptedConfigJson,
+            encodedKey: encryptionKey,
+          })
+        );
+      } catch (error) {
+        throw new IntegrationDispatchPreparationError(
+          "Stored integration secret config is invalid",
+          "integration_secret_config_invalid",
+          error
+        );
+      }
+    })();
+    const dispatchPayload = (() => {
+      try {
+        return parseDispatchPayload(dispatch.payloadJson);
+      } catch (error) {
+        throw new IntegrationDispatchPreparationError(
+          "Stored integration dispatch payload is invalid",
+          "integration_dispatch_payload_invalid",
+          error
+        );
+      }
+    })();
+
     await adapter.deliver({
       env,
       payload: dispatchPayload,
@@ -1178,7 +1242,7 @@ const processDispatchQueueMessage = async ({
     });
     message.ack();
   } catch (error) {
-    const failure = adapter.classifyFailure(error);
+    const failure = classifyIntegrationDispatchFailure({ adapter, error });
 
     await insertDeliveryAttempt({
       db,
