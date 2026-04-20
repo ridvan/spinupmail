@@ -363,6 +363,62 @@ describe("OrganizationSettingsPage", () => {
     expect(screen.queryByRole("button", { name: "Invite" })).toBeNull();
   });
 
+  it("shows integrations loading state for read-only users", () => {
+    mockedUseAuth.mockReturnValue({
+      user: {
+        id: "user-member",
+        name: "Member",
+        email: "member@example.com",
+      },
+    } as unknown as ReturnType<typeof useAuth>);
+
+    mockedUseActiveOrganizationQuery.mockReturnValue({
+      data: {
+        ...baseActiveOrganization,
+        members: [
+          {
+            id: "member-current",
+            role: "member",
+            user: {
+              id: "user-member",
+              name: "Member",
+              email: "member@example.com",
+            },
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useActiveOrganizationQuery>);
+
+    mockedUseOrganizationMembersQuery.mockReturnValue({
+      data: [
+        {
+          id: "member-current",
+          role: "member",
+          user: {
+            id: "user-member",
+            name: "Member",
+            email: "member@example.com",
+          },
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOrganizationMembersQuery>);
+
+    mockedUseIntegrationsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as unknown as ReturnType<typeof useIntegrationsQuery>);
+
+    renderPage();
+
+    expect(screen.getByText("Loading integrations...")).toBeTruthy();
+    expect(screen.queryByText("No integrations yet.")).toBeNull();
+  });
+
   it("creates invite link from origin and resets invite email", async () => {
     renderPage();
 

@@ -277,8 +277,8 @@ export const OrganizationSettingsPage = () => {
       >
         <OrganizationIntegrationsCard
           canManage={canManage}
-          integrations={integrationsQuery.data ?? []}
-          isLoading={canManage && integrationsQuery.isLoading}
+          integrations={integrationsQuery.data ?? undefined}
+          isLoading={integrationsQuery.isLoading}
           validationError={
             validateIntegrationMutation.error instanceof Error
               ? validateIntegrationMutation.error.message

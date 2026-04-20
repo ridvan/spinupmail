@@ -118,6 +118,33 @@ const clampInteger = (
   return normalized;
 };
 
+const getCryptoRandomInt = (upperBoundExclusive: number) => {
+  if (!Number.isSafeInteger(upperBoundExclusive) || upperBoundExclusive <= 0) {
+    throw new Error("upperBoundExclusive must be a positive safe integer");
+  }
+
+  if (upperBoundExclusive === 1) return 0;
+
+  const upperBound = BigInt(upperBoundExclusive);
+  const bitLength = Math.ceil(Math.log2(upperBoundExclusive));
+  const byteLength = Math.ceil(bitLength / 8);
+  const leadingBitMask = 0xff >>> (byteLength * 8 - bitLength);
+
+  while (true) {
+    const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+    bytes[0] = bytes[0]! & leadingBitMask;
+
+    let candidate = 0n;
+    for (const byte of bytes) {
+      candidate = (candidate << 8n) | BigInt(byte);
+    }
+
+    if (candidate < upperBound) {
+      return Number(candidate);
+    }
+  }
+};
+
 const requireOrganizationAdmin = async ({
   env,
   organizationId,
@@ -244,21 +271,7 @@ const buildRetryDelaySeconds = (
     baseDelaySeconds * 2 ** Math.max(0, attemptCount - 1)
   );
   const jitterSeconds =
-    config.jitterSeconds > 0
-      ? (() => {
-          const upperBound = config.jitterSeconds + 1;
-          const maxUint32 = 0x1_0000_0000;
-          const limit = maxUint32 - (maxUint32 % upperBound);
-
-          while (true) {
-            const candidate = crypto.getRandomValues(new Uint32Array(1))[0]!;
-            if (candidate < limit) {
-              const quotient = Math.floor(candidate / upperBound);
-              return candidate - quotient * upperBound;
-            }
-          }
-        })()
-      : 0;
+    config.jitterSeconds > 0 ? getCryptoRandomInt(config.jitterSeconds + 1) : 0;
 
   return Math.min(
     config.maxDelaySeconds,

@@ -51,7 +51,7 @@ import { useIntegrationDispatchesQuery } from "@/features/organization/hooks/use
 
 type OrganizationIntegrationsCardProps = {
   canManage: boolean;
-  integrations: OrganizationIntegrationSummary[];
+  integrations?: OrganizationIntegrationSummary[];
   validationError: string | null;
   createError: string | null;
   isLoading?: boolean;
@@ -404,9 +404,10 @@ export const OrganizationIntegrationsCard = ({
     validated?.provider === "telegram" &&
     validated.name.trim() === draft.name.trim() &&
     validated.publicConfig.chatId === draft.chatId.trim();
-  const telegramIntegrations = integrations.filter(
-    integration => integration.provider === "telegram"
-  );
+  const telegramIntegrations =
+    integrations?.filter(integration => integration.provider === "telegram") ??
+    [];
+  const hasResolvedIntegrations = integrations !== undefined;
 
   const showFieldError = (field: DraftField) =>
     (submitAttempted || touchedFields[field]) && Boolean(draftErrors[field]);
@@ -762,11 +763,11 @@ export const OrganizationIntegrationsCard = ({
                 );
               })}
             </div>
-          ) : (
+          ) : hasResolvedIntegrations ? (
             <p className="text-sm text-muted-foreground">
               No integrations yet.
             </p>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 

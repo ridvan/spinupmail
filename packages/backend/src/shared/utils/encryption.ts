@@ -6,6 +6,19 @@ type EncryptedPayload = {
   ciphertext: string;
 };
 
+const isEncryptedPayload = (value: unknown): value is EncryptedPayload =>
+  (() => {
+    if (typeof value !== "object" || value === null) return false;
+
+    const payload = value as Record<string, unknown>;
+    return (
+      typeof payload.iv === "string" &&
+      payload.iv.length > 0 &&
+      typeof payload.ciphertext === "string" &&
+      payload.ciphertext.length > 0
+    );
+  })();
+
 const decodeBase64 = (value: string) =>
   Uint8Array.from(Buffer.from(value, "base64"));
 
@@ -63,20 +76,15 @@ export const decryptSecret = async ({
   encrypted: string;
   encodedKey: string;
 }) => {
-  let payload: EncryptedPayload;
+  let payload: unknown;
 
   try {
-    payload = JSON.parse(encrypted) as EncryptedPayload;
+    payload = JSON.parse(encrypted);
   } catch {
     throw new Error("Encrypted payload is invalid");
   }
 
-  if (
-    typeof payload.iv !== "string" ||
-    payload.iv.length === 0 ||
-    typeof payload.ciphertext !== "string" ||
-    payload.ciphertext.length === 0
-  ) {
+  if (!isEncryptedPayload(payload)) {
     throw new Error("Encrypted payload is invalid");
   }
 
