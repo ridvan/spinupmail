@@ -650,6 +650,12 @@ export const createEmailAddress = async ({
                 },
                 maxAddressesPerOrganization: addressLimit,
               }),
+            ]);
+
+            const created = Number(results[0]?.meta?.changes ?? 0) > 0;
+            if (!created) return false;
+
+            await db.$client.batch([
               buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
                 db,
                 organizationId,
@@ -662,7 +668,7 @@ export const createEmailAddress = async ({
               }),
             ]);
 
-            return Number(results[0]?.meta?.changes ?? 0) > 0;
+            return true;
           })();
     if (!created) {
       return {
@@ -1046,7 +1052,7 @@ export const updateEmailAddress = async ({
           updatedAt: new Date(),
         }));
 
-      await db.$client.batch([
+      const results = await db.$client.batch([
         buildUpdateAddressByIdAndOrganizationStatement({
           db,
           addressId: existing.id,
@@ -1059,17 +1065,23 @@ export const updateEmailAddress = async ({
             expiresAt,
           },
         }),
-        buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
-          db,
-          organizationId,
-          addressId: existing.id,
-          eventType: "email.received",
-        }),
-        ...buildInsertAddressSubscriptionsStatements({
-          db,
-          values: subscriptionValues,
-        }),
       ]);
+
+      const updated = Number(results[0]?.meta?.changes ?? 0) > 0;
+      if (updated) {
+        await db.$client.batch([
+          buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
+            db,
+            organizationId,
+            addressId: existing.id,
+            eventType: "email.received",
+          }),
+          ...buildInsertAddressSubscriptionsStatements({
+            db,
+            values: subscriptionValues,
+          }),
+        ]);
+      }
     }
   } catch (error) {
     if (!isAddressConflictError(error)) throw error;
