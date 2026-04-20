@@ -116,6 +116,14 @@ Save the returned `bucket_name` values for the next steps. In
 `packages/backend/wrangler.toml`, keep the Worker binding as `R2_BUCKET` and
 set `bucket_name` to the actual Cloudflare bucket names.
 
+### Create Queue (Integration Dispatches)
+
+Create the queue used for integration dispatch jobs:
+
+```bash
+pnpm wrangler queues create spinupmail-integration-dispatches
+```
+
 ### Durable Objects
 
 This backend already includes the Durable Object binding and migration in
@@ -164,6 +172,7 @@ For local development, create `.dev.vars` file in `packages/backend`. Here is a 
 ```env
 BETTER_AUTH_BASE_URL="http://localhost:8787/api/auth"
 BETTER_AUTH_SECRET="" # Run `openssl rand -base64 32` to generate, or you can generate from https://better-auth.com/docs/installation
+INTEGRATION_SECRET_ENCRYPTION_KEY="" # Run `openssl rand -base64 32` to generate a base64 32-byte key
 CORS_ORIGIN="http://localhost:5173,http://127.0.0.1:5173"
 EXTENSION_REDIRECT_ORIGINS="https://<your-extension-id>.chromiumapp.org"
 RESEND_API_KEY="" # Get from Resend
@@ -181,6 +190,8 @@ pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
 # e.g. https://api.spinupmail.com/api/auth
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 # Run `openssl rand -base64 32` to generate a secret, or you can generate from https://better-auth.com/docs/installation
+pnpm exec wrangler secret put INTEGRATION_SECRET_ENCRYPTION_KEY
+# Run `openssl rand -base64 32` to generate the required base64 32-byte AES-GCM key
 pnpm exec wrangler secret put CORS_ORIGIN
 # e.g. https://app.spinupmail.com
 pnpm exec wrangler secret put RESEND_API_KEY
@@ -198,6 +209,7 @@ Use the Worker URL or your API route URL:
 - `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
+- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>`
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be configured in `wrangler.toml` `[vars]` with a verified sender/domain.

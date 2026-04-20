@@ -71,6 +71,11 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       { id: "create-d1-database", title: "Create D1 database", level: 3 },
       { id: "create-kv-namespace", title: "Create KV namespace", level: 3 },
       { id: "create-r2-bucket", title: "Create R2 bucket", level: 3 },
+      {
+        id: "create-queue-integration-dispatches",
+        title: "Create queue (integration dispatches)",
+        level: 3,
+      },
       { id: "durable-objects", title: "Durable objects", level: 3 },
       {
         id: "backend-environment-variables-and-secrets",
@@ -127,9 +132,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       { id: "notes", title: "Notes", level: 2 },
     ],
     searchText:
-      "Spinupmail installation Cloudflare Email Routing Workers Pages pnpm D1 KV R2 secrets migrations deploy API subdomain custom domain local development",
+      "Spinupmail installation Cloudflare Email Routing Workers Pages pnpm D1 KV R2 queues secrets migrations deploy API subdomain custom domain local development integration secret encryption key",
     codeText:
-      "pnpm install pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments pnpm exec wrangler secret put pnpm -C packages/backend db:migrate:dev pnpm -C packages/backend deploy VITE_AUTH_BASE_URL VITE_API_BASE_URL VITE_TURNSTILE_SITE_KEY pnpm -C packages/backend dev pnpm -C packages/frontend dev",
+      "pnpm install pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments pnpm wrangler queues create spinupmail-integration-dispatches pnpm exec wrangler secret put INTEGRATION_SECRET_ENCRYPTION_KEY pnpm -C packages/backend db:migrate:dev pnpm -C packages/backend deploy VITE_AUTH_BASE_URL VITE_API_BASE_URL VITE_TURNSTILE_SITE_KEY pnpm -C packages/backend dev pnpm -C packages/frontend dev",
   },
   "api-overview": {
     headings: [
@@ -238,9 +243,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction maxReceivedEmailsPerAddress maxReceivedEmailsPerOrganization ttl localPart acceptedRiskNotice recent activity cursor search",
+      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction maxReceivedEmailsPerAddress maxReceivedEmailsPerOrganization ttl localPart acceptedRiskNotice recent activity cursor search integrationSubscriptions integrations email.received",
     codeText:
-      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id",
+      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id integrationSubscriptions integrations",
   },
   "api-emails": {
     headings: [
@@ -309,9 +314,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "Cloudflare resources D1 KV R2 Durable Objects wrangler bindings EMAIL_DOMAINS RESEND_FROM_EMAIL AUTH_ALLOWED_EMAIL_DOMAIN preview bucket",
+      "Cloudflare resources D1 KV R2 Queues Durable Objects wrangler bindings EMAIL_DOMAINS RESEND_FROM_EMAIL AUTH_ALLOWED_EMAIL_DOMAIN preview bucket integration dispatch",
     codeText:
-      "pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments spinupmail-attachments-preview wrangler.toml.example durable_objects ABUSE_COUNTERS",
+      "pnpm exec wrangler d1 create SUM_DB pnpm exec wrangler kv namespace create SUM_KV pnpm exec wrangler r2 bucket create spinupmail-attachments spinupmail-attachments-preview pnpm wrangler queues create spinupmail-integration-dispatches wrangler.toml.example durable_objects ABUSE_COUNTERS",
   },
   "auth-secrets": {
     headings: [
@@ -362,9 +367,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "Better Auth Google OAuth Resend Turnstile secrets CORS_ORIGIN BETTER_AUTH_BASE_URL callbacks trusted origins dedicated API domain local dev",
+      "Better Auth Google OAuth Resend Turnstile secrets CORS_ORIGIN BETTER_AUTH_BASE_URL INTEGRATION_SECRET_ENCRYPTION_KEY callbacks trusted origins dedicated API domain local dev",
     codeText:
-      "BETTER_AUTH_SECRET BETTER_AUTH_BASE_URL CORS_ORIGIN GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY VITE_TURNSTILE_SITE_KEY",
+      "BETTER_AUTH_SECRET BETTER_AUTH_BASE_URL INTEGRATION_SECRET_ENCRYPTION_KEY CORS_ORIGIN GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET RESEND_API_KEY TURNSTILE_SECRET_KEY VITE_TURNSTILE_SITE_KEY",
   },
   "deploy-routing": {
     headings: [

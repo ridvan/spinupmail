@@ -28,6 +28,7 @@ pnpm exec wrangler d1 create SUM_DB
 pnpm exec wrangler kv namespace create SUM_KV
 pnpm exec wrangler r2 bucket create spinupmail-attachments
 pnpm exec wrangler r2 bucket create spinupmail-attachments-preview
+pnpm wrangler queues create spinupmail-integration-dispatches
 ```
 
 Record the values each command returns. You will need them when you edit
@@ -39,6 +40,7 @@ Record the values each command returns. You will need them when you edit
 | KV namespace | `pnpm exec wrangler kv namespace create SUM_KV` | `binding`, `id` |
 | R2 bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments` | `bucket_name` |
 | R2 preview bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments-preview` | `bucket_name` |
+| Integration dispatch queue | `pnpm wrangler queues create spinupmail-integration-dispatches` | `queue_name` |
 
 <Callout tone="info" title="Durable Objects do not need a separate create step">
   The Durable Object binding and migration already exist in the example

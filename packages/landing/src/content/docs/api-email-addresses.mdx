@@ -1,7 +1,7 @@
 ---
 title: Email Addresses API
-description: Create, list, update, and delete inboxes with TTL, sender policy, and retention controls.
-summary: Exhaustive reference for inbox lifecycle operations.
+description: Create, list, update, and delete inboxes with TTL, sender policy, retention controls, and integration subscriptions.
+summary: Exhaustive reference for inbox lifecycle operations, including integration-enabled inbox subscriptions.
 groupId: api-reference
 keywords:
   - email addresses
@@ -28,6 +28,11 @@ Email retention is controlled by two limits:
 - The effective inbox retention limit is capped by the current
   `maxReceivedEmailsPerAddress` value, and inbound storage is also bounded by
   the organization-wide `maxReceivedEmailsPerOrganization` total.
+
+Address endpoints also expose integration-linked fields:
+
+- `integrationSubscriptions` can be provided on create and update requests.
+- `integrations` is returned on address list/detail/create/update responses.
 
 ## List email addresses
 

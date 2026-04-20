@@ -102,6 +102,12 @@ const emailAddressFields: Array<ApiFieldSpec> = [
       "Parsed address metadata. May be an object, string, or null depending on what was stored.",
   },
   {
+    name: "integrations",
+    type: 'Array<{ id: string; provider: "telegram"; name: string; eventType: "email.received" }>',
+    description:
+      "Active integration subscriptions currently attached to this inbox.",
+  },
+  {
     name: "emailCount",
     type: "number",
     description: "Number of stored emails currently linked to the inbox.",
@@ -900,6 +906,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         "maxReceivedEmailCount": 25,
         "maxReceivedEmailAction": "rejectNew"
       },
+      "integrations": [
+        {
+          "id": "sub_telegram_456",
+          "provider": "telegram",
+          "name": "Ops Alerts",
+          "eventType": "email.received"
+        }
+      ],
       "emailCount": 3,
       "allowedFromDomains": ["github.com"],
       "blockedSenderDomains": ["spam.test"],
@@ -1034,6 +1048,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "localPart": "signup-test",
       "domain": "spinupmail.dev",
       "meta": null,
+      "integrations": [],
       "emailCount": 4,
       "allowedFromDomains": [],
       "blockedSenderDomains": [],
@@ -1057,11 +1072,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     method: "POST",
     path: "/api/email-addresses",
     purpose:
-      "Create a new inbox under the current organization with TTL, sender restrictions, and inbox size controls.",
+      "Create a new inbox under the current organization with TTL, sender restrictions, inbox size controls, and optional integration subscriptions.",
     successStatus: 200,
     notes: [
       "If the Worker sets FORCED_MAIL_PREFIX, the backend prepends <prefix>- to localPart before reserved-word checks, conflict checks, and persistence.",
       "GET /api/domains exposes the live maxReceivedEmailsPerAddress and maxReceivedEmailsPerOrganization values for client-side defaults and validation hints.",
+      "integrationSubscriptions currently supports only email.received and can be managed only by organization admins.",
     ],
     auth: {
       summary:
@@ -1106,6 +1122,15 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         required: false,
         description:
           "Domain to assign. Defaults to the first configured Worker domain.",
+      },
+      {
+        name: "integrationSubscriptions",
+        type: 'Array<{ integrationId: string; eventType: "email.received" }>',
+        required: false,
+        description:
+          "Optional integration subscriptions to attach to the inbox at create time.",
+        constraints:
+          "Only organization admins can set this field. Each entry must reference an active integration in the same organization.",
       },
       {
         name: "allowedFromDomains",
@@ -1190,6 +1215,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 400,
+        error:
+          "integrationSubscriptions must reference active integrations in the current organization",
+        when: "integrationSubscriptions includes an unknown, archived, or out-of-organization integration.",
+      },
+      {
+        status: 400,
         error: "allowedFromDomains contains invalid domain(s)",
         when: "One or more sender allowlist entries are not valid domain hostnames.",
       },
@@ -1216,6 +1247,11 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "localPart matches a reserved inbox keyword.",
       },
       {
+        status: 403,
+        error: "Only organization admins can manage integrations",
+        when: "integrationSubscriptions is provided by a non-admin member.",
+      },
+      {
         status: 409,
         error: "Address already exists",
         when: "Another address already uses the same normalized address.",
@@ -1235,6 +1271,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "localPart": "signup-test",
     "domain": "spinupmail.dev",
     "ttlMinutes": 120,
+    "integrationSubscriptions": [
+      {
+        "integrationId": "int_telegram_123",
+        "eventType": "email.received"
+      }
+    ],
     "allowedFromDomains": ["github.com", "example.com"],
     "blockedSenderDomains": ["spam.test"],
     "maxReceivedEmailCount": 25,
@@ -1252,6 +1294,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "maxReceivedEmailCount": 25,
     "maxReceivedEmailAction": "rejectNew"
   },
+  "integrations": [
+    {
+      "id": "sub_telegram_456",
+      "provider": "telegram",
+      "name": "Ops Alerts",
+      "eventType": "email.received"
+    }
+  ],
   "emailCount": 0,
   "allowedFromDomains": ["github.com", "example.com"],
   "blockedSenderDomains": ["spam.test"],
@@ -1324,6 +1374,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "allowedFromDomains": ["github.com"],
     "blockedSenderDomains": ["spam.test"]
   },
+  "integrations": [
+    {
+      "id": "sub_telegram_456",
+      "provider": "telegram",
+      "name": "Ops Alerts",
+      "eventType": "email.received"
+    }
+  ],
   "emailCount": 4,
   "allowedFromDomains": ["github.com"],
   "blockedSenderDomains": ["spam.test"],
@@ -1343,7 +1401,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     method: "PATCH",
     path: "/api/email-addresses/:id",
     purpose:
-      "Update an existing inbox, including renaming, TTL changes, and metadata-backed policy fields.",
+      "Update an existing inbox, including renaming, TTL changes, metadata-backed policy fields, and integration subscriptions.",
     successStatus: 200,
     auth: {
       summary:
@@ -1372,6 +1430,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "Set maxReceivedEmailCount to null to clear the stored inbox-size override from metadata. Runtime enforcement then falls back to the current MAX_RECEIVED_EMAILS_PER_ADDRESS default.",
       "Organization-wide inbound retention is still limited by MAX_RECEIVED_EMAILS_PER_ORGANIZATION even though that value is not stored on each address record.",
       "If the Worker sets FORCED_MAIL_PREFIX, localPart updates are stored with <prefix>- prepended on the backend.",
+      "When integrationSubscriptions is provided, existing email.received subscriptions are replaced with the new set.",
     ],
     bodyFields: [
       {
@@ -1402,6 +1461,15 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         type: "string",
         required: false,
         description: "New configured domain for the address.",
+      },
+      {
+        name: "integrationSubscriptions",
+        type: 'Array<{ integrationId: string; eventType: "email.received" }>',
+        required: false,
+        description:
+          "Replacement integration subscriptions for email.received events.",
+        constraints:
+          "Only organization admins can set this field. Each entry must reference an active integration in the same organization.",
       },
       {
         name: "allowedFromDomains",
@@ -1464,6 +1532,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         status: 400,
+        error:
+          "integrationSubscriptions must reference active integrations in the current organization",
+        when: "integrationSubscriptions includes an unknown, archived, or out-of-organization integration.",
+      },
+      {
+        status: 400,
         error: "allowedFromDomains contains invalid domain(s)",
         when: "One or more sender allowlist entries are not valid domain hostnames.",
       },
@@ -1484,6 +1558,11 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         when: "localPart matches a reserved inbox keyword.",
       },
       {
+        status: 403,
+        error: "Only organization admins can manage integrations",
+        when: "integrationSubscriptions is provided by a non-admin member.",
+      },
+      {
         status: 404,
         error: "address not found",
         when: "The requested address does not exist in the current organization.",
@@ -1500,6 +1579,12 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   -H "X-Org-Id: org_abc123" \\
   -d '{
     "ttlMinutes": null,
+    "integrationSubscriptions": [
+      {
+        "integrationId": "int_telegram_123",
+        "eventType": "email.received"
+      }
+    ],
     "allowedFromDomains": ["github.com"],
     "maxReceivedEmailCount": 50,
     "maxReceivedEmailAction": "cleanAll"
@@ -1514,6 +1599,14 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "maxReceivedEmailCount": 50,
     "maxReceivedEmailAction": "cleanAll"
   },
+  "integrations": [
+    {
+      "id": "sub_telegram_456",
+      "provider": "telegram",
+      "name": "Ops Alerts",
+      "eventType": "email.received"
+    }
+  ],
   "emailCount": 4,
   "allowedFromDomains": ["github.com"],
   "blockedSenderDomains": [],

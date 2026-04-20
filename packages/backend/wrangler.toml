@@ -38,8 +38,8 @@ binding = "R2_BUCKET"
 name = "EMAIL"
 
 [[queues.producers]]
-binding = "INTEGRATION_DISPATCH_QUEUE"
 queue = "spinupmail-integration-dispatches"
+binding = "spinupmail_integration_dispatches"
 
 [[queues.consumers]]
 queue = "spinupmail-integration-dispatches"

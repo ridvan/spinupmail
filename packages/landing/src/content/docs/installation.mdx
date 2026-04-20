@@ -63,6 +63,14 @@ Save the returned `bucket_name`. In `packages/backend/wrangler.toml`, keep the
 Worker binding as `R2_BUCKET` and set `bucket_name` to your real Cloudflare
 bucket name.
 
+### Create queue (integration dispatches)
+
+Create the queue used for integration dispatch jobs:
+
+```bash
+pnpm wrangler queues create spinupmail-integration-dispatches
+```
+
 ### Durable objects
 
 This project already includes the Durable Object binding and migration in
@@ -106,6 +114,7 @@ For local development, create `packages/backend/.dev.vars`:
 ```env
 BETTER_AUTH_BASE_URL="http://localhost:8787/api/auth"
 BETTER_AUTH_SECRET=""
+INTEGRATION_SECRET_ENCRYPTION_KEY=""
 CORS_ORIGIN="http://localhost:5173,http://127.0.0.1:5173"
 EXTENSION_REDIRECT_ORIGINS="https://<your-extension-id>.chromiumapp.org"
 RESEND_API_KEY=""
@@ -121,6 +130,7 @@ Set production secrets from `packages/backend`:
 ```bash
 pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
+pnpm exec wrangler secret put INTEGRATION_SECRET_ENCRYPTION_KEY
 pnpm exec wrangler secret put CORS_ORIGIN
 pnpm exec wrangler secret put RESEND_API_KEY
 pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
@@ -134,6 +144,7 @@ Use values like these:
 - `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
+- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>`
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be set in `wrangler.toml` under `[vars]`
