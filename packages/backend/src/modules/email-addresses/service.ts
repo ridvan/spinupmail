@@ -659,8 +659,6 @@ export const createEmailAddress = async ({
               ...buildInsertAddressSubscriptionsStatements({
                 db,
                 values: subscriptionValues,
-                organizationId,
-                addressId: id,
               }),
             ]);
 
@@ -1070,8 +1068,6 @@ export const updateEmailAddress = async ({
         ...buildInsertAddressSubscriptionsStatements({
           db,
           values: subscriptionValues,
-          organizationId,
-          addressId: existing.id,
         }),
       ]);
     }

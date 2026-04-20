@@ -128,7 +128,7 @@ describe("integration dispatch queue handler", () => {
         botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
       })
     );
-    mocks.markDispatchProcessing.mockResolvedValue(undefined);
+    mocks.markDispatchProcessing.mockResolvedValue(true);
     mocks.markDispatchSent.mockResolvedValue(undefined);
     mocks.markDispatchRetryScheduled.mockResolvedValue(undefined);
     mocks.markDispatchFailed.mockResolvedValue(undefined);
@@ -180,6 +180,25 @@ describe("integration dispatch queue handler", () => {
       db: {},
       id: "dispatch-1",
     });
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it("acks without delivering when another worker already claimed the dispatch", async () => {
+    const { message, ack, retry } = buildMessage();
+    mocks.markDispatchProcessing.mockResolvedValueOnce(false);
+
+    await handleIntegrationDispatchQueueBatch({
+      batch: buildBatch(message),
+      env: {
+        INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+          "base64"
+        ),
+      } as CloudflareBindings,
+    });
+
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.markDispatchSent).not.toHaveBeenCalled();
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });

@@ -381,8 +381,6 @@ export const syncAddressIntegrationSubscriptions = async ({
     ...buildInsertAddressSubscriptionsStatements({
       db,
       values,
-      organizationId,
-      addressId,
     }),
   ]);
 };
@@ -1164,12 +1162,16 @@ const processDispatchQueueMessage = async ({
   }
 
   const attemptCount = Math.max(1, Number(dispatch.attemptCount ?? 0) + 1);
-  await markDispatchProcessing({
+  const claimed = await markDispatchProcessing({
     db,
     id: dispatch.id,
     attemptCount,
     queueMessageId: message.id,
   });
+  if (!claimed) {
+    message.ack();
+    return;
+  }
 
   const startedAt = new Date();
   const adapter = getIntegrationAdapter(

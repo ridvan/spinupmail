@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   addressIntegrationSubscriptions,
   emailAddresses,
@@ -331,9 +331,15 @@ export const listAddressSubscriptionsByAddressIds = ({
         .from(addressIntegrationSubscriptions)
         .innerJoin(
           organizationIntegrations,
-          eq(
-            organizationIntegrations.id,
-            addressIntegrationSubscriptions.integrationId
+          and(
+            eq(
+              organizationIntegrations.id,
+              addressIntegrationSubscriptions.integrationId
+            ),
+            eq(
+              organizationIntegrations.organizationId,
+              addressIntegrationSubscriptions.organizationId
+            )
           )
         )
         .where(
@@ -401,13 +407,9 @@ export const insertAddressSubscriptions = ({
 export const buildInsertAddressSubscriptionsStatements = ({
   db,
   values,
-  organizationId,
-  addressId,
 }: {
   db: AppDb;
   values: (typeof addressIntegrationSubscriptions.$inferInsert)[];
-  organizationId: string;
-  addressId: string;
 }) =>
   values.map(value =>
     db.$client
@@ -445,8 +447,8 @@ export const buildInsertAddressSubscriptionsStatements = ({
         value.updatedAt instanceof Date
           ? value.updatedAt.getTime()
           : value.updatedAt,
-        organizationId,
-        addressId
+        value.organizationId,
+        value.addressId
       )
   );
 
@@ -509,9 +511,15 @@ export const listEnabledSubscriptionsForAddressAndEvent = ({
     .from(addressIntegrationSubscriptions)
     .innerJoin(
       organizationIntegrations,
-      eq(
-        organizationIntegrations.id,
-        addressIntegrationSubscriptions.integrationId
+      and(
+        eq(
+          organizationIntegrations.id,
+          addressIntegrationSubscriptions.integrationId
+        ),
+        eq(
+          organizationIntegrations.organizationId,
+          addressIntegrationSubscriptions.organizationId
+        )
       )
     )
     .where(
@@ -582,8 +590,17 @@ export const markDispatchProcessing = ({
       queueMessageId,
       updatedAt: new Date(),
     })
-    .where(eq(integrationDispatches.id, id))
-    .run();
+    .where(
+      and(
+        eq(integrationDispatches.id, id),
+        or(
+          eq(integrationDispatches.status, "pending"),
+          eq(integrationDispatches.status, "retry_scheduled")
+        )
+      )
+    )
+    .run()
+    .then(result => Number(result.meta.changes ?? 0) > 0);
 
 export const markDispatchSent = ({ db, id }: { db: AppDb; id: string }) =>
   db
@@ -749,8 +766,11 @@ export const listDispatchesByIntegrationAndOrganization = ({
   integrationId: string;
   page: number;
   pageSize: number;
-}) =>
-  db
+}) => {
+  const normalizedPage = Math.max(page, 1);
+  const normalizedPageSize = Math.max(pageSize, 1);
+
+  return db
     .select(integrationDispatchSelect)
     .from(integrationDispatches)
     .where(
@@ -763,8 +783,9 @@ export const listDispatchesByIntegrationAndOrganization = ({
       desc(integrationDispatches.createdAt),
       desc(integrationDispatches.id)
     )
-    .limit(pageSize)
-    .offset((page - 1) * pageSize);
+    .limit(normalizedPageSize)
+    .offset((normalizedPage - 1) * normalizedPageSize);
+};
 
 export const countDispatchesByIntegrationAndOrganization = ({
   db,
