@@ -179,10 +179,10 @@ export const buildInsertIntegrationStatement = ({
         : values.lastValidatedAt,
       values.createdAt instanceof Date
         ? values.createdAt.getTime()
-        : values.createdAt,
+        : (values.createdAt ?? Date.now()),
       values.updatedAt instanceof Date
         ? values.updatedAt.getTime()
-        : values.updatedAt
+        : (values.updatedAt ?? Date.now())
     );
 
 export const insertIntegrationSecret = ({

@@ -650,12 +650,6 @@ export const createEmailAddress = async ({
                 },
                 maxAddressesPerOrganization: addressLimit,
               }),
-            ]);
-
-            const created = Number(results[0]?.meta?.changes ?? 0) > 0;
-            if (!created) return false;
-
-            await db.$client.batch([
               buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
                 db,
                 organizationId,
@@ -668,7 +662,7 @@ export const createEmailAddress = async ({
               }),
             ]);
 
-            return true;
+            return Number(results[0]?.meta?.changes ?? 0) > 0;
           })();
     if (!created) {
       return {
@@ -1025,9 +1019,14 @@ export const updateEmailAddress = async ({
     }
   }
 
+  let refreshedNoChangeRow:
+    | Awaited<ReturnType<typeof findAddressByIdAndOrganization>>
+    | null
+    | undefined;
+
   try {
     if (integrationSubscriptionsValidation.subscriptions === undefined) {
-      await updateAddressByIdAndOrganization({
+      const updateResult = await updateAddressByIdAndOrganization({
         db,
         addressId: existing.id,
         organizationId,
@@ -1039,6 +1038,24 @@ export const updateEmailAddress = async ({
           expiresAt,
         },
       });
+
+      const updateChanges = Number(
+        (updateResult as { meta?: { changes?: number } } | undefined)?.meta
+          ?.changes ?? Number.NaN
+      );
+      if (Number.isFinite(updateChanges) && updateChanges === 0) {
+        refreshedNoChangeRow = await findAddressByIdAndOrganization(
+          db,
+          existing.id,
+          organizationId
+        );
+        if (!refreshedNoChangeRow) {
+          return {
+            status: 404 as const,
+            body: { error: "address not found" },
+          };
+        }
+      }
     } else {
       const subscriptionValues =
         integrationSubscriptionsValidation.subscriptions.map(subscription => ({
@@ -1065,22 +1082,31 @@ export const updateEmailAddress = async ({
             expiresAt,
           },
         }),
+        buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
+          db,
+          organizationId,
+          addressId: existing.id,
+          eventType: "email.received",
+        }),
+        ...buildInsertAddressSubscriptionsStatements({
+          db,
+          values: subscriptionValues,
+        }),
       ]);
 
       const updated = Number(results[0]?.meta?.changes ?? 0) > 0;
-      if (updated) {
-        await db.$client.batch([
-          buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement({
-            db,
-            organizationId,
-            addressId: existing.id,
-            eventType: "email.received",
-          }),
-          ...buildInsertAddressSubscriptionsStatements({
-            db,
-            values: subscriptionValues,
-          }),
-        ]);
+      if (!updated) {
+        refreshedNoChangeRow = await findAddressByIdAndOrganization(
+          db,
+          existing.id,
+          organizationId
+        );
+        if (!refreshedNoChangeRow) {
+          return {
+            status: 404 as const,
+            body: { error: "address not found" },
+          };
+        }
       }
     }
   } catch (error) {
@@ -1103,16 +1129,20 @@ export const updateEmailAddress = async ({
     addressIds: [existing.id],
   });
 
+  const responseAddress = refreshedNoChangeRow ?? {
+    ...existing,
+    address,
+    localPart,
+    domain: domainFromBody,
+    meta: metaForStorage,
+    expiresAt,
+  };
+
   return {
     status: 200 as const,
     body: toEmailAddressListItem({
-      ...existing,
-      address,
-      localPart,
-      domain: domainFromBody,
-      meta: metaForStorage,
+      ...responseAddress,
       integrations: integrationsByAddressId.get(existing.id) ?? [],
-      expiresAt,
     }),
   };
 };

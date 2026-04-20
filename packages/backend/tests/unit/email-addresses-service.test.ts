@@ -306,8 +306,7 @@ describe("email addresses service", () => {
   it("creates an address with integration subscriptions using a D1 batch", async () => {
     const batch = vi
       .fn()
-      .mockResolvedValueOnce([{ meta: { changes: 1 } }])
-      .mockResolvedValueOnce([{}, {}]);
+      .mockResolvedValueOnce([{ meta: { changes: 1 } }, {}, {}]);
     const db = { $client: { batch } };
 
     mocks.getDb.mockReturnValueOnce(db);
@@ -347,8 +346,9 @@ describe("email addresses service", () => {
     expect(
       mocks.buildInsertAddressSubscriptionsStatements
     ).toHaveBeenCalledTimes(1);
-    expect(batch).toHaveBeenNthCalledWith(1, ["insert-address-statement"]);
-    expect(batch).toHaveBeenNthCalledWith(2, [
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(batch).toHaveBeenCalledWith([
+      "insert-address-statement",
       "delete-subscriptions-statement",
       "insert-subscription-statement",
     ]);
@@ -356,7 +356,10 @@ describe("email addresses service", () => {
   });
 
   it("skips subscription writes when the address insert batch creates no row", async () => {
-    const batch = vi.fn().mockResolvedValueOnce([{ meta: { changes: 0 } }]);
+    const configuredLimit = 10;
+    const batch = vi
+      .fn()
+      .mockResolvedValueOnce([{ meta: { changes: 0 } }, {}, {}]);
     const db = { $client: { batch } };
 
     mocks.getDb.mockReturnValueOnce(db);
@@ -373,6 +376,7 @@ describe("email addresses service", () => {
     const result = await createEmailAddress({
       env: {
         EMAIL_DOMAINS: "spinupmail.com",
+        MAX_ADDRESSES_PER_ORGANIZATION: String(configuredLimit),
       } as CloudflareBindings,
       session,
       organizationId: "org-1",
@@ -391,17 +395,20 @@ describe("email addresses service", () => {
     expect(mocks.buildInsertAddressStatement).toHaveBeenCalledTimes(1);
     expect(
       mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledTimes(1);
     expect(
       mocks.buildInsertAddressSubscriptionsStatements
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledTimes(1);
     expect(batch).toHaveBeenCalledTimes(1);
-    expect(batch).toHaveBeenCalledWith(["insert-address-statement"]);
+    expect(batch).toHaveBeenCalledWith([
+      "insert-address-statement",
+      "delete-subscriptions-statement",
+      "insert-subscription-statement",
+    ]);
     expect(result).toEqual({
       status: 409,
       body: {
-        error:
-          "Address limit reached. Each organization can create up to 100 addresses.",
+        error: `Address limit reached. Each organization can create up to ${configuredLimit} addresses.`,
       },
     });
   });
@@ -895,8 +902,7 @@ describe("email addresses service", () => {
   it("updates an address with integration subscriptions using a D1 batch", async () => {
     const batch = vi
       .fn()
-      .mockResolvedValueOnce([{ meta: { changes: 1 } }])
-      .mockResolvedValueOnce([{}, {}]);
+      .mockResolvedValueOnce([{ meta: { changes: 1 } }, {}, {}]);
     const db = { $client: { batch } };
 
     mocks.getDb.mockReturnValueOnce(db);
@@ -948,8 +954,9 @@ describe("email addresses service", () => {
     expect(
       mocks.buildInsertAddressSubscriptionsStatements
     ).toHaveBeenCalledTimes(1);
-    expect(batch).toHaveBeenNthCalledWith(1, ["update-address-statement"]);
-    expect(batch).toHaveBeenNthCalledWith(2, [
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(batch).toHaveBeenCalledWith([
+      "update-address-statement",
       "delete-subscriptions-statement",
       "insert-subscription-statement",
     ]);
@@ -957,10 +964,23 @@ describe("email addresses service", () => {
   });
 
   it("skips subscription writes when the address update batch reports no changes", async () => {
-    const batch = vi.fn().mockResolvedValueOnce([{ meta: { changes: 0 } }]);
+    const batch = vi
+      .fn()
+      .mockResolvedValueOnce([{ meta: { changes: 0 } }, {}, {}]);
     const db = { $client: { batch } };
 
     mocks.getDb.mockReturnValueOnce(db);
+    mocks.findAddressByIdAndOrganization.mockResolvedValueOnce({
+      id: "address-1",
+      address: "project@spinupmail.com",
+      localPart: "project",
+      domain: "spinupmail.com",
+      meta: null,
+      emailCount: 2,
+      createdAt: new Date("2026-03-20T10:00:00.000Z"),
+      expiresAt: null,
+      lastReceivedAt: null,
+    });
     mocks.findAddressByIdAndOrganization.mockResolvedValueOnce({
       id: "address-1",
       address: "project@spinupmail.com",
@@ -1004,12 +1024,16 @@ describe("email addresses service", () => {
     ).toHaveBeenCalledTimes(1);
     expect(
       mocks.buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledTimes(1);
     expect(
       mocks.buildInsertAddressSubscriptionsStatements
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledTimes(1);
     expect(batch).toHaveBeenCalledTimes(1);
-    expect(batch).toHaveBeenCalledWith(["update-address-statement"]);
+    expect(batch).toHaveBeenCalledWith([
+      "update-address-statement",
+      "delete-subscriptions-statement",
+      "insert-subscription-statement",
+    ]);
     expect(result.status).toBe(200);
   });
 
