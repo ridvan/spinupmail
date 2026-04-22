@@ -533,7 +533,9 @@ export const validateIntegrationConnection = async ({
   const adapter = getIntegrationAdapter(body.provider);
 
   try {
-    const result = await adapter.validateConnection(body);
+    const result = await adapter.validateConnection(body, {
+      reason: "validate",
+    });
     return {
       status: 200 as const,
       body: {
@@ -607,7 +609,9 @@ export const createIntegration = async ({
   const adapter = getIntegrationAdapter(body.provider);
 
   try {
-    const validated = await adapter.validateConnection(body);
+    const validated = await adapter.validateConnection(body, {
+      reason: "create",
+    });
     const createdId = crypto.randomUUID();
     const publicConfigJson = JSON.stringify(validated.publicConfig);
     const encryptedConfigJson = await encryptSecret({

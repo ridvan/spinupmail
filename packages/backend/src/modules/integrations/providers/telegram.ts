@@ -15,6 +15,7 @@ import type {
   ClassifiedIntegrationFailure,
   EmailReceivedPayload,
   IntegrationAdapter,
+  ValidateIntegrationConnectionContext,
 } from "../types";
 
 const TELEGRAM_API_BASE_URL = "https://api.telegram.org";
@@ -330,7 +331,10 @@ const parseSecretConfig = (value: unknown) => {
 export const telegramIntegrationAdapter: IntegrationAdapter = {
   provider: "telegram",
   supportsEventType: eventType => eventType === "email.received",
-  validateConnection: async input => {
+  validateConnection: async (
+    input,
+    context?: ValidateIntegrationConnectionContext
+  ) => {
     const payload = parseTelegramValidateInput(input);
     const { name, config } = payload;
     const botToken = config.botToken.trim();
@@ -384,12 +388,17 @@ export const telegramIntegrationAdapter: IntegrationAdapter = {
       });
     }
 
+    const confirmationText =
+      context?.reason === "create"
+        ? `SpinupMail integration "${name}" has been saved to this organization.`
+        : `SpinupMail validation succeeded for "${name}".`;
+
     const sentMessage = await callTelegramApi<TelegramSendMessageResult>({
       botToken,
       method: "sendMessage",
       payload: {
         chat_id: chatId,
-        text: `SpinupMail validation succeeded for "${name}".`,
+        text: confirmationText,
         disable_notification: true,
       },
     });

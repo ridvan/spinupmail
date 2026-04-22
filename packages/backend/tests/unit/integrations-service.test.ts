@@ -151,6 +151,17 @@ describe("integrations service", () => {
       "insert-integration",
       "insert-integration-secret",
     ]);
+    expect(mocks.validateConnection).toHaveBeenCalledWith(
+      {
+        provider: "telegram",
+        name: "Ops bot",
+        config: {
+          botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
+          chatId: "-100123",
+        },
+      },
+      { reason: "create" }
+    );
     expect(result.status).toBe(201);
   });
 });
