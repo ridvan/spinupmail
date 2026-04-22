@@ -56,6 +56,11 @@ export type IntegrationAdapter = {
     input: unknown,
     context?: ValidateIntegrationConnectionContext
   ) => Promise<ValidateIntegrationConnectionResult>;
+  sendSavedNotification?: (input: {
+    name: string;
+    publicConfig: unknown;
+    secretConfig: unknown;
+  }) => Promise<void>;
   deliver: (input: {
     env: CloudflareBindings;
     payload: EmailReceivedPayload;

@@ -657,6 +657,18 @@ export const createIntegration = async ({
       throw new Error("Created integration not found");
     }
 
+    if (adapter.sendSavedNotification) {
+      try {
+        await adapter.sendSavedNotification({
+          name: body.name,
+          publicConfig: validated.publicConfig,
+          secretConfig: validated.secretConfig,
+        });
+      } catch {
+        // Save succeeds even if post-save confirmation fails.
+      }
+    }
+
     return {
       status: 201 as const,
       body: {

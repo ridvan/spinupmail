@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   buildInsertIntegrationSecretStatement: vi.fn(),
   encryptSecret: vi.fn(),
   validateConnection: vi.fn(),
+  sendSavedNotification: vi.fn(),
 }));
 
 vi.mock("@/platform/db/client", () => ({
@@ -59,6 +60,7 @@ vi.mock("@/shared/utils/encryption", () => ({
 vi.mock("@/modules/integrations/registry", () => ({
   getIntegrationAdapter: () => ({
     validateConnection: mocks.validateConnection,
+    sendSavedNotification: mocks.sendSavedNotification,
     deliver: vi.fn(),
     classifyFailure: vi.fn(),
     supportsEventType: () => true,
@@ -99,6 +101,7 @@ describe("integrations service", () => {
         botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
       },
     });
+    mocks.sendSavedNotification.mockResolvedValue(undefined);
     mocks.encryptSecret.mockResolvedValue("encrypted-config");
     mocks.buildInsertIntegrationStatement.mockReturnValue("insert-integration");
     mocks.buildInsertIntegrationSecretStatement.mockReturnValue(
@@ -162,6 +165,44 @@ describe("integrations service", () => {
       },
       { reason: "create" }
     );
+    expect(mocks.sendSavedNotification).toHaveBeenCalledWith({
+      name: "Ops bot",
+      publicConfig: {
+        telegramBotId: "101",
+        botUsername: "spinupmail_bot",
+        chatId: "-100123",
+        chatLabel: "Ops Room",
+      },
+      secretConfig: {
+        botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
+      },
+    });
+    expect(result.status).toBe(201);
+  });
+
+  it("returns success even when saved notification fails", async () => {
+    mocks.sendSavedNotification.mockRejectedValueOnce(
+      new Error("telegram notify failed")
+    );
+
+    const result = await createIntegration({
+      env: {
+        INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+          "base64"
+        ),
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      session,
+      payload: {
+        provider: "telegram",
+        name: "Ops bot",
+        config: {
+          botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
+          chatId: "-100123",
+        },
+      },
+    });
+
     expect(result.status).toBe(201);
   });
 });
