@@ -235,24 +235,14 @@ export const integrationDeliveryAttempts = sqliteTable(
       table.dispatchId,
       table.attemptNumber
     ),
+    index("integration_delivery_attempts_org_started_idx").on(
+      table.organizationId,
+      table.startedAt
+    ),
     index("integration_delivery_attempts_integration_started_idx").on(
       table.integrationId,
       table.startedAt
     ),
-    foreignKey({
-      columns: [table.organizationId, table.dispatchId],
-      foreignColumns: [
-        integrationDispatches.organizationId,
-        integrationDispatches.id,
-      ],
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.organizationId, table.integrationId],
-      foreignColumns: [
-        organizationIntegrations.organizationId,
-        organizationIntegrations.id,
-      ],
-    }).onDelete("cascade"),
   ]
 );
 

@@ -1,15 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
+  completeDeliveryAttempt: vi.fn(),
+  deleteDeliveryAttemptById: vi.fn(),
   findDispatchById: vi.fn(),
   findIntegrationByIdAndOrganization: vi.fn(),
   findActiveIntegrationSecret: vi.fn(),
-  insertDeliveryAttempt: vi.fn(),
+  findOldestDeliveryAttemptStartedAtByOrganizationSince: vi.fn(),
   markDispatchFailed: vi.fn(),
   markDispatchProcessing: vi.fn(),
   markDispatchRetryScheduled: vi.fn(),
   markDispatchSent: vi.fn(),
+  reserveDeliveryAttemptIfUnderOrganizationDailyLimit: vi.fn(),
   decryptSecret: vi.fn(),
   deliver: vi.fn(),
   classifyFailure: vi.fn(),
@@ -20,14 +23,19 @@ vi.mock("@/platform/db/client", () => ({
 }));
 
 vi.mock("@/modules/integrations/repo", () => ({
+  completeDeliveryAttempt: mocks.completeDeliveryAttempt,
+  deleteDeliveryAttemptById: mocks.deleteDeliveryAttemptById,
   findDispatchById: mocks.findDispatchById,
   findIntegrationByIdAndOrganization: mocks.findIntegrationByIdAndOrganization,
   findActiveIntegrationSecret: mocks.findActiveIntegrationSecret,
-  insertDeliveryAttempt: mocks.insertDeliveryAttempt,
+  findOldestDeliveryAttemptStartedAtByOrganizationSince:
+    mocks.findOldestDeliveryAttemptStartedAtByOrganizationSince,
   markDispatchFailed: mocks.markDispatchFailed,
   markDispatchProcessing: mocks.markDispatchProcessing,
   markDispatchRetryScheduled: mocks.markDispatchRetryScheduled,
   markDispatchSent: mocks.markDispatchSent,
+  reserveDeliveryAttemptIfUnderOrganizationDailyLimit:
+    mocks.reserveDeliveryAttemptIfUnderOrganizationDailyLimit,
 }));
 
 vi.mock("@/shared/utils/encryption", () => ({
@@ -81,6 +89,8 @@ const buildBatch = (message: Message): MessageBatch => ({
 describe("integration dispatch queue handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-19T12:00:00.000Z"));
     mocks.getDb.mockReturnValue({});
     mocks.findDispatchById.mockResolvedValue({
       id: "dispatch-1",
@@ -132,7 +142,16 @@ describe("integration dispatch queue handler", () => {
     mocks.markDispatchSent.mockResolvedValue(undefined);
     mocks.markDispatchRetryScheduled.mockResolvedValue(undefined);
     mocks.markDispatchFailed.mockResolvedValue(undefined);
-    mocks.insertDeliveryAttempt.mockResolvedValue(undefined);
+    mocks.completeDeliveryAttempt.mockResolvedValue(undefined);
+    mocks.deleteDeliveryAttemptById.mockResolvedValue(undefined);
+    mocks.findOldestDeliveryAttemptStartedAtByOrganizationSince.mockResolvedValue(
+      {
+        startedAt: new Date("2026-04-18T12:30:00.000Z"),
+      }
+    );
+    mocks.reserveDeliveryAttemptIfUnderOrganizationDailyLimit.mockResolvedValue(
+      true
+    );
     mocks.deliver.mockResolvedValue(undefined);
     mocks.classifyFailure.mockReturnValue({
       code: "telegram_rate_limited",
@@ -141,6 +160,10 @@ describe("integration dispatch queue handler", () => {
       retryAfterSeconds: 30,
       retryable: true,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("acks invalid payload messages", async () => {
@@ -175,7 +198,25 @@ describe("integration dispatch queue handler", () => {
       attemptCount: 1,
       queueMessageId: "queue-message-1",
     });
+    expect(
+      mocks.reserveDeliveryAttemptIfUnderOrganizationDailyLimit
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        maxAttempts: 100,
+        values: expect.objectContaining({
+          dispatchId: "dispatch-1",
+          outcome: "processing",
+        }),
+      })
+    );
     expect(mocks.deliver).toHaveBeenCalled();
+    expect(mocks.completeDeliveryAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        outcome: "sent",
+      })
+    );
     expect(mocks.markDispatchSent).toHaveBeenCalledWith({
       db: {},
       id: "dispatch-1",
@@ -199,8 +240,39 @@ describe("integration dispatch queue handler", () => {
 
     expect(mocks.deliver).not.toHaveBeenCalled();
     expect(mocks.markDispatchSent).not.toHaveBeenCalled();
+    expect(mocks.deleteDeliveryAttemptById).toHaveBeenCalledTimes(1);
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
+  });
+
+  it("keeps dispatches scheduled when the organization daily limit is reached", async () => {
+    const { message, ack, retry } = buildMessage();
+    mocks.reserveDeliveryAttemptIfUnderOrganizationDailyLimit.mockResolvedValueOnce(
+      false
+    );
+
+    await handleIntegrationDispatchQueueBatch({
+      batch: buildBatch(message),
+      env: {
+        INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+          "base64"
+        ),
+      } as CloudflareBindings,
+    });
+
+    expect(mocks.markDispatchProcessing).not.toHaveBeenCalled();
+    expect(mocks.deliver).not.toHaveBeenCalled();
+    expect(mocks.markDispatchRetryScheduled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        id: "dispatch-1",
+        lastError: "Organization reached the daily integration dispatch limit",
+        lastErrorCode: "organization_daily_dispatch_limit_reached",
+        nextAttemptAt: new Date("2026-04-19T12:30:01.000Z"),
+      })
+    );
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: 1801 });
+    expect(ack).not.toHaveBeenCalled();
   });
 
   it("schedules retry for retryable failures", async () => {
@@ -220,6 +292,14 @@ describe("integration dispatch queue handler", () => {
     });
 
     expect(mocks.markDispatchRetryScheduled).toHaveBeenCalled();
+    expect(mocks.completeDeliveryAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        outcome: "failed",
+        error: "Too Many Requests",
+        errorCode: "telegram_rate_limited",
+      })
+    );
     expect(retry).toHaveBeenCalledWith({ delaySeconds: 900 });
     expect(ack).not.toHaveBeenCalled();
   });
@@ -254,6 +334,14 @@ describe("integration dispatch queue handler", () => {
         lastErrorStatus: 400,
       })
     );
+    expect(mocks.completeDeliveryAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        db: {},
+        outcome: "failed",
+        error: "Bad Request",
+        errorCode: "telegram_bad_request",
+      })
+    );
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });
@@ -278,15 +366,12 @@ describe("integration dispatch queue handler", () => {
     });
 
     expect(mocks.deliver).not.toHaveBeenCalled();
-    expect(mocks.insertDeliveryAttempt).toHaveBeenCalledWith(
+    expect(mocks.completeDeliveryAttempt).toHaveBeenCalledWith(
       expect.objectContaining({
         db: {},
-        values: expect.objectContaining({
-          dispatchId: "dispatch-1",
-          outcome: "failed",
-          error: "Stored integration public config is invalid",
-          errorCode: "integration_public_config_invalid",
-        }),
+        outcome: "failed",
+        error: "Stored integration public config is invalid",
+        errorCode: "integration_public_config_invalid",
       })
     );
     expect(mocks.markDispatchFailed).toHaveBeenCalledWith(

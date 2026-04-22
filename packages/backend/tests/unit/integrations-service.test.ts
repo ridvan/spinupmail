@@ -29,15 +29,17 @@ vi.mock("@/modules/integrations/repo", () => ({
   buildInsertIntegrationStatement: mocks.buildInsertIntegrationStatement,
   buildInsertIntegrationSecretStatement:
     mocks.buildInsertIntegrationSecretStatement,
+  completeDeliveryAttempt: vi.fn(),
   countDispatchesByIntegrationAndOrganization: vi.fn(),
   countEnabledSubscriptionsForIntegration: vi.fn(),
+  deleteDeliveryAttemptById: vi.fn(),
   deleteIntegrationByIdAndOrganization: vi.fn(),
   findActiveIntegrationSecret: vi.fn(),
   findDispatchById: vi.fn(),
   findDispatchByIdIntegrationAndOrganization: vi.fn(),
+  findOldestDeliveryAttemptStartedAtByOrganizationSince: vi.fn(),
   findEmailReceivedSourceById: vi.fn(),
   findIntegrationsByIdsAndOrganization: vi.fn(),
-  insertDeliveryAttempt: vi.fn(),
   insertIntegrationDispatch: vi.fn(),
   listAddressSubscriptionsByAddressIds: vi.fn(),
   listDispatchesByIntegrationAndOrganization: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock("@/modules/integrations/repo", () => ({
   markDispatchProcessing: vi.fn(),
   markDispatchRetryScheduled: vi.fn(),
   markDispatchSent: vi.fn(),
+  reserveDeliveryAttemptIfUnderOrganizationDailyLimit: vi.fn(),
   restoreDispatchAfterReplayEnqueueFailure: vi.fn(),
   buildDeleteAddressSubscriptionsByAddressAndEventTypeStatement: vi.fn(),
   buildInsertAddressSubscriptionsStatements: vi.fn(),
@@ -259,5 +262,36 @@ describe("integrations service", () => {
     expect(result.status).toBe(201);
     expect(waitUntil).toHaveBeenCalledTimes(1);
     resolveNotification?.();
+  });
+
+  it("uses the env-backed integration cap when creating integrations", async () => {
+    mocks.countIntegrationsByOrganization.mockResolvedValueOnce({ count: 1 });
+
+    const result = await createIntegration({
+      env: {
+        INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+          "base64"
+        ),
+        MAX_INTEGRATIONS_PER_ORGANIZATION: "1",
+      } as CloudflareBindings,
+      organizationId: "org-1",
+      session,
+      payload: {
+        provider: "telegram",
+        name: "Ops bot",
+        config: {
+          botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
+          chatId: "-100123",
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      status: 409,
+      body: {
+        error: "Each organization can have at most 1 integrations",
+      },
+    });
+    expect(mocks.validateConnection).not.toHaveBeenCalled();
   });
 });

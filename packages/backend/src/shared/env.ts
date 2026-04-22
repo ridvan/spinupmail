@@ -19,6 +19,8 @@ export const normalizeOrigin = (value: string) => {
 const MAX_ADDRESSES_PER_ORGANIZATION_DEFAULT = 100;
 const MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT = 1_000;
 const MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT = 100;
+const MAX_INTEGRATIONS_PER_ORGANIZATION_DEFAULT = 3;
+const MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY_DEFAULT = 100;
 const CLOUDFLARE_KV_MINIMUM_TTL_SECONDS = 60;
 const API_KEY_RATE_LIMIT_WINDOW_DEFAULT = 60;
 const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
@@ -98,6 +100,20 @@ export const getMaxAddressesPerOrganization = (env: CloudflareBindings) => {
   return parsed;
 };
 
+export const getMaxIntegrationsPerOrganization = (
+  env?: Pick<CloudflareBindings, "MAX_INTEGRATIONS_PER_ORGANIZATION">
+) => {
+  const rawLimit = env?.MAX_INTEGRATIONS_PER_ORGANIZATION?.trim();
+  if (!rawLimit) return MAX_INTEGRATIONS_PER_ORGANIZATION_DEFAULT;
+
+  const parsed = Number(rawLimit);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return MAX_INTEGRATIONS_PER_ORGANIZATION_DEFAULT;
+  }
+
+  return parsed;
+};
+
 export const getMaxReceivedEmailsPerOrganization = (
   env: Pick<CloudflareBindings, "MAX_RECEIVED_EMAILS_PER_ORGANIZATION">
 ) => {
@@ -107,6 +123,26 @@ export const getMaxReceivedEmailsPerOrganization = (
   const parsed = Number(rawLimit);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT;
+  }
+
+  return parsed;
+};
+
+export const getMaxIntegrationDispatchesPerOrganizationPerDay = (
+  env?: Pick<
+    CloudflareBindings,
+    "MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY"
+  >
+) => {
+  const rawLimit =
+    env?.MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY?.trim();
+  if (!rawLimit) {
+    return MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY_DEFAULT;
+  }
+
+  const parsed = Number(rawLimit);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY_DEFAULT;
   }
 
   return parsed;

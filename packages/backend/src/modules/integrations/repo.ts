@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import {
   addressIntegrationSubscriptions,
   emailAddresses,
@@ -753,6 +753,135 @@ export const insertDeliveryAttempt = ({
   db: AppDb;
   values: typeof integrationDeliveryAttempts.$inferInsert;
 }) => db.insert(integrationDeliveryAttempts).values(values).run();
+
+export const reserveDeliveryAttemptIfUnderOrganizationDailyLimit = ({
+  db,
+  values,
+  startedAfter,
+  maxAttempts,
+}: {
+  db: AppDb;
+  values: typeof integrationDeliveryAttempts.$inferInsert;
+  startedAfter: Date;
+  maxAttempts: number;
+}) =>
+  db.$client
+    .prepare(
+      `
+      INSERT INTO integration_delivery_attempts (
+        id,
+        dispatch_id,
+        organization_id,
+        integration_id,
+        attempt_number,
+        outcome,
+        error,
+        error_code,
+        error_status,
+        error_retry_after_seconds,
+        started_at,
+        completed_at
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE (
+        SELECT count(*)
+        FROM integration_delivery_attempts
+        WHERE organization_id = ?
+          AND started_at >= ?
+      ) < ?
+    `
+    )
+    .bind(
+      values.id,
+      values.dispatchId,
+      values.organizationId,
+      values.integrationId,
+      values.attemptNumber,
+      values.outcome,
+      values.error ?? null,
+      values.errorCode ?? null,
+      values.errorStatus ?? null,
+      values.errorRetryAfterSeconds ?? null,
+      values.startedAt instanceof Date
+        ? values.startedAt.getTime()
+        : values.startedAt,
+      values.completedAt instanceof Date
+        ? values.completedAt.getTime()
+        : (values.completedAt ?? null),
+      values.organizationId,
+      startedAfter.getTime(),
+      maxAttempts
+    )
+    .run()
+    .then(result => Number(result.meta.changes ?? 0) > 0);
+
+export const completeDeliveryAttempt = ({
+  db,
+  id,
+  outcome,
+  error,
+  errorCode,
+  errorStatus,
+  errorRetryAfterSeconds,
+  completedAt,
+}: {
+  db: AppDb;
+  id: string;
+  outcome: string;
+  error?: string | null;
+  errorCode?: string | null;
+  errorStatus?: number | null;
+  errorRetryAfterSeconds?: number | null;
+  completedAt: Date;
+}) =>
+  db
+    .update(integrationDeliveryAttempts)
+    .set({
+      outcome,
+      error: error ?? null,
+      errorCode: errorCode ?? null,
+      errorStatus: errorStatus ?? null,
+      errorRetryAfterSeconds: errorRetryAfterSeconds ?? null,
+      completedAt,
+    })
+    .where(eq(integrationDeliveryAttempts.id, id))
+    .run();
+
+export const deleteDeliveryAttemptById = ({
+  db,
+  id,
+}: {
+  db: AppDb;
+  id: string;
+}) =>
+  db
+    .delete(integrationDeliveryAttempts)
+    .where(eq(integrationDeliveryAttempts.id, id))
+    .run();
+
+export const findOldestDeliveryAttemptStartedAtByOrganizationSince = ({
+  db,
+  organizationId,
+  startedAfter,
+}: {
+  db: AppDb;
+  organizationId: string;
+  startedAfter: Date;
+}) =>
+  db
+    .select({
+      startedAt: integrationDeliveryAttempts.startedAt,
+    })
+    .from(integrationDeliveryAttempts)
+    .where(
+      and(
+        eq(integrationDeliveryAttempts.organizationId, organizationId),
+        gte(integrationDeliveryAttempts.startedAt, startedAfter)
+      )
+    )
+    .orderBy(integrationDeliveryAttempts.startedAt)
+    .limit(1)
+    .get();
 
 export const listDispatchesByIntegrationAndOrganization = ({
   db,

@@ -1,7 +1,6 @@
 import {
   createIntegrationRequestSchema,
   deleteIntegrationResponseSchema,
-  INTEGRATION_MAX_PER_ORGANIZATION,
   listIntegrationDispatchesParamsSchema,
   telegramIntegrationPublicConfigSchema,
   type AddressIntegration,
@@ -19,6 +18,8 @@ import {
   isOrganizationAdminRole,
 } from "@/modules/organizations/access";
 import {
+  getMaxIntegrationDispatchesPerOrganizationPerDay,
+  getMaxIntegrationsPerOrganization,
   getIntegrationQueueRetryConfig,
   getIntegrationSecretEncryptionKey,
 } from "@/shared/env";
@@ -39,17 +40,19 @@ import {
   buildInsertAddressSubscriptionsStatements,
   buildInsertIntegrationSecretStatement,
   buildInsertIntegrationStatement,
+  completeDeliveryAttempt,
   countIntegrationsByOrganization,
   countDispatchesByIntegrationAndOrganization,
+  deleteDeliveryAttemptById,
   countEnabledSubscriptionsForIntegration,
   deleteIntegrationByIdAndOrganization,
   findActiveIntegrationSecret,
   findDispatchById,
   findDispatchByIdIntegrationAndOrganization,
+  findOldestDeliveryAttemptStartedAtByOrganizationSince,
   findEmailReceivedSourceById,
   findIntegrationByIdAndOrganization,
   findIntegrationsByIdsAndOrganization,
-  insertDeliveryAttempt,
   insertIntegrationDispatch,
   listAddressSubscriptionsByAddressIds,
   listDispatchesByIntegrationAndOrganization,
@@ -60,12 +63,14 @@ import {
   markDispatchProcessing,
   markDispatchRetryScheduled,
   markDispatchSent,
+  reserveDeliveryAttemptIfUnderOrganizationDailyLimit,
   restoreDispatchAfterReplayEnqueueFailure,
 } from "./repo";
 
 const INTEGRATION_DISPATCH_PAGE_DEFAULT = 1;
 const INTEGRATION_DISPATCH_PAGE_SIZE_DEFAULT = 5;
 const INTEGRATION_DISPATCH_PAGE_SIZE_MAX = 100;
+const INTEGRATION_DAILY_DISPATCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TERMINAL_STATUSES = new Set<IntegrationDispatchStatus>([
   "sent",
   "failed_permanent",
@@ -308,6 +313,21 @@ const buildRetryDelaySeconds = (
     config.maxDelaySeconds,
     exponentialDelaySeconds + jitterSeconds
   );
+};
+
+const buildDailyDispatchLimitDelaySeconds = ({
+  now,
+  oldestStartedAt,
+}: {
+  now: Date;
+  oldestStartedAt: Date | null | undefined;
+}) => {
+  if (!oldestStartedAt) return 60;
+
+  const retryAtMs =
+    oldestStartedAt.getTime() + INTEGRATION_DAILY_DISPATCH_WINDOW_MS + 1000;
+
+  return Math.max(1, Math.ceil((retryAtMs - now.getTime()) / 1000));
 };
 
 const hasExceededRetryWindow = ({
@@ -590,13 +610,12 @@ export const createIntegration = async ({
     db: adminCheck.db,
     organizationId,
   });
-  if (
-    Number(integrationCount?.count ?? 0) >= INTEGRATION_MAX_PER_ORGANIZATION
-  ) {
+  const maxIntegrationsPerOrganization = getMaxIntegrationsPerOrganization(env);
+  if (Number(integrationCount?.count ?? 0) >= maxIntegrationsPerOrganization) {
     return {
       status: 409 as const,
       body: {
-        error: `Each organization can have at most ${INTEGRATION_MAX_PER_ORGANIZATION} integrations`,
+        error: `Each organization can have at most ${maxIntegrationsPerOrganization} integrations`,
       },
     };
   }
@@ -1192,6 +1211,49 @@ const processDispatchQueueMessage = async ({
   }
 
   const attemptCount = Math.max(1, Number(dispatch.attemptCount ?? 0) + 1);
+  const startedAt = new Date();
+  const dailyDispatchWindowStart = new Date(
+    startedAt.getTime() - INTEGRATION_DAILY_DISPATCH_WINDOW_MS
+  );
+  const deliveryAttemptId = crypto.randomUUID();
+  const reservedDeliveryAttempt =
+    await reserveDeliveryAttemptIfUnderOrganizationDailyLimit({
+      db,
+      values: {
+        id: deliveryAttemptId,
+        dispatchId: dispatch.id,
+        organizationId: dispatch.organizationId,
+        integrationId: dispatch.integrationId,
+        attemptNumber: attemptCount,
+        outcome: "processing",
+        startedAt,
+      },
+      startedAfter: dailyDispatchWindowStart,
+      maxAttempts: getMaxIntegrationDispatchesPerOrganizationPerDay(env),
+    });
+
+  if (!reservedDeliveryAttempt) {
+    const oldestAttempt =
+      await findOldestDeliveryAttemptStartedAtByOrganizationSince({
+        db,
+        organizationId: dispatch.organizationId,
+        startedAfter: dailyDispatchWindowStart,
+      });
+    const delaySeconds = buildDailyDispatchLimitDelaySeconds({
+      now: startedAt,
+      oldestStartedAt: oldestAttempt?.startedAt,
+    });
+    await markDispatchRetryScheduled({
+      db,
+      id: dispatch.id,
+      nextAttemptAt: new Date(startedAt.getTime() + delaySeconds * 1000),
+      lastError: "Organization reached the daily integration dispatch limit",
+      lastErrorCode: "organization_daily_dispatch_limit_reached",
+    });
+    message.retry({ delaySeconds });
+    return;
+  }
+
   const claimed = await markDispatchProcessing({
     db,
     id: dispatch.id,
@@ -1199,11 +1261,13 @@ const processDispatchQueueMessage = async ({
     queueMessageId: message.id,
   });
   if (!claimed) {
+    await deleteDeliveryAttemptById({
+      db,
+      id: deliveryAttemptId,
+    });
     message.ack();
     return;
   }
-
-  const startedAt = new Date();
   const adapter = getIntegrationAdapter(
     integration.provider as IntegrationProvider
   );
@@ -1255,18 +1319,11 @@ const processDispatchQueueMessage = async ({
       secretConfig,
     });
 
-    await insertDeliveryAttempt({
+    await completeDeliveryAttempt({
       db,
-      values: {
-        id: crypto.randomUUID(),
-        dispatchId: dispatch.id,
-        organizationId: dispatch.organizationId,
-        integrationId: dispatch.integrationId,
-        attemptNumber: attemptCount,
-        outcome: "sent",
-        startedAt,
-        completedAt: new Date(),
-      },
+      id: deliveryAttemptId,
+      outcome: "sent",
+      completedAt: new Date(),
     });
     await markDispatchSent({
       db,
@@ -1276,22 +1333,15 @@ const processDispatchQueueMessage = async ({
   } catch (error) {
     const failure = classifyIntegrationDispatchFailure({ adapter, error });
 
-    await insertDeliveryAttempt({
+    await completeDeliveryAttempt({
       db,
-      values: {
-        id: crypto.randomUUID(),
-        dispatchId: dispatch.id,
-        organizationId: dispatch.organizationId,
-        integrationId: dispatch.integrationId,
-        attemptNumber: attemptCount,
-        outcome: "failed",
-        error: failure.message,
-        errorCode: failure.code,
-        errorStatus: failure.status,
-        errorRetryAfterSeconds: failure.retryAfterSeconds,
-        startedAt,
-        completedAt: new Date(),
-      },
+      id: deliveryAttemptId,
+      outcome: "failed",
+      error: failure.message,
+      errorCode: failure.code,
+      errorStatus: failure.status,
+      errorRetryAfterSeconds: failure.retryAfterSeconds,
+      completedAt: new Date(),
     });
 
     const exceededWindow = hasExceededRetryWindow({

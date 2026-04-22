@@ -5,6 +5,8 @@ import {
   getAllowedDomains,
   getExtensionRedirectOrigins,
   getForcedMailPrefix,
+  getMaxIntegrationDispatchesPerOrganizationPerDay,
+  getMaxIntegrationsPerOrganization,
   getIntegrationQueueRetryConfig,
   getIntegrationSecretEncryptionKey,
   getMaxTotalAttachmentStoragePerOrganization,
@@ -136,6 +138,56 @@ describe("shared env helpers", () => {
       } as CloudflareBindings)
     ).toBe(100);
     expect(getMaxAddressesPerOrganization({} as CloudflareBindings)).toBe(100);
+  });
+
+  it("parses max integrations per organization and falls back to default", () => {
+    expect(
+      getMaxIntegrationsPerOrganization({
+        MAX_INTEGRATIONS_PER_ORGANIZATION: "5",
+      } as CloudflareBindings)
+    ).toBe(5);
+    expect(
+      getMaxIntegrationsPerOrganization({
+        MAX_INTEGRATIONS_PER_ORGANIZATION: "1.5",
+      } as CloudflareBindings)
+    ).toBe(3);
+    expect(
+      getMaxIntegrationsPerOrganization({
+        MAX_INTEGRATIONS_PER_ORGANIZATION: "0",
+      } as CloudflareBindings)
+    ).toBe(3);
+    expect(
+      getMaxIntegrationsPerOrganization({
+        MAX_INTEGRATIONS_PER_ORGANIZATION: "invalid",
+      } as CloudflareBindings)
+    ).toBe(3);
+    expect(getMaxIntegrationsPerOrganization({} as CloudflareBindings)).toBe(3);
+  });
+
+  it("parses max integration dispatches per organization per day and falls back to default", () => {
+    expect(
+      getMaxIntegrationDispatchesPerOrganizationPerDay({
+        MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY: "250",
+      } as CloudflareBindings)
+    ).toBe(250);
+    expect(
+      getMaxIntegrationDispatchesPerOrganizationPerDay({
+        MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY: "1.5",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxIntegrationDispatchesPerOrganizationPerDay({
+        MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY: "0",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxIntegrationDispatchesPerOrganizationPerDay({
+        MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY: "invalid",
+      } as CloudflareBindings)
+    ).toBe(100);
+    expect(
+      getMaxIntegrationDispatchesPerOrganizationPerDay({} as CloudflareBindings)
+    ).toBe(100);
   });
 
   it("parses max total attachment storage per organization and falls back to default", () => {

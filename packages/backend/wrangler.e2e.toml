@@ -48,6 +48,8 @@ dead_letter_queue = "spinupmail-e2e-integration-dispatches-dlq"
 [vars]
 EMAIL_DOMAINS = "spinupmail.com,spinupmail.dev"
 MAX_ADDRESSES_PER_ORGANIZATION = "100"
+MAX_INTEGRATIONS_PER_ORGANIZATION = "3"
+MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY = "100"
 RESEND_FROM_EMAIL = "Spinupmail <verify@spinupmail.com>"
 EMAIL_MAX_BYTES = "10485760"
 EMAIL_BODY_MAX_BYTES = "524288"
