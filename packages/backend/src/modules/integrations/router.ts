@@ -83,6 +83,7 @@ export const createIntegrationsRouter = () => {
         organizationId: c.get("organizationId"),
         session: c.get("session"),
         payload: c.req.valid("json"),
+        executionContext: c.executionCtx,
       });
 
       return c.json(

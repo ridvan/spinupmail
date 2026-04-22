@@ -11,6 +11,7 @@ import {
   type ValidateIntegrationConnectionRequest,
   validateIntegrationConnectionRequestSchema,
 } from "@spinupmail/contracts";
+import type { ExecutionContext } from "@cloudflare/workers-types";
 import { getDb } from "@/platform/db/client";
 import type { AppDb } from "@/platform/db/client";
 import {
@@ -562,11 +563,13 @@ export const createIntegration = async ({
   organizationId,
   session,
   payload,
+  executionContext,
 }: {
   env: CloudflareBindings;
   organizationId: string;
   session: AppHonoEnv["Variables"]["session"];
   payload: unknown;
+  executionContext?: ExecutionContext;
 }) => {
   const adminCheck = await requireOrganizationAdmin({
     env,
@@ -658,14 +661,25 @@ export const createIntegration = async ({
     }
 
     if (adapter.sendSavedNotification) {
-      try {
-        await adapter.sendSavedNotification({
+      const notificationPromise = adapter
+        .sendSavedNotification({
           name: body.name,
           publicConfig: validated.publicConfig,
           secretConfig: validated.secretConfig,
+        })
+        .catch(error => {
+          console.warn("[integrations] Failed to send post-save notification", {
+            organizationId,
+            provider: body.provider,
+            integrationName: body.name,
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
-      } catch {
-        // Save succeeds even if post-save confirmation fails.
+
+      if (executionContext) {
+        executionContext.waitUntil(notificationPromise);
+      } else {
+        void notificationPromise;
       }
     }
 

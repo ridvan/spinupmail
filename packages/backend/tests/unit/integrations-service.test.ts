@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExecutionContext } from "@cloudflare/workers-types";
 
 const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
@@ -181,6 +182,7 @@ describe("integrations service", () => {
   });
 
   it("returns success even when saved notification fails", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.sendSavedNotification.mockRejectedValueOnce(
       new Error("telegram notify failed")
     );
@@ -204,5 +206,58 @@ describe("integrations service", () => {
     });
 
     expect(result.status).toBe(201);
+    await Promise.resolve();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[integrations] Failed to send post-save notification",
+      expect.objectContaining({
+        organizationId: "org-1",
+        provider: "telegram",
+        integrationName: "Ops bot",
+        error: "telegram notify failed",
+      })
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("schedules saved notification using execution context", async () => {
+    let resolveNotification: (() => void) | null = null;
+    mocks.sendSavedNotification.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          resolveNotification = resolve;
+        })
+    );
+
+    const waitUntil = vi.fn();
+    const result = await Promise.race([
+      createIntegration({
+        env: {
+          INTEGRATION_SECRET_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString(
+            "base64"
+          ),
+        } as CloudflareBindings,
+        organizationId: "org-1",
+        session,
+        payload: {
+          provider: "telegram",
+          name: "Ops bot",
+          config: {
+            botToken: "123456:ABCdefGhIJKlmNoPQRsTuvWXyz_123456789",
+            chatId: "-100123",
+          },
+        },
+        executionContext: {
+          waitUntil,
+          passThroughOnException: vi.fn(),
+        } as unknown as ExecutionContext,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("createIntegration timed out")), 50);
+      }),
+    ]);
+
+    expect(result.status).toBe(201);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    resolveNotification?.();
   });
 });
