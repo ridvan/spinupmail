@@ -98,10 +98,7 @@ export const OrganizationInvitationsCard = ({
 
   if (isLoading && !canManage) {
     return (
-      <OrganizationSettingsPanel
-        badge={<Skeleton className="h-5 w-20 rounded-full" />}
-        contentClassName="space-y-4"
-      >
+      <OrganizationSettingsPanel contentClassName="space-y-4">
         <div className="max-w-xl">
           <div className="grid gap-x-3 gap-y-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto]">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

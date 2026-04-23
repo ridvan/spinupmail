@@ -509,7 +509,9 @@ describe("OrganizationSettingsPage", () => {
     expect(
       screen.getByRole("tab", { name: "Members", selected: true })
     ).toBeTruthy();
-    expect(document.getElementById("organization-members")).toBeTruthy();
+    expect(
+      document.querySelector("[data-section-id='organization-members']")
+    ).toBeTruthy();
 
     await user.click(screen.getByRole("tab", { name: "Invitations" }));
 
@@ -517,7 +519,9 @@ describe("OrganizationSettingsPage", () => {
       screen.getByRole("tab", { name: "Invitations", selected: true })
     ).toBeTruthy();
     expect(router.state.location.hash).toBe("#organization-invitations");
-    expect(document.getElementById("organization-invitations")).toBeTruthy();
+    expect(
+      document.querySelector("[data-section-id='organization-invitations']")
+    ).toBeTruthy();
   });
 
   it("shows integration placeholders without required errors on initial render", () => {

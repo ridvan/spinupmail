@@ -39,9 +39,7 @@ export const OrganizationMembersCard = ({
 }: OrganizationMembersCardProps) => {
   if (isLoading) {
     return (
-      <OrganizationSettingsPanel
-        badge={<Skeleton className="h-5 w-8 rounded-full" />}
-      >
+      <OrganizationSettingsPanel>
         <Table>
           <TableHeader>
             <TableRow>
