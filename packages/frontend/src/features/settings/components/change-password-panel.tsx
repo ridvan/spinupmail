@@ -389,7 +389,7 @@ export const ChangePasswordPanel = ({
                     }
                   >
                     {changePasswordMutation.isPending ? (
-                      <Spinner data-icon="inline-start" />
+                      <Spinner aria-hidden="true" data-icon="inline-start" />
                     ) : null}
                     <TextMorph>
                       {changePasswordMutation.isPending

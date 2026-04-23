@@ -414,7 +414,7 @@ export const TwoFactorPanel = ({
                   type="submit"
                 >
                   {enableTwoFactorMutation.isPending ? (
-                    <Spinner data-icon="inline-start" />
+                    <Spinner aria-hidden="true" data-icon="inline-start" />
                   ) : null}
                   <TextMorph>
                     {enableTwoFactorMutation.isPending
@@ -541,7 +541,7 @@ export const TwoFactorPanel = ({
                   type="submit"
                 >
                   {verifyTwoFactorMutation.isPending ? (
-                    <Spinner data-icon="inline-start" />
+                    <Spinner aria-hidden="true" data-icon="inline-start" />
                   ) : null}
                   <TextMorph>
                     {verifyTwoFactorMutation.isPending
@@ -608,7 +608,7 @@ export const TwoFactorPanel = ({
                 variant="outline"
               >
                 {regenerateBackupCodesMutation.isPending ? (
-                  <Spinner data-icon="inline-start" />
+                  <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : null}
                 <TextMorph>
                   {regenerateBackupCodesMutation.isPending
@@ -671,7 +671,7 @@ export const TwoFactorPanel = ({
                 variant="destructive"
               >
                 {disableTwoFactorMutation.isPending ? (
-                  <Spinner data-icon="inline-start" />
+                  <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : null}
                 <TextMorph>
                   {disableTwoFactorMutation.isPending

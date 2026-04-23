@@ -50,23 +50,26 @@ const useLiveTime = (timeZone: string) => {
 
 export const UserProfileTimezoneSection = ({
   effectiveTimeZone,
+  previewTimeZone,
   source,
   manualTimezoneField,
   timezoneField,
 }: {
   effectiveTimeZone: string;
+  previewTimeZone?: string;
   source: TimeZoneSource;
   manualTimezoneField: React.ReactNode;
   timezoneField: React.ReactNode;
 }) => {
-  const liveTime = useLiveTime(effectiveTimeZone);
+  const activeTimeZone = previewTimeZone ?? effectiveTimeZone;
+  const liveTime = useLiveTime(activeTimeZone);
 
   return (
     <div className="space-y-3 pt-1">
       <FieldLabel className="flex items-center gap-1.5">Timezone</FieldLabel>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{effectiveTimeZone}</Badge>
+        <Badge variant="secondary">{activeTimeZone}</Badge>
         <Badge variant="outline">{describeSource(source)}</Badge>
       </div>
       <div className="flex flex-row gap-2 max-w-102 text-sm text-muted-foreground">

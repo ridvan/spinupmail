@@ -191,6 +191,9 @@ const UserProfilePanelBody = ({
     >
       {({ canSubmit, isSubmitting, values }) => {
         const normalizedSelectedTimeZone = normalizeTimeZone(values.timezone);
+        const selectedPreviewTimeZone = values.manualTimezone
+          ? (normalizedSelectedTimeZone ?? values.timezone)
+          : undefined;
         const nextTimezone = values.manualTimezone
           ? normalizedSelectedTimeZone
           : null;
@@ -248,6 +251,7 @@ const UserProfilePanelBody = ({
 
             <UserProfileTimezoneSection
               effectiveTimeZone={effectiveTimeZone}
+              previewTimeZone={selectedPreviewTimeZone}
               source={source}
               manualTimezoneField={
                 <form.Field
@@ -314,7 +318,7 @@ const UserProfilePanelBody = ({
                 }
               >
                 {updateProfileMutation.isPending ? (
-                  <Spinner data-icon="inline-start" />
+                  <Spinner aria-hidden="true" data-icon="inline-start" />
                 ) : null}
                 <TextMorph>
                   {updateProfileMutation.isPending

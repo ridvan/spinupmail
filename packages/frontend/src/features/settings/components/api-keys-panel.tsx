@@ -236,7 +236,7 @@ export const ApiKeysPanel = () => {
           type="submit"
         >
           {createMutation.isPending ? (
-            <Spinner data-icon="inline-start" />
+            <Spinner aria-hidden="true" data-icon="inline-start" />
           ) : null}
           <TextMorph>
             {createMutation.isPending ? "Creating..." : "Create key"}
