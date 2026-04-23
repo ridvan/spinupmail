@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { EditAddressSheet } from "@/features/addresses/components/edit-address-sheet";
@@ -87,6 +93,18 @@ const telegramIntegration = {
     chatId: "-1001234567890",
     chatLabel: "Product alerts",
   },
+};
+
+const addressWithTelegramIntegration = {
+  ...baseAddress,
+  integrations: [
+    {
+      id: telegramIntegration.id,
+      provider: telegramIntegration.provider,
+      name: telegramIntegration.name,
+      eventType: "email.received" as const,
+    },
+  ],
 };
 
 const renderEditAddressSheet = (
@@ -384,6 +402,172 @@ describe("EditAddressSheet", () => {
               eventType: "email.received",
             },
           ],
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
+      })
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("rehydrates existing integrations when matching providers load after mount", async () => {
+    const onOpenChange = vi.fn();
+
+    updateMutation.mutateAsync.mockResolvedValue(undefined);
+    mockedUseUpdateAddressMutation.mockReturnValue(
+      updateMutation as unknown as ReturnType<typeof useUpdateAddressMutation>
+    );
+
+    let view: ReturnType<typeof render> | undefined;
+
+    await act(async () => {
+      view = render(
+        <EditAddressSheet
+          address={addressWithTelegramIntegration as never}
+          domains={["example.com"]}
+          maxReceivedEmailsPerAddress={100}
+          integrations={[]}
+          canManageIntegrations
+          open
+          onOpenChange={onOpenChange}
+        />
+      );
+    });
+
+    expect(
+      screen
+        .getByRole("switch", { name: "Enable integrations" })
+        .getAttribute("aria-checked")
+    ).toBe("false");
+
+    await act(async () => {
+      view?.rerender(
+        <EditAddressSheet
+          address={addressWithTelegramIntegration as never}
+          domains={["example.com"]}
+          maxReceivedEmailsPerAddress={100}
+          integrations={[telegramIntegration]}
+          canManageIntegrations
+          open
+          onOpenChange={onOpenChange}
+        />
+      );
+    });
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("switch", { name: "Enable integrations" })
+          .getAttribute("aria-checked")
+      ).toBe("true")
+    );
+
+    expect(screen.getByRole("radio", { name: "Telegram" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Ops alerts" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(updateMutation.mutateAsync).toHaveBeenCalledWith({
+        addressId: "address-1",
+        payload: {
+          localPart: "hello",
+          domain: "example.com",
+          ttlMinutes: null,
+          allowedFromDomains: [],
+          integrationSubscriptions: [
+            {
+              integrationId: "integration-1",
+              eventType: "email.received",
+            },
+          ],
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
+      })
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("submits no integrations after unchecking an existing telegram connection", async () => {
+    const onOpenChange = vi.fn();
+
+    updateMutation.mutateAsync.mockResolvedValue(undefined);
+    mockedUseUpdateAddressMutation.mockReturnValue(
+      updateMutation as unknown as ReturnType<typeof useUpdateAddressMutation>
+    );
+
+    renderEditAddressSheet(onOpenChange, {
+      address: addressWithTelegramIntegration as never,
+      canManageIntegrations: true,
+      integrations: [telegramIntegration],
+    });
+
+    expect(
+      screen
+        .getByRole("switch", { name: "Enable integrations" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ops alerts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(updateMutation.mutateAsync).toHaveBeenCalledWith({
+        addressId: "address-1",
+        payload: {
+          localPart: "hello",
+          domain: "example.com",
+          ttlMinutes: null,
+          allowedFromDomains: [],
+          integrationSubscriptions: [],
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
+      })
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("allows disabling integrations from the edit sheet", async () => {
+    const onOpenChange = vi.fn();
+
+    updateMutation.mutateAsync.mockResolvedValue(undefined);
+    mockedUseUpdateAddressMutation.mockReturnValue(
+      updateMutation as unknown as ReturnType<typeof useUpdateAddressMutation>
+    );
+
+    renderEditAddressSheet(onOpenChange, {
+      address: addressWithTelegramIntegration as never,
+      canManageIntegrations: true,
+      integrations: [telegramIntegration],
+    });
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Enable integrations",
+      })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("switch", { name: "Enable integrations" })
+          .getAttribute("aria-checked")
+      ).toBe("false")
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(updateMutation.mutateAsync).toHaveBeenCalledWith({
+        addressId: "address-1",
+        payload: {
+          localPart: "hello",
+          domain: "example.com",
+          ttlMinutes: null,
+          allowedFromDomains: [],
+          integrationSubscriptions: [],
           maxReceivedEmailCount: 100,
           maxReceivedEmailAction: "cleanAll",
         },

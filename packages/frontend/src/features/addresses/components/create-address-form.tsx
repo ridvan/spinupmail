@@ -344,9 +344,7 @@ export const CreateAddressForm = ({
     availableIntegrationsByProvider[selectedIntegrationProvider]?.length
       ? selectedIntegrationProvider
       : "";
-  const areIntegrationsEnabled =
-    resolvedSelectedIntegrationProvider !== "" &&
-    availableIntegrationProviders.length > 0;
+  const areIntegrationsEnabled = resolvedSelectedIntegrationProvider !== "";
   const selectedProviderIntegrations = resolvedSelectedIntegrationProvider
     ? (availableIntegrationsByProvider[resolvedSelectedIntegrationProvider] ??
       [])
