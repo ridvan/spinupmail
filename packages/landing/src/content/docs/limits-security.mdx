@@ -103,6 +103,23 @@ Spinupmail applies both Better Auth throttling and API key throttling.
 API key throttling also covers Better Auth runtime checks on `/get-session` and
 `/organization/get-full-organization`, not just the application endpoints.
 
+## Integration dispatch limits
+
+Integration dispatches are also protected by organization-level caps and queue
+retry controls.
+
+| Control | Current default |
+| --- | --- |
+| `MAX_INTEGRATIONS_PER_ORGANIZATION` | `3` |
+| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` | `100` |
+| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS` | `21600` seconds |
+| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS` | `30` seconds |
+| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS` | `1800` seconds |
+| `INTEGRATION_QUEUE_JITTER_SECONDS` | `10` seconds |
+
+Dispatches run asynchronously through the integration queue and retry with
+backoff inside the configured retry window.
+
 ### Verification resend throttling
 
 Email verification resend is also guarded by backend constants:

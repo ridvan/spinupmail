@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   CodeIcon,
+  ConnectIcon,
   LayoutIcon,
   MailIcon,
   ShieldIcon,
@@ -54,44 +55,51 @@ export function Features() {
           </p>
         </motion.div>
 
-        <div className="mt-12 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-12">
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-2"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-8"
             {...cardMotion()}
           >
             <AddressControlsCard />
           </motion.div>
 
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-4"
             {...cardMotion(0.05)}
           >
             <TeamsCard />
           </motion.div>
 
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-4"
             {...cardMotion(0.1)}
           >
             <ApiCard />
           </motion.div>
 
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-2"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-8"
+            {...cardMotion(0.125)}
+          >
+            <IntegrationsCard />
+          </motion.div>
+
+          <motion.div
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-4"
             {...cardMotion(0.15)}
           >
             <AnalyticsCard />
           </motion.div>
 
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-2"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-4"
             {...cardMotion(0.2)}
           >
             <CloudflareCard />
           </motion.div>
 
           <motion.div
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card"
+            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card lg:col-span-4"
             {...cardMotion(0.25)}
           >
             <SecurityCard />
@@ -320,6 +328,39 @@ function AnalyticsCard() {
         <div className="mt-2 flex justify-between text-[10px] text-muted-foreground/65">
           <span>14 days ago</span>
           <span>Today</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function IntegrationsCard() {
+  const channels = [
+    { name: "Telegram", desc: "Provider available" },
+    { name: "email.received", desc: "Supported event" },
+    { name: "Queue dispatch", desc: "Async delivery" },
+  ];
+
+  return (
+    <>
+      <CardHeader
+        icon={ConnectIcon}
+        title="Integrations"
+        description="Route inbound email events to external notification channels with organization-scoped subscriptions. Events are dispatched asynchronously via Cloudflare Queues with retry controls."
+      />
+      <div className="mt-auto border-t border-border/60 bg-muted/20 px-6 py-5">
+        <div className="flex flex-wrap gap-2">
+          {channels.map(channel => (
+            <Badge
+              key={channel.name}
+              variant="outline"
+              className="gap-1.5 border-border/70 py-1"
+            >
+              <span className="size-1.5 rounded-full bg-muted-foreground/70" />
+              <span className="font-medium">{channel.name}</span>
+              <span className="text-muted-foreground">{channel.desc}</span>
+            </Badge>
+          ))}
         </div>
       </div>
     </>

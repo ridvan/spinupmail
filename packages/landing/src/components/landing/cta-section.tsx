@@ -47,7 +47,8 @@ export function CtaSection() {
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
                 Use the setup guide to deploy Worker + Pages on Cloudflare, then
-                create addresses and automate inbox workflows.
+                create addresses, wire integrations, and automate inbox
+                workflows.
               </p>
 
               <motion.div

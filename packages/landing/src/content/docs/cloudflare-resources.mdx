@@ -113,6 +113,12 @@ control routing, email limits, and optional product behavior.
 | `MAX_ADDRESSES_PER_ORGANIZATION` | Address cap per org, default `100` |
 | `MAX_RECEIVED_EMAILS_PER_ADDRESS` | Default and hard cap for stored emails per inbox, default `100` |
 | `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` | Total stored-email cap across one org, default `1000` |
+| `MAX_INTEGRATIONS_PER_ORGANIZATION` | Integration cap per org, default `3` |
+| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` | Daily integration dispatch cap per org, default `100` |
+| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS` | Retry window for integration dispatch failures, default `21600` |
+| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS` | Initial retry delay for integration dispatches, default `30` |
+| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS` | Maximum retry delay for integration dispatches, default `1800` |
+| `INTEGRATION_QUEUE_JITTER_SECONDS` | Retry jitter to spread retries, default `10` |
 | `API_KEY_RATE_LIMIT_WINDOW` and `API_KEY_RATE_LIMIT_MAX` | Rate limit window and max for `x-api-key` traffic |
 | `AUTH_RATE_LIMIT_WINDOW` and `AUTH_RATE_LIMIT_MAX` | Better Auth global rate limiting |
 | `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | Change-email rate limiting |

@@ -212,6 +212,11 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
   "api-email-addresses": {
     headings: [
       {
+        id: "integration-subscriptions",
+        title: "Integration subscriptions",
+        level: 2,
+      },
+      {
         id: "list-email-addresses",
         title: "List email addresses",
         level: 2,
@@ -243,9 +248,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction maxReceivedEmailsPerAddress maxReceivedEmailsPerOrganization ttl localPart acceptedRiskNotice recent activity cursor search integrationSubscriptions integrations email.received",
+      "email addresses allowedFromDomains blockedSenderDomains inboundRatePolicy maxReceivedEmailCount maxReceivedEmailAction maxReceivedEmailsPerAddress maxReceivedEmailsPerOrganization ttl localPart acceptedRiskNotice recent activity cursor search integration subscriptions integrations telegram email.received",
     codeText:
-      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id integrationSubscriptions integrations",
+      "GET /api/email-addresses GET /api/email-addresses/recent-activity POST /api/email-addresses GET /api/email-addresses/:id PATCH /api/email-addresses/:id DELETE /api/email-addresses/:id integrationSubscriptions integrations email.received",
   },
   "api-emails": {
     headings: [
@@ -409,6 +414,44 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
     codeText:
       "email-attachments/<organizationId>/<addressId>/<emailId>/<attachmentId>-<filename>",
   },
+  integrations: {
+    headings: [
+      {
+        id: "integrations-overview",
+        title: "Integrations overview",
+        level: 2,
+      },
+      {
+        id: "supported-providers",
+        title: "Supported providers",
+        level: 2,
+      },
+      {
+        id: "telegram",
+        title: "Telegram",
+        level: 3,
+      },
+      {
+        id: "address-subscriptions",
+        title: "Address subscriptions",
+        level: 2,
+      },
+      {
+        id: "queue-delivery-behavior",
+        title: "Queue delivery behavior",
+        level: 2,
+      },
+      {
+        id: "troubleshooting",
+        title: "Troubleshooting",
+        level: 2,
+      },
+    ],
+    searchText:
+      "integrations telegram notifications integration subscriptions email.received queue dispatch retries encryption key provider",
+    codeText:
+      "INTEGRATION_SECRET_ENCRYPTION_KEY /api/integrations /api/email-addresses integrationSubscriptions email.received",
+  },
   "multi-domain": {
     headings: [
       { id: "worker-config", title: "Worker config", level: 2 },
@@ -454,6 +497,11 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
         level: 2,
       },
       {
+        id: "integration-dispatch-limits",
+        title: "Integration dispatch limits",
+        level: 2,
+      },
+      {
         id: "verification-resend-throttling",
         title: "Verification resend throttling",
         level: 3,
@@ -465,9 +513,9 @@ const DOC_INDEX: Partial<Record<string, DocIndexItem>> = {
       },
     ],
     searchText:
-      "limits security organizations members addresses attachments raw email rate limiting verification resend X-Org-Id",
+      "limits security organizations members addresses attachments raw email rate limiting integration dispatch telegram verification resend X-Org-Id",
     codeText:
-      "MAX_ADDRESSES_PER_ORGANIZATION EMAIL_MAX_BYTES EMAIL_BODY_MAX_BYTES EMAIL_ATTACHMENT_MAX_BYTES EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION EMAIL_ATTACHMENTS_ENABLED API_KEY_RATE_LIMIT_WINDOW API_KEY_RATE_LIMIT_MAX AUTH_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX EMAIL_STORE_HEADERS_IN_DB EMAIL_STORE_RAW_IN_DB EMAIL_STORE_RAW_IN_R2",
+      "MAX_ADDRESSES_PER_ORGANIZATION MAX_INTEGRATIONS_PER_ORGANIZATION MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS INTEGRATION_QUEUE_BASE_DELAY_SECONDS INTEGRATION_QUEUE_MAX_DELAY_SECONDS INTEGRATION_QUEUE_JITTER_SECONDS EMAIL_MAX_BYTES EMAIL_BODY_MAX_BYTES EMAIL_ATTACHMENT_MAX_BYTES EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION EMAIL_ATTACHMENTS_ENABLED API_KEY_RATE_LIMIT_WINDOW API_KEY_RATE_LIMIT_MAX AUTH_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX EMAIL_STORE_HEADERS_IN_DB EMAIL_STORE_RAW_IN_DB EMAIL_STORE_RAW_IN_R2",
   },
 };
 

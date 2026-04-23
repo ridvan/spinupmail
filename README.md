@@ -38,6 +38,7 @@ attachments), and manage everything through a secure Better Auth + Hono API and 
 - Browse organization-scoped emails in the UI
 - Store inbound mail attachments in Cloudflare R2 and download them in UI/API
 - Generate API keys for automation (e.g., test suites)
+- Route inbound email events to integrations for real-time notifications (Telegram provider available)
 
 ## Screenshots
 
@@ -60,7 +61,7 @@ attachments), and manage everything through a secure Better Auth + Hono API and 
 
 - `packages/backend/src/index.ts` — Worker entrypoint and API composition
 - `packages/backend/src/app/` — app types and shared middleware
-- `packages/backend/src/modules/` — domain modules (`auth-http`, `domains`, `organizations`, `email-addresses`, `emails`, `inbound-email`)
+- `packages/backend/src/modules/` — domain modules (`auth-http`, `domains`, `organizations`, `email-addresses`, `emails`, `inbound-email`, `integrations`)
 - `packages/backend/src/shared/` — shared constants, helpers, validation, and utilities
 - `packages/backend/src/platform/` — platform integrations (auth runtime and DB client)
 
@@ -118,6 +119,7 @@ set `bucket_name` to the actual Cloudflare bucket names.
 
 ### Create Queue (Integration Dispatches)
 
+Spinupmail uses a queue worker to dispatch integration events in the background.
 Create the queue used for integration dispatch jobs:
 
 ```bash
@@ -145,8 +147,8 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
 - `[[r2_buckets]].preview_bucket_name` (e.g. `spinupmail-attachments-preview`)
 - `[vars].EMAIL_DOMAINS` (comma-separated inbound domains, can be single domain like `spinupmail.com` or multiple domains like `spinupmail.com,spinupmail.dev`)
 - `[vars].RESEND_FROM_EMAIL` (e.g. `Spinupmail <verify@spinupmail.com>`. Will be used when sending Verification/Password Reset emails.)
-- Optional: `[vars].AUTH_ALLOWED_EMAIL_DOMAIN` (restrict auth to one email domain. **Useful when you want to deploy an internal tool for your organization and restrict access to a specific domain.**)
 - Optional:
+  - `[vars].AUTH_ALLOWED_EMAIL_DOMAIN` (restrict auth to one email domain. **Useful when you want to deploy an internal tool for your organization and restrict access to a specific domain.**)
   - `[vars].FORCED_MAIL_PREFIX` (when set, every created or renamed inbox is forced to start with this prefix plus `-`, for example `temp-`)
   - `[vars].EMAIL_MAX_BYTES`
   - `[vars].EMAIL_BODY_MAX_BYTES`
@@ -157,15 +159,21 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
   - `[vars].MAX_ADDRESSES_PER_ORGANIZATION` (default: `100`)
   - `[vars].MAX_RECEIVED_EMAILS_PER_ORGANIZATION` (default: `1000`)
   - `[vars].MAX_RECEIVED_EMAILS_PER_ADDRESS` (default: `100`)
+  - `[vars].MAX_INTEGRATIONS_PER_ORGANIZATION` (default: `3`)
+  - `[vars].MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` (default: `100`)
   - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
   - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
-- `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
-- `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)
-- `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` (default: `2`)
-- `[vars].EXTENSION_REDIRECT_ORIGINS` (comma-separated exact redirect origins for trusted extension builds, for example `https://<extension-id>.chromiumapp.org`)
-- `[vars].EMAIL_STORE_HEADERS_IN_DB`
-- `[vars].EMAIL_STORE_RAW_IN_DB`
-- `[vars].EMAIL_STORE_RAW_IN_R2`
+  - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
+  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` (default: `3600`)
+  - `[vars].AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` (default: `2`)
+  - `[vars].INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS` (default: `21600`)
+  - `[vars].INTEGRATION_QUEUE_BASE_DELAY_SECONDS` (default: `30`)
+  - `[vars].INTEGRATION_QUEUE_MAX_DELAY_SECONDS` (default: `1800`)
+  - `[vars].INTEGRATION_QUEUE_JITTER_SECONDS` (default: `10`)
+  - `[vars].EXTENSION_REDIRECT_ORIGINS` (comma-separated exact redirect origins for trusted extension builds, for example `https://<extension-id>.chromiumapp.org`)
+  - `[vars].EMAIL_STORE_HEADERS_IN_DB`
+  - `[vars].EMAIL_STORE_RAW_IN_DB`
+  - `[vars].EMAIL_STORE_RAW_IN_R2`
 
 For local development, create `.dev.vars` file in `packages/backend`. Here is a sample file:
 
@@ -191,7 +199,7 @@ pnpm exec wrangler secret put BETTER_AUTH_BASE_URL
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 # Run `openssl rand -base64 32` to generate a secret, or you can generate from https://better-auth.com/docs/installation
 pnpm exec wrangler secret put INTEGRATION_SECRET_ENCRYPTION_KEY
-# Run `openssl rand -base64 32` to generate the required base64 32-byte AES-GCM key
+# Run `openssl rand -base64 32` to generate the required base64 32-byte AES-GCM key used to encrypt integration credentials
 pnpm exec wrangler secret put CORS_ORIGIN
 # e.g. https://app.spinupmail.com
 pnpm exec wrangler secret put RESEND_API_KEY
@@ -209,7 +217,7 @@ Use the Worker URL or your API route URL:
 - `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
-- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>`
+- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>` (used to encrypt integration credentials)
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be configured in `wrangler.toml` `[vars]` with a verified sender/domain.
@@ -335,6 +343,32 @@ Important:
 - Frontend does not need separate Google env vars for this OAuth redirect flow.
 - If you set `AUTH_ALLOWED_EMAIL_DOMAIN`, Spinupmail will reject email/password sign-up and sign-in outside that domain and will pass the same domain to Google OAuth using the hosted-domain hint (`hd`).
 
+### Setting Up Integrations (Telegram)
+
+Spinupmail includes an integrations platform for routing inbound email events to
+external notification channels. Telegram is currently supported.
+
+1. Create a Telegram bot:
+   - Open Telegram and chat with `@BotFather`
+   - Run `/newbot` and follow the prompts
+   - Save the generated bot token
+2. Collect your target chat ID:
+   - Send a message to your bot (or add it to a group/channel)
+   - Open `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Copy the chat id from the updates response
+3. Ensure `INTEGRATION_SECRET_ENCRYPTION_KEY` is configured in Worker secrets.
+4. Create a Telegram integration from your organization settings or integrations
+   API endpoints.
+5. Attach integration subscriptions to addresses so `email.received` events are
+   dispatched to Telegram.
+
+Current event support:
+
+- `email.received`
+
+Integrations are dispatched asynchronously through the integration queue with
+retry/backoff controls from `INTEGRATION_QUEUE_*` vars.
+
 ## 4. Database Migrations
 
 Do **not** hand-edit migrations.
@@ -406,6 +440,12 @@ AUTH_RATE_LIMIT_WINDOW = "60"
 AUTH_RATE_LIMIT_MAX = "100"
 AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW = "3600"
 AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX = "2"
+MAX_INTEGRATIONS_PER_ORGANIZATION = "3"
+MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY = "100"
+INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS = "21600"
+INTEGRATION_QUEUE_BASE_DELAY_SECONDS = "30"
+INTEGRATION_QUEUE_MAX_DELAY_SECONDS = "1800"
+INTEGRATION_QUEUE_JITTER_SECONDS = "10"
 EMAIL_ATTACHMENTS_ENABLED = "true"
 EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION = "104857600"
 ```

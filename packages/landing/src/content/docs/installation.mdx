@@ -65,11 +65,15 @@ bucket name.
 
 ### Create queue (integration dispatches)
 
-Create the queue used for integration dispatch jobs:
+Spinupmail dispatches integration events asynchronously through a queue. Create
+the queue used for integration dispatch jobs:
 
 ```bash
 pnpm wrangler queues create spinupmail-integration-dispatches
 ```
+
+See [Integrations](/docs/integrations) for provider setup and subscription
+flow.
 
 ### Durable objects
 
@@ -144,7 +148,7 @@ Use values like these:
 - `EXTENSION_REDIRECT_ORIGINS = https://<your-extension-id>.chromiumapp.org[,https://<your-firefox-extension-id>.extensions.allizom.org]`
 - `GOOGLE_CLIENT_ID = <google oauth web client id>`
 - `GOOGLE_CLIENT_SECRET = <google oauth web client secret>`
-- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>`
+- `INTEGRATION_SECRET_ENCRYPTION_KEY = <base64 32-byte key; generate with openssl rand -base64 32>` used to encrypt provider credentials (for example Telegram bot tokens)
 - `RESEND_API_KEY = re_...`
 - `TURNSTILE_SECRET_KEY = <Cloudflare Turnstile secret key>`
 - `RESEND_FROM_EMAIL` should be set in `wrangler.toml` under `[vars]`

@@ -1,0 +1,90 @@
+---
+title: Integrations
+description: Route inbound email events to external notification channels.
+summary: Configure providers, attach address subscriptions, and understand queue-backed dispatch behavior.
+groupId: operations
+keywords:
+  - integrations
+  - telegram
+  - notifications
+  - subscriptions
+  - dispatch
+---
+
+Spinupmail includes an integrations platform so inbox events can trigger
+notifications in external systems. This keeps email workflows visible to teams
+that operate in chat or incident channels.
+
+## Integrations overview
+
+Integrations are organization-scoped. You configure a provider once, then
+subscribe one or more inboxes to receive supported events.
+
+Current event support:
+
+- `email.received`
+
+## Supported providers
+
+### Telegram
+
+Telegram is currently available for real-time notification delivery.
+
+Typical uses include verification-code monitoring, QA workflow alerts, and
+internal operational notifications.
+
+Setup flow:
+
+1. Create a bot with `@BotFather` and copy the bot token.
+2. Send a message to the bot (or add it to a target group/channel).
+3. Fetch updates from `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   and copy the target chat ID.
+4. Create a Telegram integration in your organization.
+
+Future providers can be added on top of the same integrations model.
+
+## Address subscriptions
+
+Address-level subscriptions control where events are sent. On address create or
+update endpoints, pass `integrationSubscriptions` entries.
+
+```json
+{
+  "localPart": "alerts",
+  "integrationSubscriptions": [
+    {
+      "integrationId": "int_telegram_123",
+      "eventType": "email.received"
+    }
+  ]
+}
+```
+
+Address responses also include active `integrations` so clients can render
+configured subscriptions directly.
+
+## Queue delivery behavior
+
+Integration dispatch is asynchronous. Events are queued and processed by the
+Worker queue consumer, with retry and backoff controls.
+
+Relevant controls:
+
+- `MAX_INTEGRATIONS_PER_ORGANIZATION`
+- `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY`
+- `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS`
+- `INTEGRATION_QUEUE_BASE_DELAY_SECONDS`
+- `INTEGRATION_QUEUE_MAX_DELAY_SECONDS`
+- `INTEGRATION_QUEUE_JITTER_SECONDS`
+
+`INTEGRATION_SECRET_ENCRYPTION_KEY` must be configured so provider credentials
+(such as Telegram bot tokens) are encrypted at rest.
+
+## Troubleshooting
+
+- No notifications arriving: verify bot token, chat ID, and address
+  subscriptions.
+- Dispatches failing repeatedly: check queue retry limits and provider-side API
+  errors.
+- Configuration errors at runtime: confirm `INTEGRATION_DISPATCH_QUEUE` binding
+  and `INTEGRATION_SECRET_ENCRYPTION_KEY` are set.

@@ -31,6 +31,7 @@ export const docsNavGroups: Array<DocNavGroup> = [
     description: "Inbound flow and production operations.",
     slugs: [
       "inbound-pipeline",
+      "integrations",
       "multi-domain",
       "local-development",
       "limits-security",

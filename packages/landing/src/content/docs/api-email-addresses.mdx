@@ -34,6 +34,30 @@ Address endpoints also expose integration-linked fields:
 - `integrationSubscriptions` can be provided on create and update requests.
 - `integrations` is returned on address list/detail/create/update responses.
 
+## Integration subscriptions
+
+Spinupmail integrations let you route inbox events to external providers.
+Telegram is currently available, and each address can subscribe to integration
+events through `integrationSubscriptions`.
+
+Use this when you want workflow inboxes (for sign-up tests, operations, or QA)
+to notify your team in real time without polling the dashboard.
+
+```json
+{
+  "localPart": "alerts",
+  "integrationSubscriptions": [
+    {
+      "integrationId": "int_telegram_123",
+      "eventType": "email.received"
+    }
+  ]
+}
+```
+
+For provider setup, delivery behavior, and troubleshooting, see
+[Integrations](/docs/integrations).
+
 ## List email addresses
 
 <ApiEndpointReference specId="get-email-addresses" />
