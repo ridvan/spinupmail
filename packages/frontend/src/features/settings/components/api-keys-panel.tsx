@@ -83,6 +83,22 @@ const formatDate = (value: string | null, timeZone: string) => {
   });
 };
 
+const ApiKeysTableShell = ({ children }: { children: React.ReactNode }) => (
+  <div className="overflow-hidden rounded-lg border border-border/70 bg-background/30">
+    <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          <TableHead>Prefix</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead className="w-36 text-right">Action</TableHead>
+        </TableRow>
+      </TableHeader>
+      {children}
+    </Table>
+  </div>
+);
+
 export const ApiKeysPanel = () => {
   const { effectiveTimeZone } = useTimezone();
   const apiKeysQuery = useApiKeysQuery();
@@ -276,40 +292,28 @@ export const ApiKeysPanel = () => {
       ) : null}
 
       {apiKeysQuery.isLoading ? (
-        <div className="overflow-hidden rounded-lg border border-border/70 bg-background/30">
-          <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Prefix</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-36 text-right">Action</TableHead>
+        <ApiKeysTableShell>
+          <TableBody>
+            {apiKeySkeletonRows.map(row => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  <Skeleton className={`h-4 rounded-sm ${row.nameWidth}`} />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className={`h-4 rounded-sm ${row.prefixWidth}`} />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className={`h-4 rounded-sm ${row.createdWidth}`} />
+                </TableCell>
+                <TableCell className="w-36 text-right">
+                  <div className="flex justify-end">
+                    <Skeleton className="h-8 w-[72px] rounded-md" />
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {apiKeySkeletonRows.map(row => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    <Skeleton className={`h-4 rounded-sm ${row.nameWidth}`} />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className={`h-4 rounded-sm ${row.prefixWidth}`} />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton
-                      className={`h-4 rounded-sm ${row.createdWidth}`}
-                    />
-                  </TableCell>
-                  <TableCell className="w-36 text-right">
-                    <div className="flex justify-end">
-                      <Skeleton className="h-8 w-[72px] rounded-md" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </ApiKeysTableShell>
       ) : apiKeysQuery.error ? (
         <p className="text-sm text-destructive">{apiKeysQuery.error.message}</p>
       ) : (apiKeysQuery.data?.length ?? 0) === 0 ? (
@@ -317,53 +321,43 @@ export const ApiKeysPanel = () => {
           No API keys created yet.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border/70 bg-background/30">
-          <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Prefix</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-36 text-right">Action</TableHead>
+        <ApiKeysTableShell>
+          <TableBody>
+            {apiKeysQuery.data?.map((item: ApiKeyRow) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.name || "Untitled"}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  {item.start ?? ""}
+                  {item.prefix || item.start ? "..." : "-"}
+                </TableCell>
+                <TableCell>
+                  {formatDate(item.createdAt, effectiveTimeZone)}
+                </TableCell>
+                <TableCell className="w-36 text-right">
+                  <Button
+                    className="-mr-2"
+                    disabled={deleteMutation.isPending}
+                    onClick={() =>
+                      setPendingRevokeKey({
+                        id: item.id,
+                        label:
+                          item.name?.trim() ||
+                          (item.prefix || item.start
+                            ? `${item.start ?? ""}...`
+                            : "this API key"),
+                      })
+                    }
+                    size="sm"
+                    type="button"
+                    variant="destructive"
+                  >
+                    Revoke
+                  </Button>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {apiKeysQuery.data?.map((item: ApiKeyRow) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.name || "Untitled"}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {item.start ?? ""}
-                    {item.prefix || item.start ? "..." : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(item.createdAt, effectiveTimeZone)}
-                  </TableCell>
-                  <TableCell className="w-36 text-right">
-                    <Button
-                      className="-mr-2"
-                      disabled={deleteMutation.isPending}
-                      onClick={() =>
-                        setPendingRevokeKey({
-                          id: item.id,
-                          label:
-                            item.name?.trim() ||
-                            (item.prefix || item.start
-                              ? `${item.start ?? ""}...`
-                              : "this API key"),
-                        })
-                      }
-                      size="sm"
-                      type="button"
-                      variant="destructive"
-                    >
-                      Revoke
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </ApiKeysTableShell>
       )}
 
       <AlertDialog

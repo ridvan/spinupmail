@@ -7,6 +7,7 @@ import {
   signInWithOrganization,
 } from "./helpers/auth-fixture";
 import { e2eFrontendBaseUrl } from "./helpers/e2e-urls";
+import { settingsTab } from "./helpers/page-helpers";
 
 const cardTitle = (page: Page, text: string) =>
   page.locator('[data-slot="card-title"]').filter({ hasText: text }).first();
@@ -16,9 +17,6 @@ const cardDescription = (page: Page, text: string) =>
     .locator('[data-slot="card-description"]')
     .filter({ hasText: text })
     .first();
-
-const settingsTab = (page: Page, text: string) =>
-  page.getByRole("tab", { name: text, exact: true });
 
 test.describe("spinupmail protected pages", () => {
   test.skip(!runE2E, "Set RUN_E2E=1 to run browser smoke tests.");

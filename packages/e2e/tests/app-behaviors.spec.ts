@@ -7,6 +7,7 @@ import {
   signInWithOrganization,
 } from "./helpers/auth-fixture";
 import { e2eBackendBaseUrl, e2eFrontendBaseUrl } from "./helpers/e2e-urls";
+import { settingsTab } from "./helpers/page-helpers";
 
 const navButton = (page: Page, text: string) =>
   page
@@ -16,9 +17,6 @@ const navButton = (page: Page, text: string) =>
 
 const cardTitle = (page: Page, text: string) =>
   page.locator('[data-slot="card-title"]').filter({ hasText: text }).first();
-
-const settingsTab = (page: Page, text: string) =>
-  page.getByRole("tab", { name: text, exact: true });
 
 const openCommandMenu = async (page: Page) => {
   await page.getByRole("button", { name: "Open command menu" }).click();

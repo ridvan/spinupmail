@@ -22,18 +22,29 @@ const describeSource = (source: TimeZoneSource) => {
 
 const useLiveTime = (timeZone: string) => {
   const getCurrentTime = React.useCallback(() => {
-    return new Date().toLocaleString("en-US", {
-      timeZone,
-      dateStyle: "full",
-      timeStyle: "long",
-    });
+    try {
+      return new Date().toLocaleString("en-US", {
+        timeZone,
+        dateStyle: "full",
+        timeStyle: "long",
+      });
+    } catch {
+      try {
+        return new Date().toLocaleString("en-US", {
+          dateStyle: "full",
+          timeStyle: "long",
+        });
+      } catch {
+        return new Date().toString();
+      }
+    }
   }, [timeZone]);
 
   const [currentTime, setCurrentTime] = React.useState(getCurrentTime);
   const frameRef = React.useRef<number>(0);
   const lastTickRef = React.useRef<number>(0);
 
-  React.useInsertionEffect(() => {
+  React.useEffect(() => {
     const tick = (timestamp: number) => {
       if (timestamp - lastTickRef.current >= 1000) {
         lastTickRef.current = timestamp;

@@ -331,13 +331,11 @@ const UserProfilePanelBody = ({
 };
 
 export const UserProfilePanel = ({
-  withCard = true,
   wrapperId,
   wrapperClassName,
   headerClassName,
   contentClassName,
 }: {
-  withCard?: boolean;
   wrapperId?: string;
   wrapperClassName?: string;
   headerClassName?: string;
@@ -390,7 +388,6 @@ export const UserProfilePanel = ({
   return (
     <div
       id={wrapperId}
-      data-with-card={withCard ? "true" : "false"}
       className={cn(
         "min-w-0 rounded-lg border border-border/70 p-4 scroll-mt-24 md:scroll-mt-28",
         wrapperClassName

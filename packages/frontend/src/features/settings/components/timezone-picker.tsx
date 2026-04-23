@@ -250,6 +250,7 @@ export const TimezonePickerField = React.memo(
             ref={timezoneTriggerRef}
             render={
               <Button
+                aria-label={value || "Select timezone"}
                 type="button"
                 variant="outline"
                 className="max-w-102 justify-between font-normal"
