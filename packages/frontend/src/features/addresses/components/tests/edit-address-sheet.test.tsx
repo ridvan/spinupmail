@@ -68,7 +68,31 @@ const baseAddress = {
   lastReceivedAtMs: null,
 };
 
-const renderEditAddressSheet = (onOpenChange = vi.fn()) =>
+const telegramIntegration = {
+  id: "integration-1",
+  provider: "telegram" as const,
+  name: "Ops alerts",
+  status: "active" as const,
+  supportedEventTypes: ["email.received" as const],
+  mailboxCount: 2,
+  lastValidatedAt: "2026-04-20T10:00:00.000Z",
+  lastValidatedAtMs: 1_745_143_200_000,
+  createdAt: "2026-04-20T10:00:00.000Z",
+  createdAtMs: 1_745_143_200_000,
+  updatedAt: "2026-04-20T10:00:00.000Z",
+  updatedAtMs: 1_745_143_200_000,
+  publicConfig: {
+    telegramBotId: "123456",
+    botUsername: "spinupmail_bot",
+    chatId: "-1001234567890",
+    chatLabel: "Product alerts",
+  },
+};
+
+const renderEditAddressSheet = (
+  onOpenChange = vi.fn(),
+  props?: Partial<React.ComponentProps<typeof EditAddressSheet>>
+) =>
   render(
     <EditAddressSheet
       address={baseAddress as never}
@@ -76,6 +100,7 @@ const renderEditAddressSheet = (onOpenChange = vi.fn()) =>
       maxReceivedEmailsPerAddress={100}
       open
       onOpenChange={onOpenChange}
+      {...props}
     />
   );
 
@@ -290,6 +315,75 @@ describe("EditAddressSheet", () => {
           domain: "example.com",
           ttlMinutes: null,
           allowedFromDomains: [],
+          maxReceivedEmailCount: 100,
+          maxReceivedEmailAction: "cleanAll",
+        },
+      })
+    );
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("shows provider radios only after integrations are enabled", () => {
+    mockedUseUpdateAddressMutation.mockReturnValue(
+      updateMutation as unknown as ReturnType<typeof useUpdateAddressMutation>
+    );
+
+    renderEditAddressSheet(vi.fn(), {
+      canManageIntegrations: true,
+      integrations: [telegramIntegration],
+    });
+
+    expect(screen.queryByRole("radio", { name: "Telegram" })).toBeNull();
+    expect(screen.queryByText("Ops alerts")).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Enable integrations",
+      })
+    );
+
+    expect(screen.getByRole("radio", { name: "Telegram" })).toBeTruthy();
+    expect(screen.getByText("Ops alerts")).toBeTruthy();
+    expect(
+      screen.getByText("Send emails to Telegram (Product alerts)")
+    ).toBeTruthy();
+  });
+
+  it("submits selected integrations from the enabled provider section", async () => {
+    const onOpenChange = vi.fn();
+
+    updateMutation.mutateAsync.mockResolvedValue(undefined);
+    mockedUseUpdateAddressMutation.mockReturnValue(
+      updateMutation as unknown as ReturnType<typeof useUpdateAddressMutation>
+    );
+
+    renderEditAddressSheet(onOpenChange, {
+      canManageIntegrations: true,
+      integrations: [telegramIntegration],
+    });
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Enable integrations",
+      })
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ops alerts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(updateMutation.mutateAsync).toHaveBeenCalledWith({
+        addressId: "address-1",
+        payload: {
+          localPart: "hello",
+          domain: "example.com",
+          ttlMinutes: null,
+          allowedFromDomains: [],
+          integrationSubscriptions: [
+            {
+              integrationId: "integration-1",
+              eventType: "email.received",
+            },
+          ],
           maxReceivedEmailCount: 100,
           maxReceivedEmailAction: "cleanAll",
         },

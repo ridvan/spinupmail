@@ -31,6 +31,27 @@ const createMutation = {
   mutateAsync: vi.fn(),
 };
 
+const telegramIntegration = {
+  id: "integration-1",
+  provider: "telegram" as const,
+  name: "Ops alerts",
+  status: "active" as const,
+  supportedEventTypes: ["email.received" as const],
+  mailboxCount: 2,
+  lastValidatedAt: "2026-04-20T10:00:00.000Z",
+  lastValidatedAtMs: 1_745_143_200_000,
+  createdAt: "2026-04-20T10:00:00.000Z",
+  createdAtMs: 1_745_143_200_000,
+  updatedAt: "2026-04-20T10:00:00.000Z",
+  updatedAtMs: 1_745_143_200_000,
+  publicConfig: {
+    telegramBotId: "123456",
+    botUsername: "spinupmail_bot",
+    chatId: "-1001234567890",
+    chatLabel: "Product alerts",
+  },
+};
+
 describe("CreateAddressForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,5 +155,58 @@ describe("CreateAddressForm", () => {
     expect(
       screen.queryByText("Select one of the available domains")
     ).toBeNull();
+  });
+
+  it("shows provider radios only after integrations are enabled", async () => {
+    render(
+      <CreateAddressForm
+        domains={["example.com"]}
+        canManageIntegrations
+        integrations={[telegramIntegration]}
+      />
+    );
+
+    expect(
+      screen.queryByRole("radio", {
+        name: "Telegram",
+      })
+    ).toBeNull();
+    expect(screen.queryByText("Ops alerts")).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Enable integrations",
+      })
+    );
+
+    expect(screen.getByRole("radio", { name: "Telegram" })).toBeTruthy();
+    expect(screen.getByText("Ops alerts")).toBeTruthy();
+    expect(
+      screen.getByText("Send emails to Telegram (Product alerts)")
+    ).toBeTruthy();
+  });
+
+  it("updates the provider badge when a connection is selected", async () => {
+    render(
+      <CreateAddressForm
+        domains={["example.com"]}
+        canManageIntegrations
+        integrations={[telegramIntegration]}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Enable integrations",
+      })
+    );
+
+    expect(screen.getAllByText("0/1")).toHaveLength(2);
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Ops alerts" })
+    );
+
+    expect(await screen.findAllByText("1/1")).toHaveLength(2);
   });
 });

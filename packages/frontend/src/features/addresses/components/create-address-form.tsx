@@ -2,23 +2,30 @@ import { useForm } from "@tanstack/react-form";
 import {
   AddSquareIcon,
   Cancel01Icon,
+  ConnectIcon,
   Delete02Icon,
   ShuffleIcon,
+  TelegramIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { z } from "zod";
 import { Link } from "react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldLegend,
   FieldLabel,
+  FieldSet,
+  FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +36,7 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { SendIcon, type SendIconHandle } from "@/components/ui/send";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -38,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -62,7 +71,10 @@ import {
 } from "@/features/addresses/schemas/address-form";
 import { useCreateAddressMutation } from "@/features/addresses/hooks/use-addresses";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
-import type { OrganizationIntegrationSummary } from "@/lib/api";
+import type {
+  IntegrationProvider,
+  OrganizationIntegrationSummary,
+} from "@/lib/api";
 
 type CreateAddressFormProps = {
   domains: string[];
@@ -159,6 +171,28 @@ const generateRandomLocalPart = (
 };
 
 const DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS = 100;
+
+const INTEGRATION_PROVIDER_LABELS: Record<IntegrationProvider, string> = {
+  telegram: "Telegram",
+};
+
+const getIntegrationProviderIcon = (provider: IntegrationProvider) => {
+  switch (provider) {
+    case "telegram":
+      return TelegramIcon;
+  }
+};
+
+const getIntegrationConnectionSummary = (
+  integration: OrganizationIntegrationSummary
+) => {
+  switch (integration.provider) {
+    case "telegram":
+      return (
+        integration.publicConfig.chatLabel ?? integration.publicConfig.chatId
+      );
+  }
+};
 
 const getNormalizedSelectedDomain = (value: string) =>
   normalizeDomainToken(value);
@@ -272,9 +306,8 @@ export const CreateAddressForm = ({
     maxReceivedEmailsPerAddress ?? DEFAULT_MAX_RECEIVED_EMAILS_PER_ADDRESS;
   const createMutation = useCreateAddressMutation();
   const sendIconRef = useRef<SendIconHandle>(null);
-  const previousDefaultMaxReceivedEmailsRef = useRef(
-    resolvedMaxReceivedEmailsPerAddress
-  );
+  const [selectedIntegrationProvider, setSelectedIntegrationProvider] =
+    useState<IntegrationProvider | "">("");
   const availableDomains = useMemo(() => uniqueDomains(domains), [domains]);
   const availableIntegrations = useMemo(
     () =>
@@ -285,6 +318,39 @@ export const CreateAddressForm = ({
       ),
     [integrations]
   );
+  const availableIntegrationsByProvider = useMemo(() => {
+    const grouped = {} as Record<
+      IntegrationProvider,
+      OrganizationIntegrationSummary[]
+    >;
+
+    for (const integration of availableIntegrations) {
+      const currentIntegrations = grouped[integration.provider] ?? [];
+      grouped[integration.provider] = [...currentIntegrations, integration];
+    }
+
+    return grouped;
+  }, [availableIntegrations]);
+  const availableIntegrationProviders = useMemo(
+    () => Object.keys(availableIntegrationsByProvider) as IntegrationProvider[],
+    [availableIntegrationsByProvider]
+  );
+  const availableIntegrationIds = useMemo(
+    () => new Set(availableIntegrations.map(integration => integration.id)),
+    [availableIntegrations]
+  );
+  const resolvedSelectedIntegrationProvider =
+    selectedIntegrationProvider &&
+    availableIntegrationsByProvider[selectedIntegrationProvider]?.length
+      ? selectedIntegrationProvider
+      : "";
+  const areIntegrationsEnabled =
+    resolvedSelectedIntegrationProvider !== "" &&
+    availableIntegrationProviders.length > 0;
+  const selectedProviderIntegrations = resolvedSelectedIntegrationProvider
+    ? (availableIntegrationsByProvider[resolvedSelectedIntegrationProvider] ??
+      [])
+    : [];
   const defaultDomain = availableDomains[0] ?? "";
   const localPartMaxLength = getCustomLocalPartMaxLength(
     ADDRESS_LOCAL_PART_MAX_LENGTH,
@@ -330,6 +396,9 @@ export const CreateAddressForm = ({
         getSingleAvailableDomain(availableDomains) ||
         undefined;
       const allowedFromDomains = uniqueDomains(value.allowedFromDomains);
+      const selectedIntegrationIds = value.integrationIds.filter(
+        integrationId => availableIntegrationIds.has(integrationId)
+      );
       const createAddressToast = toast.promise(
         createMutation.mutateAsync({
           localPart: value.localPart.trim(),
@@ -338,7 +407,7 @@ export const CreateAddressForm = ({
           allowedFromDomains:
             allowedFromDomains.length > 0 ? allowedFromDomains : undefined,
           integrationSubscriptions: canManageIntegrations
-            ? value.integrationIds.map(integrationId => ({
+            ? selectedIntegrationIds.map(integrationId => ({
                 integrationId,
                 eventType: "email.received" as const,
               }))
@@ -374,6 +443,7 @@ export const CreateAddressForm = ({
         return;
       }
 
+      setSelectedIntegrationProvider("");
       form.reset({
         ...form.state.values,
         localPart: "",
@@ -385,29 +455,6 @@ export const CreateAddressForm = ({
       });
     },
   });
-
-  useEffect(() => {
-    const previousDefaultMaxReceivedEmails =
-      previousDefaultMaxReceivedEmailsRef.current;
-    const currentMaxReceivedEmailCount =
-      form.state.values.maxReceivedEmailCount;
-
-    if (
-      currentMaxReceivedEmailCount === undefined ||
-      currentMaxReceivedEmailCount === previousDefaultMaxReceivedEmails
-    ) {
-      form.setFieldValue(
-        "maxReceivedEmailCount",
-        resolvedMaxReceivedEmailsPerAddress,
-        {
-          dontUpdateMeta: true,
-        }
-      );
-    }
-
-    previousDefaultMaxReceivedEmailsRef.current =
-      resolvedMaxReceivedEmailsPerAddress;
-  }, [form, resolvedMaxReceivedEmailsPerAddress]);
 
   const hasSubmitAttempted = form.state.submissionAttempts > 0;
 
@@ -682,58 +729,227 @@ export const CreateAddressForm = ({
                     name="integrationIds"
                     children={field => (
                       <Field>
-                        <FieldLabel>Integrations</FieldLabel>
-                        <div className="space-y-2 rounded-md border border-border/70 bg-background/70 p-3">
-                          {availableIntegrations.length > 0 ? (
-                            availableIntegrations.map(integration => {
-                              const checked = field.state.value.includes(
-                                integration.id
-                              );
-
-                              return (
-                                <label
-                                  key={integration.id}
-                                  className="flex cursor-pointer items-start gap-3"
-                                >
-                                  <Checkbox
-                                    checked={checked}
-                                    className="mt-0.5"
-                                    onCheckedChange={nextChecked =>
-                                      field.handleChange(
-                                        nextChecked
-                                          ? [
-                                              ...field.state.value,
-                                              integration.id,
-                                            ]
-                                          : field.state.value.filter(
-                                              value => value !== integration.id
-                                            )
-                                      )
+                        <FieldGroup className="gap-3">
+                          <Field className="rounded-lg border border-border/70 bg-background/10">
+                            <div className="flex items-center gap-3 px-3 py-3">
+                              <span className="flex items-center gap-2">
+                                <HugeiconsIcon
+                                  icon={ConnectIcon}
+                                  strokeWidth={1.9}
+                                  className="size-4 text-muted-foreground"
+                                />
+                                <FieldTitle>Integrations</FieldTitle>
+                              </span>
+                              <div className="ml-auto flex items-center gap-2">
+                                <Badge variant="outline">
+                                  {field.state.value.length}/
+                                  {availableIntegrations.length}
+                                </Badge>
+                                <Switch
+                                  aria-label="Enable integrations"
+                                  className="cursor-pointer"
+                                  checked={areIntegrationsEnabled}
+                                  disabled={
+                                    availableIntegrationProviders.length === 0
+                                  }
+                                  onCheckedChange={checked => {
+                                    if (checked) {
+                                      setSelectedIntegrationProvider(
+                                        availableIntegrationProviders[0] ?? ""
+                                      );
+                                      return;
                                     }
-                                  />
-                                  <span className="space-y-0.5 text-sm">
-                                    <span className="block font-medium">
-                                      {integration.name}
-                                    </span>
-                                    <span className="block text-muted-foreground">
-                                      Telegram to{" "}
-                                      {integration.publicConfig.chatLabel ??
-                                        integration.publicConfig.chatId}
-                                    </span>
-                                  </span>
-                                </label>
-                              );
-                            })
-                          ) : (
-                            <p className="text-sm text-muted-foreground">
-                              No active integrations available yet.
-                            </p>
-                          )}
-                        </div>
-                        <FieldDescription>
-                          Forward `email.received` events from this address to
-                          one or more active integrations.
-                        </FieldDescription>
+
+                                    setSelectedIntegrationProvider("");
+                                    field.handleChange([]);
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {areIntegrationsEnabled ? (
+                              <div className="border-t border-border/70 px-3 py-3">
+                                <FieldGroup className="gap-4">
+                                  <FieldSet>
+                                    <FieldLegend variant="label">
+                                      Providers
+                                    </FieldLegend>
+                                    <RadioGroup
+                                      value={
+                                        resolvedSelectedIntegrationProvider
+                                      }
+                                      onValueChange={value =>
+                                        setSelectedIntegrationProvider(
+                                          value as IntegrationProvider
+                                        )
+                                      }
+                                      className="sm:grid-cols-2"
+                                    >
+                                      {availableIntegrationProviders.map(
+                                        provider => {
+                                          const ProviderIcon =
+                                            getIntegrationProviderIcon(
+                                              provider
+                                            );
+                                          const providerFieldId = `address-integration-provider-${provider}`;
+
+                                          return (
+                                            <Field key={provider}>
+                                              <FieldLabel
+                                                htmlFor={providerFieldId}
+                                              >
+                                                <Field
+                                                  orientation="horizontal"
+                                                  className="items-center cursor-pointer"
+                                                >
+                                                  <RadioGroupItem
+                                                    id={providerFieldId}
+                                                    value={provider}
+                                                    className="mt-0.75!"
+                                                  />
+                                                  <FieldContent className="min-w-0">
+                                                    <span className="flex items-center gap-2 text-sm font-medium">
+                                                      <HugeiconsIcon
+                                                        icon={ProviderIcon}
+                                                        strokeWidth={1.9}
+                                                        className="size-4 text-muted-foreground"
+                                                      />
+                                                      {
+                                                        INTEGRATION_PROVIDER_LABELS[
+                                                          provider
+                                                        ]
+                                                      }
+                                                    </span>
+                                                  </FieldContent>
+                                                  <Badge
+                                                    variant="outline"
+                                                    aria-hidden="true"
+                                                  >
+                                                    {
+                                                      availableIntegrationsByProvider[
+                                                        provider
+                                                      ]?.length
+                                                    }
+                                                  </Badge>
+                                                </Field>
+                                              </FieldLabel>
+                                            </Field>
+                                          );
+                                        }
+                                      )}
+                                    </RadioGroup>
+                                  </FieldSet>
+
+                                  {resolvedSelectedIntegrationProvider ? (
+                                    <FieldSet>
+                                      <FieldLegend variant="label">
+                                        Connections
+                                      </FieldLegend>
+                                      <div className="rounded-lg border border-border/60 bg-background/20">
+                                        <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-3">
+                                          <span className="flex items-center gap-2 text-sm font-medium">
+                                            <HugeiconsIcon
+                                              icon={getIntegrationProviderIcon(
+                                                resolvedSelectedIntegrationProvider
+                                              )}
+                                              strokeWidth={1.9}
+                                              className="size-4 text-muted-foreground"
+                                            />
+                                            {
+                                              INTEGRATION_PROVIDER_LABELS[
+                                                resolvedSelectedIntegrationProvider
+                                              ]
+                                            }
+                                          </span>
+                                          <Badge variant="outline">
+                                            {
+                                              selectedProviderIntegrations.filter(
+                                                integration =>
+                                                  field.state.value.includes(
+                                                    integration.id
+                                                  )
+                                              ).length
+                                            }
+                                            /
+                                            {
+                                              selectedProviderIntegrations.length
+                                            }
+                                          </Badge>
+                                        </div>
+
+                                        <ScrollArea className="max-h-56">
+                                          <FieldGroup className="gap-2 p-3">
+                                            {selectedProviderIntegrations.map(
+                                              integration => {
+                                                const checked =
+                                                  field.state.value.includes(
+                                                    integration.id
+                                                  );
+                                                const integrationFieldId = `address-integration-${integration.id}`;
+
+                                                return (
+                                                  <Field
+                                                    key={integration.id}
+                                                    orientation="horizontal"
+                                                    className="rounded-lg border border-border/60 bg-background/30 px-3 py-2.5"
+                                                  >
+                                                    <Checkbox
+                                                      id={integrationFieldId}
+                                                      checked={checked}
+                                                      className="mt-0.75! cursor-pointer"
+                                                      onCheckedChange={nextChecked =>
+                                                        field.handleChange(
+                                                          nextChecked
+                                                            ? [
+                                                                ...field.state
+                                                                  .value,
+                                                                integration.id,
+                                                              ]
+                                                            : field.state.value.filter(
+                                                                value =>
+                                                                  value !==
+                                                                  integration.id
+                                                              )
+                                                        )
+                                                      }
+                                                    />
+                                                    <FieldContent className="min-w-0">
+                                                      <FieldLabel
+                                                        htmlFor={
+                                                          integrationFieldId
+                                                        }
+                                                        className="w-full cursor-pointer"
+                                                      >
+                                                        {integration.name}
+                                                      </FieldLabel>
+                                                      <FieldDescription>
+                                                        {"Send emails to "}
+                                                        {
+                                                          INTEGRATION_PROVIDER_LABELS[
+                                                            integration.provider
+                                                          ]
+                                                        }{" "}
+                                                        {"("}
+                                                        {getIntegrationConnectionSummary(
+                                                          integration
+                                                        )}
+                                                        {")"}
+                                                      </FieldDescription>
+                                                    </FieldContent>
+                                                  </Field>
+                                                );
+                                              }
+                                            )}
+                                          </FieldGroup>
+                                        </ScrollArea>
+                                      </div>
+                                    </FieldSet>
+                                  ) : null}
+                                </FieldGroup>
+                              </div>
+                            ) : null}
+                          </Field>
+                        </FieldGroup>
                       </Field>
                     )}
                   />
@@ -749,12 +965,6 @@ export const CreateAddressForm = ({
                     Required
                   </span>
                 </div>
-
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Each new address starts with the default limit of{" "}
-                  {resolvedMaxReceivedEmailsPerAddress.toLocaleString()} stored
-                  emails.
-                </p>
 
                 <div className="mt-3 space-y-3">
                   <form.Field
