@@ -1,26 +1,25 @@
 import * as React from "react";
-import { UserRound } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { TimezonePickerField } from "@/features/settings/components/timezone-picker";
 import { UserProfileTimezoneSection } from "@/features/settings/components/user-profile-timezone-section";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
-import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 import {
   normalizeTimeZone,
   type TimeZoneSource,
 } from "@/features/timezone/lib/resolve-timezone";
 import { authClient } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { TextMorph } from "torph/react";
 
 const userProfileSchema = z
   .object({
@@ -198,19 +197,6 @@ const UserProfilePanelBody = ({
         const hasNameChanges = values.name.trim() !== currentName;
         const hasTimezoneChanges = nextTimezone !== currentTimezone;
         const hasChanges = hasNameChanges || hasTimezoneChanges;
-        const previewTimeZone =
-          values.manualTimezone && normalizedSelectedTimeZone
-            ? normalizedSelectedTimeZone
-            : effectiveTimeZone;
-        const previewValue = formatDateTimeInTimeZone({
-          value: new Date(),
-          timeZone: previewTimeZone,
-          options: {
-            dateStyle: "full",
-            timeStyle: "long",
-          },
-          fallback: "Unavailable",
-        });
 
         return (
           <form
@@ -230,12 +216,7 @@ const UserProfilePanelBody = ({
 
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel
-                      className="text-muted-foreground"
-                      htmlFor={field.name}
-                    >
-                      Name
-                    </FieldLabel>
+                    <FieldLabel htmlFor={field.name}>Name</FieldLabel>
                     <Input
                       id={field.name}
                       name={field.name}
@@ -268,7 +249,6 @@ const UserProfilePanelBody = ({
             <UserProfileTimezoneSection
               effectiveTimeZone={effectiveTimeZone}
               source={source}
-              previewValue={previewValue}
               manualTimezoneField={
                 <form.Field
                   name="manualTimezone"
@@ -333,7 +313,14 @@ const UserProfilePanelBody = ({
                   !hasChanges
                 }
               >
-                {updateProfileMutation.isPending ? "Saving..." : "Save changes"}
+                {updateProfileMutation.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+                <TextMorph>
+                  {updateProfileMutation.isPending
+                    ? "Saving..."
+                    : "Save changes"}
+                </TextMorph>
               </Button>
             </div>
           </form>
@@ -400,24 +387,18 @@ export const UserProfilePanel = ({
       });
     },
   });
-
-  const content = (
-    <>
-      <CardHeader
-        className={cn(
-          "space-y-1 border-b border-border/70 pb-4",
-          headerClassName
-        )}
+  return (
+    <div
+      id={wrapperId}
+      data-with-card={withCard ? "true" : "false"}
+      className={cn(
+        "min-w-0 rounded-lg border border-border/70 p-4 scroll-mt-24 md:scroll-mt-28",
+        wrapperClassName
+      )}
+    >
+      <div
+        className={cn("space-y-5 text-sm", headerClassName, contentClassName)}
       >
-        <CardTitle className="flex items-center gap-2 text-[15px]">
-          <UserRound
-            aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-muted-foreground"
-          />
-          <span>User Profile</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={cn("pt-3 text-sm", contentClassName)}>
         <emailForm.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,
@@ -447,12 +428,7 @@ export const UserProfilePanel = ({
 
                       return (
                         <div className="space-y-1 sm:col-start-1 sm:col-end-2">
-                          <FieldLabel
-                            className="text-muted-foreground"
-                            htmlFor="email-input"
-                          >
-                            Email
-                          </FieldLabel>
+                          <FieldLabel htmlFor="email-input">Email</FieldLabel>
                           <Input
                             id="email-input"
                             name={field.name}
@@ -530,30 +506,7 @@ export const UserProfilePanel = ({
             />
           )}
         </emailForm.Subscribe>
-      </CardContent>
-    </>
-  );
-
-  if (!withCard) {
-    return (
-      <div
-        id={wrapperId}
-        className={cn("min-w-0 scroll-mt-24 md:scroll-mt-28", wrapperClassName)}
-      >
-        {content}
       </div>
-    );
-  }
-
-  return (
-    <Card
-      id={wrapperId}
-      className={cn(
-        "border-border/70 bg-card/60 scroll-mt-24 md:scroll-mt-28",
-        wrapperClassName
-      )}
-    >
-      {content}
-    </Card>
+    </div>
   );
 };

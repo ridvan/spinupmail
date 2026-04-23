@@ -1,53 +1,108 @@
+import {
+  Key01Icon,
+  LockIcon,
+  SmartPhone01Icon,
+  UserIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useLocation, useNavigate } from "react-router";
 import { ApiKeysPanel } from "@/features/settings/components/api-keys-panel";
 import { ChangePasswordPanel } from "@/features/settings/components/change-password-panel";
 import { TwoFactorPanel } from "@/features/settings/components/two-factor-panel";
 import { UserProfilePanel } from "@/features/settings/components/user-profile-panel";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const settingsSections = [
+  {
+    id: "profile",
+    label: "Profile",
+    icon: UserIcon,
+    render: () => <UserProfilePanel />,
+  },
+  {
+    id: "password",
+    label: "Password",
+    icon: LockIcon,
+    render: () => <ChangePasswordPanel />,
+  },
+  {
+    id: "two-factor",
+    label: "Two-Factor",
+    icon: SmartPhone01Icon,
+    render: () => <TwoFactorPanel />,
+  },
+  {
+    id: "api-keys",
+    label: "API Keys",
+    icon: Key01Icon,
+    render: () => <ApiKeysPanel />,
+  },
+] as const;
+
+type SettingsSectionId = (typeof settingsSections)[number]["id"];
+
+const settingsSectionIds = new Set(settingsSections.map(section => section.id));
+
+const getActiveSettingsSection = (hash: string) => {
+  const sectionId = hash.startsWith("#") ? hash.slice(1) : hash;
+  return settingsSectionIds.has(sectionId as SettingsSectionId)
+    ? (sectionId as SettingsSectionId)
+    : "profile";
+};
 
 export const SettingsPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeSection = getActiveSettingsSection(location.hash);
+
   return (
-    <div className="space-y-6 [&_button]:cursor-pointer">
-      <Card className="border-border/70 bg-card/60">
-        <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:space-y-0">
-          <UserProfilePanel
-            withCard={false}
-            wrapperId="profile"
-            wrapperClassName="min-w-0 lg:contents"
-            headerClassName="min-w-0 lg:col-start-1 lg:row-start-1"
-            contentClassName="min-w-0 pt-4 lg:col-start-1 lg:row-start-2 lg:pr-6"
-          />
-          <Separator className="bg-border/70 lg:hidden" />
-          <div className="hidden lg:block lg:col-start-2 lg:row-start-1" />
-          <Separator
-            orientation="vertical"
-            className="hidden bg-border/70 lg:mb-2 lg:mt-4 lg:block lg:col-start-2 lg:row-start-2"
-          />
-          <ChangePasswordPanel
-            withCard={false}
-            wrapperId="password"
-            wrapperClassName="min-w-0 lg:contents"
-            headerClassName="min-w-0 lg:col-start-3 lg:row-start-1"
-            contentClassName="min-w-0 pt-4 lg:col-start-3 lg:row-start-2 lg:pl-6"
-          />
-        </div>
-      </Card>
+    <Tabs
+      className="flex w-full max-w-2xl flex-col gap-6 [&_button]:cursor-pointer"
+      value={activeSection}
+      onValueChange={value => {
+        const nextSection = getActiveSettingsSection(String(value));
+        const nextHash = `#${nextSection}`;
 
-      <section
-        id="two-factor"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="Two-factor authentication"
-      >
-        <TwoFactorPanel />
-      </section>
+        if (location.hash === nextHash) return;
 
-      <section
-        id="api-keys"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="API keys"
-      >
-        <ApiKeysPanel />
-      </section>
-    </div>
+        void navigate(
+          {
+            pathname: location.pathname,
+            hash: nextHash,
+          },
+          { replace: true }
+        );
+      }}
+    >
+      <div>
+        <TabsList
+          aria-label="Settings sections"
+          variant="line"
+          className="min-w-max border-b border-border/70 p-0 gap-6"
+        >
+          {settingsSections.map(section => (
+            <TabsTrigger key={section.id} value={section.id}>
+              <HugeiconsIcon
+                data-icon="inline-start"
+                icon={section.icon}
+                strokeWidth={2}
+              />
+              {section.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+
+      {settingsSections.map(section => (
+        <TabsContent
+          key={section.id}
+          id={section.id}
+          value={section.id}
+          className="min-w-0 scroll-mt-24 md:scroll-mt-28"
+        >
+          {section.render()}
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 };

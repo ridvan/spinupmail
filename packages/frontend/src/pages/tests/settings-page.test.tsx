@@ -1,59 +1,15 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "@/pages/settings-page";
 
 vi.mock("@/features/settings/components/user-profile-panel", () => ({
-  UserProfilePanel: ({
-    withCard = true,
-    wrapperId,
-    wrapperClassName,
-    headerClassName,
-    contentClassName,
-  }: {
-    withCard?: boolean;
-    wrapperId?: string;
-    wrapperClassName?: string;
-    headerClassName?: string;
-    contentClassName?: string;
-  }) => (
-    <div
-      data-testid="user-profile-panel"
-      data-with-card={String(withCard)}
-      data-wrapper-id={wrapperId ?? ""}
-      data-wrapper-class={wrapperClassName ?? ""}
-      data-header-class={headerClassName ?? ""}
-      data-content-class={contentClassName ?? ""}
-    >
-      User Profile Section
-    </div>
-  ),
+  UserProfilePanel: () => <div data-testid="user-profile-panel" />,
 }));
 
 vi.mock("@/features/settings/components/change-password-panel", () => ({
-  ChangePasswordPanel: ({
-    withCard = true,
-    wrapperId,
-    wrapperClassName,
-    headerClassName,
-    contentClassName,
-  }: {
-    withCard?: boolean;
-    wrapperId?: string;
-    wrapperClassName?: string;
-    headerClassName?: string;
-    contentClassName?: string;
-  }) => (
-    <div
-      data-testid="change-password-panel"
-      data-with-card={String(withCard)}
-      data-wrapper-id={wrapperId ?? ""}
-      data-wrapper-class={wrapperClassName ?? ""}
-      data-header-class={headerClassName ?? ""}
-      data-content-class={contentClassName ?? ""}
-    >
-      Password Section
-    </div>
-  ),
+  ChangePasswordPanel: () => <div data-testid="change-password-panel" />,
 }));
 
 vi.mock("@/features/settings/components/two-factor-panel", () => ({
@@ -64,82 +20,58 @@ vi.mock("@/features/settings/components/api-keys-panel", () => ({
   ApiKeysPanel: () => <div data-testid="api-keys-panel" />,
 }));
 
+const LocationDisplay = () => {
+  const location = useLocation();
+
+  return (
+    <div data-testid="location-display">{`${location.pathname}${location.hash}`}</div>
+  );
+};
+
 describe("SettingsPage", () => {
-  it("renders profile and password inside one responsive card", () => {
-    const { container } = render(<SettingsPage />);
-
-    const userProfilePanels = screen.getAllByTestId("user-profile-panel");
-    const changePasswordPanels = screen.getAllByTestId("change-password-panel");
-
-    expect(userProfilePanels).toHaveLength(1);
-    expect(changePasswordPanels).toHaveLength(1);
-
-    for (const panel of [...userProfilePanels, ...changePasswordPanels]) {
-      expect(panel.getAttribute("data-with-card")).toBe("false");
-    }
-
-    const cards = container.querySelectorAll('[data-slot="card"]');
-    expect(cards).toHaveLength(1);
-
-    const responsiveGrid = cards[0]?.firstElementChild;
-    expect(responsiveGrid).toBeTruthy();
-    expect(responsiveGrid?.getAttribute("class")).toContain(
-      "lg:grid-rows-[auto_1fr]"
+  it("defaults to the profile section and shows tabs", () => {
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsPage />
+      </MemoryRouter>
     );
 
-    const desktopUserProfilePanel = userProfilePanels[0];
-    const desktopChangePasswordPanel = changePasswordPanels[0];
-
     expect(
-      desktopUserProfilePanel.getAttribute("data-wrapper-class")
-    ).toContain("lg:contents");
-    expect(
-      desktopChangePasswordPanel.getAttribute("data-wrapper-class")
-    ).toContain("lg:contents");
-    expect(desktopUserProfilePanel.getAttribute("data-header-class")).toContain(
-      "row-start-1"
-    );
-    expect(
-      desktopUserProfilePanel.getAttribute("data-content-class")
-    ).toContain("row-start-2");
-    expect(
-      desktopChangePasswordPanel.getAttribute("data-header-class")
-    ).toContain("row-start-1");
-    expect(
-      desktopChangePasswordPanel.getAttribute("data-content-class")
-    ).toContain("row-start-2");
-    expect(desktopUserProfilePanel.getAttribute("data-wrapper-id")).toBe(
-      "profile"
-    );
-    expect(desktopChangePasswordPanel.getAttribute("data-wrapper-id")).toBe(
-      "password"
-    );
-
-    const separators = container.querySelectorAll('[data-slot="separator"]');
-    expect(separators).toHaveLength(2);
-    const verticalSeparator = Array.from(separators).find(separator =>
-      separator.className.includes("lg:block")
-    );
-    expect(verticalSeparator).toBeTruthy();
-    expect(
-      verticalSeparator?.getAttribute("data-orientation") === "vertical" ||
-        verticalSeparator?.getAttribute("aria-orientation") === "vertical" ||
-        verticalSeparator?.hasAttribute("data-vertical")
-    ).toBe(true);
-    expect(
-      desktopUserProfilePanel.compareDocumentPosition(
-        desktopChangePasswordPanel
-      ) & Node.DOCUMENT_POSITION_FOLLOWING
+      screen.getByRole("tablist", { name: "Settings sections" })
     ).toBeTruthy();
+    expect(
+      screen.getByRole("tab", { name: "Profile", selected: true })
+    ).toBeTruthy();
+    expect(screen.getByTestId("user-profile-panel")).toBeTruthy();
+    expect(screen.queryByTestId("change-password-panel")).toBeNull();
+    expect(screen.queryByTestId("two-factor-panel")).toBeNull();
+    expect(screen.queryByTestId("api-keys-panel")).toBeNull();
+  });
 
-    const twoFactorSection = screen
-      .getByTestId("two-factor-panel")
-      .closest("section");
-    const apiKeysSection = screen
-      .getByTestId("api-keys-panel")
-      .closest("section");
+  it("selects the section from the hash and updates the hash when tabs change", async () => {
+    const user = userEvent.setup();
 
-    expect(twoFactorSection?.id).toBe("two-factor");
-    expect(apiKeysSection?.id).toBe("api-keys");
+    render(
+      <MemoryRouter initialEntries={["/settings#api-keys"]}>
+        <SettingsPage />
+        <LocationDisplay />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId("api-keys-panel")).toBeTruthy();
+    expect(screen.queryByTestId("user-profile-panel")).toBeNull();
+    expect(screen.getByTestId("location-display").textContent).toBe(
+      "/settings#api-keys"
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Two-Factor" }));
+
+    expect(screen.getByTestId("two-factor-panel")).toBeTruthy();
+    expect(
+      screen.getByRole("tab", { name: "Two-Factor", selected: true })
+    ).toBeTruthy();
+    expect(screen.getByTestId("location-display").textContent).toBe(
+      "/settings#two-factor"
+    );
   });
 });

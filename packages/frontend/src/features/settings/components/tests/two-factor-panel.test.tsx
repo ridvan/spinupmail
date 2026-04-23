@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import {
   fireEvent,
   render,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { TwoFactorPanel } from "@/features/settings/components/two-factor-panel";
 import { authClient } from "@/lib/auth";
+import { TestQueryProvider } from "@/test/render-utils";
 
 vi.mock("@/features/auth/hooks/use-auth", () => ({
   useAuth: vi.fn(),
@@ -88,6 +90,13 @@ const resolveToastPromise = <T,>(
   return promise as Promise<T>;
 };
 
+const renderTwoFactorPanel = (props?: ComponentProps<typeof TwoFactorPanel>) =>
+  render(
+    <TestQueryProvider>
+      <TwoFactorPanel {...props} />
+    </TestQueryProvider>
+  );
+
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -112,26 +121,20 @@ describe("TwoFactorPanel", () => {
     mockedDisable.mockResolvedValue({ error: null, data: null });
   });
 
-  it("renders status badges with icons for enabled and disabled states", () => {
+  it("renders the enabled and disabled 2FA layouts", () => {
     mockedUseAuth.mockReturnValue(buildAuthState({ twoFactorEnabled: true }));
 
-    const { unmount } = render(<TwoFactorPanel />);
-    const enabledBadge = screen
-      .getByText("Enabled")
-      .closest("[data-slot=badge]");
-    expect(enabledBadge).toBeTruthy();
-    expect(enabledBadge?.querySelector("svg")).toBeTruthy();
+    const { unmount } = renderTwoFactorPanel();
+    expect(screen.getByText("Regenerate backup codes")).toBeTruthy();
+    expect(screen.getByText("Disable 2FA")).toBeTruthy();
 
     unmount();
 
     mockedUseAuth.mockReturnValue(buildAuthState({ twoFactorEnabled: false }));
 
-    render(<TwoFactorPanel />);
-    const disabledBadge = screen
-      .getByText("Disabled")
-      .closest("[data-slot=badge]");
-    expect(disabledBadge).toBeTruthy();
-    expect(disabledBadge?.querySelector("svg")).toBeTruthy();
+    renderTwoFactorPanel();
+    expect(screen.getByText("Start setup")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable 2FA" })).toBeTruthy();
   });
 
   it("starts 2FA setup and shows verification UI", async () => {
@@ -144,7 +147,7 @@ describe("TwoFactorPanel", () => {
       },
     });
 
-    render(<TwoFactorPanel />);
+    renderTwoFactorPanel();
 
     fireEvent.change(screen.getByLabelText("Current password"), {
       target: { value: "password-123" },
@@ -154,23 +157,23 @@ describe("TwoFactorPanel", () => {
     await waitFor(() =>
       expect(mockedEnable).toHaveBeenCalledWith({ password: "password-123" })
     );
-    await waitFor(() => expect(screen.getByText("Scan QR code")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Scan QR Code")).toBeTruthy());
     expect(screen.getByText("Manual setup key")).toBeTruthy();
   });
 
   it("renders setup guidance as an ordered list and accepts card class overrides", () => {
     mockedUseAuth.mockReturnValue(buildAuthState({ twoFactorEnabled: false }));
 
-    const { container } = render(
-      <TwoFactorPanel cardClassName="rounded-xl border-border" />
-    );
+    const { container } = renderTwoFactorPanel({
+      cardClassName: "rounded-xl border-border",
+    });
 
     const orderedList = container.querySelector("ol");
     expect(orderedList).toBeTruthy();
     expect(orderedList?.querySelectorAll("li")).toHaveLength(3);
 
-    const card = container.querySelector('[data-slot="card"]');
-    expect(card?.getAttribute("class")).toContain("rounded-xl");
+    const root = container.firstElementChild;
+    expect(root?.getAttribute("class")).toContain("rounded-xl");
   });
 
   it("disables 2FA after confirmation input and refreshes session", async () => {
@@ -181,7 +184,7 @@ describe("TwoFactorPanel", () => {
       buildAuthState({ twoFactorEnabled: true, refreshSession })
     );
 
-    render(<TwoFactorPanel />);
+    renderTwoFactorPanel();
 
     const disableButton = screen.getByRole("button", { name: "Disable 2FA" });
     const disableForm = disableButton.closest("form");

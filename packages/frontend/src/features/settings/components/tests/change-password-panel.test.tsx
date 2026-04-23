@@ -173,13 +173,11 @@ describe("ChangePasswordPanel", () => {
       signOut: vi.fn(),
     });
 
-    renderChangePasswordPanel({
+    const { container } = renderChangePasswordPanel({
       wrapperClassName: "password-wrapper-test",
     });
 
-    expect(
-      screen.getByText("Password").closest(".password-wrapper-test")
-    ).toBeTruthy();
+    expect(container.querySelector(".password-wrapper-test")).toBeTruthy();
   });
 
   it("emails a password setup link for accounts without credentials", async () => {

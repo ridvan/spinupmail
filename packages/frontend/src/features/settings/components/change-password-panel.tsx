@@ -1,18 +1,19 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LockKeyhole } from "lucide-react";
 import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { useSendPasswordSetupEmailMutation } from "@/features/auth/hooks/use-auth-mutations";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { TextMorph } from "torph/react";
 
 const changePasswordSchema = z
   .object({
@@ -141,26 +142,22 @@ export const ChangePasswordPanel = ({
     },
   });
 
-  const content = (
-    <>
-      <CardHeader
-        className={cn(
-          "space-y-1 border-b border-border/70 pb-4",
-          headerClassName
-        )}
-      >
-        <CardTitle className="flex items-center gap-2 text-[15px]">
-          <LockKeyhole
-            aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-muted-foreground"
-          />
-          <span>Password</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={cn("pt-3", contentClassName)}>
+  return (
+    <div
+      id={wrapperId}
+      data-with-card={withCard ? "true" : "false"}
+      className={cn(
+        "min-w-0 rounded-lg border border-border/70 p-4 scroll-mt-24 md:scroll-mt-28",
+        wrapperClassName
+      )}
+    >
+      <div className={cn("space-y-5", headerClassName, contentClassName)}>
         {isCheckingPasswordState ? (
-          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
-            Checking how this account signs in...
+          <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-3">
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-44 rounded-sm" />
+              <Skeleton className="h-4 w-60 max-w-full rounded-sm" />
+            </div>
           </div>
         ) : null}
 
@@ -260,10 +257,7 @@ export const ChangePasswordPanel = ({
 
                     return (
                       <Field data-invalid={isInvalid}>
-                        <FieldLabel
-                          htmlFor={field.name}
-                          className="text-muted-foreground"
-                        >
+                        <FieldLabel htmlFor={field.name}>
                           Current password
                         </FieldLabel>
                         <Input
@@ -298,10 +292,7 @@ export const ChangePasswordPanel = ({
 
                     return (
                       <Field data-invalid={isInvalid}>
-                        <FieldLabel
-                          htmlFor={field.name}
-                          className="text-muted-foreground"
-                        >
+                        <FieldLabel htmlFor={field.name}>
                           New password
                         </FieldLabel>
                         <Input
@@ -336,10 +327,7 @@ export const ChangePasswordPanel = ({
 
                     return (
                       <Field data-invalid={isInvalid}>
-                        <FieldLabel
-                          htmlFor={field.name}
-                          className="text-muted-foreground"
-                        >
+                        <FieldLabel htmlFor={field.name}>
                           Confirm new password
                         </FieldLabel>
                         <Input
@@ -369,8 +357,9 @@ export const ChangePasswordPanel = ({
                 <form.Field
                   name="revokeOtherSessions"
                   children={field => (
-                    <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+                    <label className="flex items-start gap-3 text-sm">
                       <Checkbox
+                        className="mt-0.5"
                         checked={field.state.value}
                         onCheckedChange={checked =>
                           field.handleChange(Boolean(checked))
@@ -399,39 +388,21 @@ export const ChangePasswordPanel = ({
                       !canSubmit
                     }
                   >
-                    {changePasswordMutation.isPending
-                      ? "Updating..."
-                      : "Update password"}
+                    {changePasswordMutation.isPending ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : null}
+                    <TextMorph>
+                      {changePasswordMutation.isPending
+                        ? "Updating..."
+                        : "Update password"}
+                    </TextMorph>
                   </Button>
                 </div>
               </form>
             )}
           </form.Subscribe>
         ) : null}
-      </CardContent>
-    </>
-  );
-
-  if (!withCard) {
-    return (
-      <div
-        id={wrapperId}
-        className={cn("min-w-0 scroll-mt-24 md:scroll-mt-28", wrapperClassName)}
-      >
-        {content}
       </div>
-    );
-  }
-
-  return (
-    <Card
-      id={wrapperId}
-      className={cn(
-        "border-border/70 bg-card/60 scroll-mt-24 md:scroll-mt-28",
-        wrapperClassName
-      )}
-    >
-      {content}
-    </Card>
+    </div>
   );
 };

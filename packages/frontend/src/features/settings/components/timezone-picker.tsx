@@ -12,7 +12,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError } from "@/components/ui/field";
 import {
   Popover,
   PopoverContent,
@@ -241,7 +241,6 @@ export const TimezonePickerField = React.memo(
 
     return (
       <Field data-invalid={isInvalid}>
-        <FieldLabel className="text-muted-foreground">Timezone</FieldLabel>
         <Popover
           open={isTimezoneMenuOpen}
           modal={false}
@@ -253,7 +252,7 @@ export const TimezonePickerField = React.memo(
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-between font-normal"
+                className="max-w-102 justify-between font-normal"
                 disabled={disabled}
                 onMouseEnter={handleTimezoneTriggerMouseEnter}
                 onMouseLeave={handleTimezoneTriggerMouseLeave}

@@ -315,10 +315,6 @@ describe("UserProfilePanel", () => {
       wrapperClassName: "profile-wrapper-test",
     });
 
-    expect(
-      container
-        .querySelector('[data-slot="card"]')
-        ?.className.includes("profile-wrapper-test")
-    ).toBe(true);
+    expect(container.querySelector(".profile-wrapper-test")).toBeTruthy();
   });
 });

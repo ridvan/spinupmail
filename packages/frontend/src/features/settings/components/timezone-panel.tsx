@@ -6,7 +6,6 @@ import { TimezoneCommandList } from "@/features/settings/components/timezone-pic
 import { UserProfileTimezoneSection } from "@/features/settings/components/user-profile-timezone-section";
 import { useFilteredTimeZones } from "@/features/settings/lib/timezone-picker";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
-import { formatDateTimeInTimeZone } from "@/features/timezone/lib/date-format";
 
 const TimezonePanelEditor = ({
   effectiveTimeZone,
@@ -25,16 +24,6 @@ const TimezonePanelEditor = ({
   );
   const { filteredTimeZones } = useFilteredTimeZones(searchValue);
 
-  const previewTimeZone = manualMode ? selectedTimeZone : effectiveTimeZone;
-  const previewValue = formatDateTimeInTimeZone({
-    value: new Date(),
-    timeZone: previewTimeZone,
-    options: {
-      dateStyle: "full",
-      timeStyle: "long",
-    },
-    fallback: "Unavailable",
-  });
   const hasChanges = manualMode
     ? selectedTimeZone !== (savedTimeZone ?? "")
     : Boolean(savedTimeZone);
@@ -74,7 +63,6 @@ const TimezonePanelEditor = ({
         <UserProfileTimezoneSection
           effectiveTimeZone={effectiveTimeZone}
           source={source}
-          previewValue={previewValue}
           manualTimezoneField={
             <label className="flex items-start gap-3 text-sm">
               <Checkbox

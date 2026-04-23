@@ -2,20 +2,15 @@ import * as React from "react";
 import {
   Copy01Icon,
   Key01Icon,
-  LockIcon,
   QrCodeIcon,
-  SecurityCheckIcon,
   SmartPhone01Icon,
-  SquareUnlock02Icon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
+import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,11 +25,13 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { authClient, type AuthUser } from "@/lib/auth";
 import { QRCode } from "@/lib/react-qr-code";
 import { cn } from "@/lib/utils";
+import { TextMorph } from "torph/react";
 
 const OTP_LENGTH = 6;
 
@@ -55,21 +52,21 @@ type SetupState = {
 const setupSteps = [
   {
     id: "authenticator-app",
-    title: "Authenticator app",
+    title: "1. Install a 2FA app",
     icon: SmartPhone01Icon,
-    description: "1. Install Google Authenticator or similar apps.",
+    description: "e.g. Google Authenticator.",
   },
   {
     id: "quick-setup",
-    title: "Quick setup",
+    title: "2. Quick setup",
     icon: QrCodeIcon,
-    description: "2. Scan the QR code and enter one verification code.",
+    description: "Scan QR code and verify.",
   },
   {
     id: "backup-codes",
-    title: "Backup codes",
+    title: "3. Backup codes",
     icon: Key01Icon,
-    description: "3. Save recovery codes in case you lose your device.",
+    description: "Store them in a safe place.",
   },
 ] as const;
 
@@ -124,6 +121,38 @@ export const TwoFactorPanel = ({
     []
   );
 
+  const enableTwoFactorMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const result = await authClient.twoFactor.enable({
+        password,
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message || "Unable to start 2FA setup");
+      }
+
+      const totpURI = result.data?.totpURI;
+      if (!totpURI) {
+        throw new Error("Missing TOTP setup URI");
+      }
+
+      return {
+        totpURI,
+        backupCodes: result.data?.backupCodes ?? [],
+      };
+    },
+    onSuccess: ({ backupCodes, totpURI }) => {
+      setSetupState({
+        totpURI,
+        secret: getSecretFromTotpURI(totpURI),
+        backupCodes,
+      });
+      setDidCopySetupKey(false);
+      enableForm.reset();
+      verifySetupForm.reset();
+    },
+  });
+
   const enableForm = useForm({
     defaultValues: {
       password: "",
@@ -132,29 +161,7 @@ export const TwoFactorPanel = ({
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      const enablePromise = (async () => {
-        const result = await authClient.twoFactor.enable({
-          password: value.password,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message || "Unable to start 2FA setup");
-        }
-
-        const totpURI = result.data?.totpURI;
-        if (!totpURI) {
-          throw new Error("Missing TOTP setup URI");
-        }
-
-        setSetupState({
-          totpURI,
-          secret: getSecretFromTotpURI(totpURI),
-          backupCodes: result.data?.backupCodes ?? [],
-        });
-        setDidCopySetupKey(false);
-        enableForm.reset();
-        verifySetupForm.reset();
-      })();
+      const enablePromise = enableTwoFactorMutation.mutateAsync(value.password);
 
       await toast.promise(enablePromise, {
         loading: "Preparing 2FA setup...",
@@ -172,26 +179,51 @@ export const TwoFactorPanel = ({
       onSubmit: setupCodeSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      const verifyPromise = (async () => {
-        const result = await authClient.twoFactor.verifyTotp({
-          code: value.code,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message || "Invalid verification code");
-        }
-
-        setGeneratedBackupCodes(setupState?.backupCodes ?? null);
-        await refreshSession();
-        setSetupState(null);
-        verifySetupForm.reset();
-      })();
+      const verifyPromise = verifyTwoFactorMutation.mutateAsync(value.code);
 
       await toast.promise(verifyPromise, {
         loading: "Verifying setup code...",
         success: "Two-factor authentication is now enabled.",
         error: error => getErrorMessage(error, "Unable to verify setup code"),
       });
+    },
+  });
+
+  const verifyTwoFactorMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const result = await authClient.twoFactor.verifyTotp({
+        code,
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message || "Invalid verification code");
+      }
+    },
+    onSuccess: async () => {
+      setGeneratedBackupCodes(setupState?.backupCodes ?? null);
+      await refreshSession();
+      setSetupState(null);
+      verifySetupForm.reset();
+    },
+  });
+
+  const regenerateBackupCodesMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const result = await authClient.twoFactor.generateBackupCodes({
+        password,
+      });
+
+      if (result.error) {
+        throw new Error(
+          result.error.message || "Unable to generate backup codes"
+        );
+      }
+
+      return result.data?.backupCodes ?? [];
+    },
+    onSuccess: backupCodes => {
+      setGeneratedBackupCodes(backupCodes);
+      regenerateBackupCodesForm.reset();
     },
   });
 
@@ -203,20 +235,9 @@ export const TwoFactorPanel = ({
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      const regeneratePromise = (async () => {
-        const result = await authClient.twoFactor.generateBackupCodes({
-          password: value.password,
-        });
-
-        if (result.error) {
-          throw new Error(
-            result.error.message || "Unable to generate backup codes"
-          );
-        }
-
-        setGeneratedBackupCodes(result.data?.backupCodes ?? []);
-        regenerateBackupCodesForm.reset();
-      })();
+      const regeneratePromise = regenerateBackupCodesMutation.mutateAsync(
+        value.password
+      );
 
       await toast.promise(regeneratePromise, {
         loading: "Generating backup codes...",
@@ -224,6 +245,26 @@ export const TwoFactorPanel = ({
         error: error =>
           getErrorMessage(error, "Unable to generate backup codes"),
       });
+    },
+  });
+
+  const disableTwoFactorMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const result = await authClient.twoFactor.disable({
+        password,
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message || "Unable to disable 2FA");
+      }
+    },
+    onSuccess: async () => {
+      await refreshSession();
+      disableForm.reset();
+      verifySetupForm.reset();
+      regenerateBackupCodesForm.reset();
+      setSetupState(null);
+      setGeneratedBackupCodes(null);
     },
   });
 
@@ -235,22 +276,9 @@ export const TwoFactorPanel = ({
       onSubmit: passwordSubmitSchema,
     },
     onSubmit: async ({ value }) => {
-      const disablePromise = (async () => {
-        const result = await authClient.twoFactor.disable({
-          password: value.password,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message || "Unable to disable 2FA");
-        }
-
-        await refreshSession();
-        disableForm.reset();
-        verifySetupForm.reset();
-        regenerateBackupCodesForm.reset();
-        setSetupState(null);
-        setGeneratedBackupCodes(null);
-      })();
+      const disablePromise = disableTwoFactorMutation.mutateAsync(
+        value.password
+      );
 
       await toast.promise(disablePromise, {
         loading: "Disabling 2FA...",
@@ -302,345 +330,48 @@ export const TwoFactorPanel = ({
   };
 
   return (
-    <Card className={cn("border-border/70 bg-card/60", cardClassName)}>
-      <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="flex items-center gap-2 text-[15px]">
-            <HugeiconsIcon
-              aria-hidden="true"
-              icon={SecurityCheckIcon}
-              className="h-4 w-4 shrink-0 text-muted-foreground"
-              strokeWidth={2}
-            />
-            <span>Two-Factor Authentication</span>
-          </CardTitle>
-          <Badge
-            className="inline-flex items-center gap-1.5"
-            variant={twoFactorEnabled ? "default" : "outline"}
-          >
-            {twoFactorEnabled ? (
-              <HugeiconsIcon
-                aria-hidden="true"
-                icon={LockIcon}
-                className="size-3.5"
-                strokeWidth={2}
-              />
-            ) : (
-              <HugeiconsIcon
-                aria-hidden="true"
-                icon={SquareUnlock02Icon}
-                className="size-3.5"
-                strokeWidth={2}
-              />
-            )}
-            {twoFactorEnabled ? "Enabled" : "Disabled"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5 pt-1">
-        {!twoFactorEnabled && !setupState ? (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-stretch">
-            <div className="w-full max-w-none rounded-lg border border-border/70 bg-background/40 p-4 xl:max-w-md">
-              <form
-                className="space-y-4"
-                noValidate
-                onSubmit={event => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  void enableForm.handleSubmit();
-                }}
-              >
-                <div className="space-y-1.5">
-                  <p className="text-[15px] font-medium">Start setup</p>
-                </div>
-
-                <enableForm.Field
-                  name="password"
-                  children={field => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
-
-                    return (
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel
-                          htmlFor={field.name}
-                          className="text-muted-foreground"
-                        >
-                          Current password
-                        </FieldLabel>
-                        <Input
-                          autoComplete="current-password"
-                          aria-invalid={isInvalid}
-                          id={field.name}
-                          name={field.name}
-                          type="password"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={event =>
-                            field.handleChange(event.target.value)
-                          }
-                        />
-                        {isInvalid ? (
-                          <FieldError
-                            errors={toFieldErrors(field.state.meta.errors)}
-                          />
-                        ) : null}
-                      </Field>
-                    );
-                  }}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    className="min-w-32"
-                    disabled={enableForm.state.isSubmitting}
-                    type="submit"
-                  >
-                    {enableForm.state.isSubmitting
-                      ? "Preparing..."
-                      : "Enable 2FA"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-
-            <div className="space-y-4 py-1">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h3 className="text-[15px] font-semibold leading-tight text-balance">
-                    Secure your sign-in with 2FA
-                  </h3>
-                  <div className="inline-flex items-center gap-2 border border-border/70 bg-background/70 px-2 py-0.5 text-[12px] rounded-full font-medium text-muted-foreground">
+    <div className={cn("space-y-5", cardClassName)}>
+      {!twoFactorEnabled && !setupState ? (
+        <div className="space-y-4">
+          <div className="space-y-4">
+            <ol className="grid list-none gap-3 sm:grid-cols-3">
+              {setupSteps.map(step => (
+                <li
+                  key={step.id}
+                  className="rounded-lg border border-border/60 bg-background/55 p-3"
+                >
+                  <div className="flex items-center gap-2">
                     <HugeiconsIcon
                       aria-hidden="true"
-                      icon={Tick02Icon}
-                      className="h-3.5 w-3.5"
+                      icon={step.icon}
+                      className="h-4 w-4 shrink-0 text-muted-foreground"
                       strokeWidth={2}
                     />
-                    Recommended
+                    <p className="text-sm font-medium">{step.title}</p>
                   </div>
-                </div>
-              </div>
-
-              <ol className="grid list-none gap-3 sm:grid-cols-3">
-                {setupSteps.map(step => (
-                  <li
-                    key={step.id}
-                    className="rounded-lg border border-border/60 bg-background/55 p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <HugeiconsIcon
-                        aria-hidden="true"
-                        icon={step.icon}
-                        className="h-4 w-4 shrink-0 text-muted-foreground"
-                        strokeWidth={2}
-                      />
-                      <p className="text-sm font-medium">{step.title}</p>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        ) : null}
-
-        {setupState ? (
-          <div className="space-y-4 rounded-lg border border-border/70 bg-background/40 p-5">
-            <div className="space-y-2 text-center">
-              <p className="text-sm font-medium">Scan QR code</p>
-              <p className="text-sm text-muted-foreground">
-                Scan with Google Authenticator, 1Password, Authy, or any TOTP
-                app. Then enter the 6-digit code below.
-              </p>
-            </div>
-
-            <div className="mx-auto grid w-full max-w-4xl gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
-              <div className="mx-auto w-full max-w-[200px] border border-border/70 bg-white p-4 mt-1 shadow-sm">
-                <QRCode
-                  bgColor="#FFFFFF"
-                  fgColor="#111111"
-                  level="M"
-                  size={198}
-                  style={{ height: "auto", width: "100%" }}
-                  value={setupState.totpURI}
-                  viewBox="0 0 256 256"
-                />
-              </div>
-
-              <div className="mx-auto w-full max-w-xl space-y-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Manual setup key</p>
-                  <p className="text-sm text-muted-foreground">
-                    If scanning fails, paste this key into your authenticator
-                    app.
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {step.description}
                   </p>
-                  <InputGroup className="h-9">
-                    <InputGroupInput
-                      readOnly
-                      className="font-mono text-xs"
-                      value={setupState.secret || setupState.totpURI}
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupButton
-                        aria-label="Copy setup key"
-                        onClick={() => void handleCopySetupKey()}
-                        size="xs"
-                        type="button"
-                        variant="outline"
-                      >
-                        <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
-                        {didCopySetupKey ? "Copied" : "Copy"}
-                      </InputGroupButton>
-                    </InputGroupAddon>
-                  </InputGroup>
-                </div>
-
-                <form
-                  className="space-y-2"
-                  noValidate
-                  onSubmit={event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    void verifySetupForm.handleSubmit();
-                  }}
-                >
-                  <verifySetupForm.Field
-                    name="code"
-                    children={field => {
-                      const isInvalid =
-                        field.state.meta.isTouched && !field.state.meta.isValid;
-
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel
-                            htmlFor={field.name}
-                            className="text-muted-foreground"
-                          >
-                            Verification code
-                          </FieldLabel>
-                          <InputOTP
-                            containerClassName="justify-start"
-                            id={field.name}
-                            maxLength={OTP_LENGTH}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={value =>
-                              field.handleChange(
-                                value.replace(/\D/g, "").slice(0, OTP_LENGTH)
-                              )
-                            }
-                          >
-                            <InputOTPGroup>
-                              <InputOTPSlot index={0} />
-                              <InputOTPSlot index={1} />
-                              <InputOTPSlot index={2} />
-                            </InputOTPGroup>
-                            <InputOTPSeparator />
-                            <InputOTPGroup>
-                              <InputOTPSlot index={3} />
-                              <InputOTPSlot index={4} />
-                              <InputOTPSlot index={5} />
-                            </InputOTPGroup>
-                          </InputOTP>
-                          {isInvalid ? (
-                            <FieldError
-                              errors={toFieldErrors(field.state.meta.errors)}
-                            />
-                          ) : null}
-                        </Field>
-                      );
-                    }}
-                  />
-
-                  <Button
-                    className="min-w-44"
-                    disabled={verifySetupForm.state.isSubmitting}
-                    type="submit"
-                  >
-                    {verifySetupForm.state.isSubmitting
-                      ? "Verifying..."
-                      : "Verify and turn on 2FA"}
-                  </Button>
-                </form>
-              </div>
-            </div>
+                </li>
+              ))}
+            </ol>
           </div>
-        ) : null}
 
-        {twoFactorEnabled ? (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="w-full rounded-lg border border-border/70 bg-background/40 p-4">
             <form
-              className="w-full space-y-3 rounded-lg border border-border/70 bg-background/40 p-4"
+              className="space-y-4"
               noValidate
               onSubmit={event => {
                 event.preventDefault();
                 event.stopPropagation();
-                void regenerateBackupCodesForm.handleSubmit();
+                void enableForm.handleSubmit();
               }}
             >
-              <p className="text-sm font-medium">Regenerate backup codes</p>
-              <regenerateBackupCodesForm.Field
-                name="password"
-                children={field => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
-
-                  return (
-                    <Field data-invalid={isInvalid}>
-                      <FieldLabel
-                        htmlFor={`regen-${field.name}`}
-                        className="text-muted-foreground"
-                      >
-                        Current password
-                      </FieldLabel>
-                      <Input
-                        autoComplete="current-password"
-                        aria-invalid={isInvalid}
-                        id={`regen-${field.name}`}
-                        name={field.name}
-                        type="password"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={event =>
-                          field.handleChange(event.target.value)
-                        }
-                      />
-                      {isInvalid ? (
-                        <FieldError
-                          errors={toFieldErrors(field.state.meta.errors)}
-                        />
-                      ) : null}
-                    </Field>
-                  );
-                }}
-              />
-              <div className="flex justify-end">
-                <Button
-                  className="min-w-44"
-                  disabled={regenerateBackupCodesForm.state.isSubmitting}
-                  type="submit"
-                  variant="outline"
-                >
-                  {regenerateBackupCodesForm.state.isSubmitting
-                    ? "Generating..."
-                    : "Generate new backup codes"}
-                </Button>
+              <div className="space-y-1.5">
+                <p className="text-[15px] font-medium">Start setup</p>
               </div>
-            </form>
 
-            <form
-              className="w-full space-y-3 rounded-lg border border-border/70 bg-background/40 p-4"
-              noValidate
-              onSubmit={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                void disableForm.handleSubmit();
-              }}
-            >
-              <p className="text-sm font-medium">Disable 2FA</p>
-              <disableForm.Field
+              <enableForm.Field
                 name="password"
                 children={field => {
                   const isInvalid =
@@ -649,7 +380,7 @@ export const TwoFactorPanel = ({
                   return (
                     <Field data-invalid={isInvalid}>
                       <FieldLabel
-                        htmlFor={`disable-${field.name}`}
+                        htmlFor={field.name}
                         className="text-muted-foreground"
                       >
                         Current password
@@ -657,7 +388,8 @@ export const TwoFactorPanel = ({
                       <Input
                         autoComplete="current-password"
                         aria-invalid={isInvalid}
-                        id={`disable-${field.name}`}
+                        disabled={enableTwoFactorMutation.isPending}
+                        id={field.name}
                         name={field.name}
                         type="password"
                         value={field.state.value}
@@ -678,49 +410,309 @@ export const TwoFactorPanel = ({
               <div className="flex justify-end">
                 <Button
                   className="min-w-32"
-                  disabled={disableForm.state.isSubmitting}
+                  disabled={enableTwoFactorMutation.isPending}
                   type="submit"
-                  variant="destructive"
                 >
-                  {disableForm.state.isSubmitting
-                    ? "Disabling..."
-                    : "Disable 2FA"}
+                  {enableTwoFactorMutation.isPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  <TextMorph>
+                    {enableTwoFactorMutation.isPending
+                      ? "Preparing..."
+                      : "Enable 2FA"}
+                  </TextMorph>
                 </Button>
               </div>
             </form>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {backupCodesToDisplay?.length ? (
-          <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/10 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">
-                Backup codes (save these somewhere safe)
-              </p>
-              <Button
-                className="min-w-24"
-                onClick={() => void handleCopyBackupCodes()}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
-                {didCopyBackupCodes ? "Copied" : "Copy codes"}
-              </Button>
+      {setupState ? (
+        <div className="space-y-4 rounded-lg border border-border/70 bg-background/40 p-5">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Scan QR Code</p>
+            <p className="text-sm text-muted-foreground">
+              Scan with Google Authenticator, Authy, or any TOTP app. Then enter
+              the 6-digit code below.
+            </p>
+          </div>
+
+          <div className="mx-auto grid w-full max-w-4xl gap-6 lg:grid-cols-[170px_minmax(0,1fr)] lg:items-center">
+            <div className="w-full max-w-[170px] border border-border/70 bg-white p-1 mt-1 shadow-sm rounded-md">
+              <QRCode
+                bgColor="#FFFFFF"
+                fgColor="#111111"
+                level="M"
+                size={198}
+                style={{ height: "auto", width: "100%" }}
+                value={setupState.totpURI}
+                viewBox="0 0 175 175"
+              />
             </div>
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-              {backupCodesToDisplay.map(code => (
-                <code
-                  className="rounded bg-background/80 px-2 py-1 text-xs"
-                  key={code}
+
+            <div className="mx-auto w-full max-w-xl space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Manual setup key</p>
+                <p className="text-sm text-muted-foreground">
+                  If scanning fails, paste this key into your app.
+                </p>
+                <InputGroup className="h-9">
+                  <InputGroupInput
+                    readOnly
+                    className="font-mono text-xs"
+                    value={setupState.secret || setupState.totpURI}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      aria-label="Copy setup key"
+                      onClick={() => void handleCopySetupKey()}
+                      size="xs"
+                      type="button"
+                      variant="outline"
+                    >
+                      <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
+                      <TextMorph>
+                        {didCopySetupKey ? "Copied" : "Copy"}
+                      </TextMorph>
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              </div>
+
+              <form
+                className="flex flex-row items-end"
+                noValidate
+                onSubmit={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void verifySetupForm.handleSubmit();
+                }}
+              >
+                <verifySetupForm.Field
+                  name="code"
+                  children={field => {
+                    const isInvalid =
+                      field.state.meta.isTouched && !field.state.meta.isValid;
+
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel htmlFor={field.name}>
+                          Verification code
+                        </FieldLabel>
+                        <InputOTP
+                          disabled={verifyTwoFactorMutation.isPending}
+                          containerClassName="justify-start"
+                          id={field.name}
+                          maxLength={OTP_LENGTH}
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={value =>
+                            field.handleChange(
+                              value.replace(/\D/g, "").slice(0, OTP_LENGTH)
+                            )
+                          }
+                        >
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                          </InputOTPGroup>
+                          <InputOTPSeparator />
+                          <InputOTPGroup>
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                        {isInvalid ? (
+                          <FieldError
+                            errors={toFieldErrors(field.state.meta.errors)}
+                          />
+                        ) : null}
+                      </Field>
+                    );
+                  }}
+                />
+
+                <Button
+                  className="cursor-pointer"
+                  disabled={verifyTwoFactorMutation.isPending}
+                  type="submit"
                 >
-                  {code}
-                </code>
-              ))}
+                  {verifyTwoFactorMutation.isPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  <TextMorph>
+                    {verifyTwoFactorMutation.isPending
+                      ? "Verifying..."
+                      : "Verify & Enable 2FA"}
+                  </TextMorph>
+                </Button>
+              </form>
             </div>
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      ) : null}
+
+      {twoFactorEnabled ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <form
+            className="w-full space-y-3 rounded-lg border border-border/70 bg-background/40 p-4"
+            noValidate
+            onSubmit={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              void regenerateBackupCodesForm.handleSubmit();
+            }}
+          >
+            <p className="text-sm font-medium">Regenerate backup codes</p>
+            <regenerateBackupCodesForm.Field
+              name="password"
+              children={field => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={`regen-${field.name}`}
+                      className="text-muted-foreground"
+                    >
+                      Current password
+                    </FieldLabel>
+                    <Input
+                      autoComplete="current-password"
+                      aria-invalid={isInvalid}
+                      disabled={regenerateBackupCodesMutation.isPending}
+                      id={`regen-${field.name}`}
+                      name={field.name}
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={event => field.handleChange(event.target.value)}
+                    />
+                    {isInvalid ? (
+                      <FieldError
+                        errors={toFieldErrors(field.state.meta.errors)}
+                      />
+                    ) : null}
+                  </Field>
+                );
+              }}
+            />
+            <div className="flex justify-end">
+              <Button
+                disabled={regenerateBackupCodesMutation.isPending}
+                type="submit"
+                variant="outline"
+              >
+                {regenerateBackupCodesMutation.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+                <TextMorph>
+                  {regenerateBackupCodesMutation.isPending
+                    ? "Generating..."
+                    : "Generate"}
+                </TextMorph>
+              </Button>
+            </div>
+          </form>
+
+          <form
+            className="w-full space-y-3 rounded-lg border border-border/70 bg-background/40 p-4"
+            noValidate
+            onSubmit={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              void disableForm.handleSubmit();
+            }}
+          >
+            <p className="text-sm font-medium">Disable 2FA</p>
+            <disableForm.Field
+              name="password"
+              children={field => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid;
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={`disable-${field.name}`}
+                      className="text-muted-foreground"
+                    >
+                      Current password
+                    </FieldLabel>
+                    <Input
+                      autoComplete="current-password"
+                      aria-invalid={isInvalid}
+                      disabled={disableTwoFactorMutation.isPending}
+                      id={`disable-${field.name}`}
+                      name={field.name}
+                      type="password"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={event => field.handleChange(event.target.value)}
+                    />
+                    {isInvalid ? (
+                      <FieldError
+                        errors={toFieldErrors(field.state.meta.errors)}
+                      />
+                    ) : null}
+                  </Field>
+                );
+              }}
+            />
+            <div className="flex justify-end">
+              <Button
+                className="min-w-32"
+                disabled={disableTwoFactorMutation.isPending}
+                type="submit"
+                variant="destructive"
+              >
+                {disableTwoFactorMutation.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+                <TextMorph>
+                  {disableTwoFactorMutation.isPending
+                    ? "Disabling..."
+                    : "Disable 2FA"}
+                </TextMorph>
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {backupCodesToDisplay?.length ? (
+        <div className="space-y-2 rounded-lg border p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Backup Codes</p>
+            <Button
+              className="min-w-24"
+              onClick={() => void handleCopyBackupCodes()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
+              <TextMorph>
+                {didCopyBackupCodes ? "Copied" : "Copy codes"}
+              </TextMorph>
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {backupCodesToDisplay.map(code => (
+              <span
+                className="rounded bg-muted/10 px-2 py-1.5 text-xs text-center font-mono"
+                key={code}
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 };

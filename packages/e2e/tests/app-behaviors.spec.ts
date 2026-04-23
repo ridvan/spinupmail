@@ -17,6 +17,9 @@ const navButton = (page: Page, text: string) =>
 const cardTitle = (page: Page, text: string) =>
   page.locator('[data-slot="card-title"]').filter({ hasText: text }).first();
 
+const settingsTab = (page: Page, text: string) =>
+  page.getByRole("tab", { name: text, exact: true });
+
 const openCommandMenu = async (page: Page) => {
   await page.getByRole("button", { name: "Open command menu" }).click();
 
@@ -92,7 +95,15 @@ test.describe("spinupmail app behaviors", () => {
     await passwordOption.click();
 
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings#password`);
-    await expect(cardTitle(page, "Password")).toBeVisible();
+    await expect(settingsTab(page, "Password")).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    await expect(
+      page
+        .getByRole("button", { name: "Update password" })
+        .or(page.getByRole("button", { name: "Email password setup link" }))
+    ).toBeVisible();
     await expect(dialog).toBeHidden();
   });
 

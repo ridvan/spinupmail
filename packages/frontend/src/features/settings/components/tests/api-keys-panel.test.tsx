@@ -93,16 +93,23 @@ describe("ApiKeysPanel", () => {
 
     render(<ApiKeysPanel />);
 
-    fireEvent.change(screen.getByPlaceholderText("Key label (optional)"), {
-      target: { value: "CI integration" },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText("A descriptive name, e.g. 'Jenkins'"),
+      {
+        target: { value: "CI integration" },
+      }
+    );
     fireEvent.click(screen.getByRole("button", { name: "Create key" }));
 
     await waitFor(() =>
       expect(createMutateAsync).toHaveBeenCalledWith("CI integration")
     );
     await waitFor(() => expect(screen.getByText("New API key")).toBeTruthy());
-    expect(screen.getByText("spin_live_secret_key_123")).toBeTruthy();
+    const createdKeyInput = screen.getByLabelText(
+      "New API key"
+    ) as HTMLInputElement;
+    expect(createdKeyInput.value).toBe("spin_live_secret_key_123");
+    expect(createdKeyInput.type).toBe("password");
     expect(mockedToastSuccess).toHaveBeenCalledWith(
       "API key created.",
       expect.objectContaining({
@@ -110,7 +117,10 @@ describe("ApiKeysPanel", () => {
       })
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show API key" }));
+    expect(createdKeyInput.type).toBe("text");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(

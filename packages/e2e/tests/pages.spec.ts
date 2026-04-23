@@ -17,6 +17,9 @@ const cardDescription = (page: Page, text: string) =>
     .filter({ hasText: text })
     .first();
 
+const settingsTab = (page: Page, text: string) =>
+  page.getByRole("tab", { name: text, exact: true });
+
 test.describe("spinupmail protected pages", () => {
   test.skip(!runE2E, "Set RUN_E2E=1 to run browser smoke tests.");
 
@@ -80,9 +83,10 @@ test.describe("spinupmail protected pages", () => {
 
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings`);
     await expect(page.getByLabel("Name", { exact: true })).toBeVisible();
-    await expect(cardTitle(page, "Password")).toBeVisible();
-    await expect(cardTitle(page, "Two-Factor Authentication")).toBeVisible();
-    await expect(cardTitle(page, "API Keys")).toBeVisible();
+    await expect(settingsTab(page, "Profile")).toBeVisible();
+    await expect(settingsTab(page, "Password")).toBeVisible();
+    await expect(settingsTab(page, "Two-Factor")).toBeVisible();
+    await expect(settingsTab(page, "API Keys")).toBeVisible();
   });
 
   test("renders the organization settings page", async ({ authSeed, page }) => {

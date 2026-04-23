@@ -171,7 +171,7 @@ const routes: RouteObject[] = [
       {
         path: "settings",
         element: <SettingsPage />,
-        handle: { title: "Settings" },
+        handle: { title: "Account Settings" },
       },
       {
         path: "organization/settings",
