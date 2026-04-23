@@ -29,6 +29,7 @@ import { toFieldErrors } from "@/lib/forms/to-field-errors";
 import { formatRole, roleBadgeVariant } from "./organization-settings-utils";
 import { OrganizationSettingsPanel } from "./organization-settings-panel";
 import { TextMorph } from "torph/react";
+import { Separator } from "@/components/ui/separator";
 
 const invitationFormSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -80,7 +81,7 @@ export const OrganizationInvitationsCard = ({
       setCreatedInviteLink(null);
       try {
         const createdLink = await onInviteMember({
-          email: value.email.trim(),
+          email: value.email,
           role: value.role,
         });
 
@@ -317,6 +318,8 @@ export const OrganizationInvitationsCard = ({
           </TableBody>
         </Table>
       ) : null}
+
+      {canManage && !isLoading ? <Separator /> : null}
 
       {canManage && !isLoading && invitations.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pending invitations.</p>

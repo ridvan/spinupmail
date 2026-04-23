@@ -323,14 +323,12 @@ export const OrganizationSettingsPage = () => {
     <div className="space-y-4">
       <HashTabsPage
         ariaLabel="Organization sections"
-        className="max-w-4xl"
+        className="max-w-3xl"
         defaultSection="organization-profile"
         sections={organizationSections.map(section => ({
           ...section,
           content: (
-            <section aria-label={section.label} id={section.id}>
-              {section.content}
-            </section>
+            <section aria-label={section.label}>{section.content}</section>
           ),
         }))}
       />

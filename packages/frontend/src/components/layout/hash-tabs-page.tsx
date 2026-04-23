@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode } from "react";
 import type { IconSvgElement } from "@hugeicons/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useLocation, useNavigate } from "react-router";
@@ -44,7 +44,10 @@ export const HashTabsPage = ({
 }: HashTabsPageProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const sectionIds = new Set(sections.map(section => section.id));
+  const sectionIds = useMemo(
+    () => new Set(sections.map(section => section.id)),
+    [sections]
+  );
   const activeSection = getActiveHashSection({
     hash: location.hash,
     defaultSection,
@@ -105,7 +108,7 @@ export const HashTabsPage = ({
       {sections.map(section => (
         <TabsContent
           key={section.id}
-          id={section.id}
+          data-section-id={section.id}
           value={section.id}
           className={cn(
             "min-w-0 scroll-mt-24 md:scroll-mt-28",
