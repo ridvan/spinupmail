@@ -333,13 +333,9 @@ const UserProfilePanelBody = ({
 export const UserProfilePanel = ({
   wrapperId,
   wrapperClassName,
-  headerClassName,
-  contentClassName,
 }: {
   wrapperId?: string;
   wrapperClassName?: string;
-  headerClassName?: string;
-  contentClassName?: string;
 }) => {
   const { user, refreshSession } = useAuth();
   const { effectiveTimeZone, savedTimeZone, source } = useTimezone();
@@ -393,9 +389,7 @@ export const UserProfilePanel = ({
         wrapperClassName
       )}
     >
-      <div
-        className={cn("space-y-5 text-sm", headerClassName, contentClassName)}
-      >
+      <div className="space-y-5 text-sm">
         <emailForm.Subscribe
           selector={state => ({
             canSubmit: state.canSubmit,

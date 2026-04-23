@@ -40,24 +40,12 @@ const useLiveTime = (timeZone: string) => {
     }
   }, [timeZone]);
 
-  const [currentTime, setCurrentTime] = React.useState(getCurrentTime);
-  const frameRef = React.useRef<number>(0);
-  const lastTickRef = React.useRef<number>(0);
+  const subscribe = React.useCallback((onStoreChange: () => void) => {
+    const intervalId = window.setInterval(onStoreChange, 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
-  React.useEffect(() => {
-    const tick = (timestamp: number) => {
-      if (timestamp - lastTickRef.current >= 1000) {
-        lastTickRef.current = timestamp;
-        setCurrentTime(getCurrentTime());
-      }
-      frameRef.current = requestAnimationFrame(tick);
-    };
-
-    frameRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [getCurrentTime]);
-
-  return currentTime;
+  return React.useSyncExternalStore(subscribe, getCurrentTime, () => "");
 };
 
 export const UserProfileTimezoneSection = ({
