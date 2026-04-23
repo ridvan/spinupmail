@@ -3,8 +3,8 @@ export const formatRole = (role: string) =>
 
 export const roleBadgeVariant = (
   role: string
-): "secondary" | "outline" | "ghost" => {
+): "outline" | "secondary" | "default" => {
   if (role === "owner") return "secondary";
-  if (role === "admin") return "outline";
-  return "ghost";
+  if (role === "admin") return "default";
+  return "outline";
 };

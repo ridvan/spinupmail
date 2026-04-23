@@ -1,5 +1,12 @@
 import * as React from "react";
+import {
+  ConnectIcon,
+  Mail01Icon,
+  Settings02Icon,
+  UserMultiple02Icon,
+} from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
+import { HashTabsPage } from "@/components/layout/hash-tabs-page";
 import {
   Card,
   CardDescription,
@@ -69,40 +76,19 @@ export const OrganizationSettingsPage = () => {
   const replayIntegrationDispatchMutation =
     useReplayIntegrationDispatchMutation();
 
-  const [organizationNameDraft, setOrganizationNameDraft] = React.useState<{
-    organizationId: string | null;
-    value: string;
-  } | null>(null);
-  const [inviteEmail, setInviteEmail] = React.useState("");
-  const [inviteRole, setInviteRole] = React.useState<"member" | "admin">(
-    "member"
-  );
-  const [createdInviteLink, setCreatedInviteLink] = React.useState<
-    string | null
-  >(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const members = membersQuery.data ?? activeOrganizationMembers;
   const invitations = canManage
-    ? (invitationsQuery.data ?? activeOrganization?.invitations ?? [])
+    ? (invitationsQuery.data ?? activeOrganization?.invitations ?? []).filter(
+        inv => inv.status !== "canceled"
+      )
     : [];
-  const activeOrganizationId = activeOrganization?.id ?? null;
-  const organizationName =
-    organizationNameDraft?.organizationId === activeOrganizationId
-      ? organizationNameDraft.value
-      : (activeOrganization?.name ?? "");
 
   const handleError = (error: unknown, fallback: string) => {
     const message = toErrorMessage(error, fallback);
     setErrorMessage(message);
     toast.error(message);
-  };
-
-  const handleOrganizationNameChange = (value: string) => {
-    setOrganizationNameDraft({
-      organizationId: activeOrganizationId,
-      value,
-    });
   };
 
   const copyToClipboard = async (value: string, successMessage: string) => {
@@ -114,8 +100,7 @@ export const OrganizationSettingsPage = () => {
     }
   };
 
-  const handleRenameOrganization = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleRenameOrganization = async (organizationName: string) => {
     if (!canManage) return;
     setErrorMessage(null);
 
@@ -124,28 +109,30 @@ export const OrganizationSettingsPage = () => {
       toast.success("Organization name updated.");
     } catch (error) {
       handleError(error, "Unable to update organization name");
+      throw error;
     }
   };
 
-  const handleInviteMember = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!canManage) return;
+  const handleInviteMember = async ({
+    email,
+    role,
+  }: {
+    email: string;
+    role: "member" | "admin";
+  }) => {
+    if (!canManage) return null;
     setErrorMessage(null);
-    setCreatedInviteLink(null);
 
     try {
       const invitation = await inviteMemberMutation.mutateAsync({
-        email: inviteEmail.trim(),
-        role: inviteRole,
+        email: email.trim(),
+        role,
       });
-      if (invitation?.id) {
-        setCreatedInviteLink(buildInvitationUrl(invitation.id));
-      }
-      setInviteEmail("");
-      setInviteRole("member");
       toast.success("Invitation sent.");
+      return invitation?.id ? buildInvitationUrl(invitation.id) : null;
     } catch (error) {
       handleError(error, "Unable to invite member");
+      throw error;
     }
   };
 
@@ -212,32 +199,25 @@ export const OrganizationSettingsPage = () => {
     );
   }
 
-  const organizationNameChanged =
-    activeOrganization != null &&
-    organizationName.trim() !== activeOrganization.name.trim();
   const pendingInvitationsCount = invitations.filter(
     invitation => invitation.status === "pending"
   ).length;
   const currentUserRole = currentMember?.role ?? "member";
-
-  return (
-    <div className="space-y-6 [&_button]:cursor-pointer">
-      <section
-        id="organization-profile"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="Organization profile"
-      >
+  const organizationSections = [
+    {
+      id: "organization-profile",
+      label: "Profile",
+      icon: Settings02Icon,
+      content: (
         <OrganizationProfileCard
+          key={activeOrganization?.id ?? "organization-profile"}
           activeOrganization={activeOrganization ?? null}
           isLoading={isProfileLoading}
           canManage={canManage}
           membersCount={members.length}
           pendingInvitationsCount={pendingInvitationsCount}
           currentUserRole={currentUserRole}
-          organizationName={organizationName}
-          organizationNameChanged={organizationNameChanged}
           isRenamePending={updateOrganizationMutation.isPending}
-          onOrganizationNameChange={handleOrganizationNameChange}
           onRenameOrganization={handleRenameOrganization}
           onCopyOrganizationId={() =>
             activeOrganization
@@ -248,13 +228,13 @@ export const OrganizationSettingsPage = () => {
               : undefined
           }
         />
-      </section>
-
-      <section
-        id="organization-members"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="Organization members"
-      >
+      ),
+    },
+    {
+      id: "organization-members",
+      label: "Members",
+      icon: UserMultiple02Icon,
+      content: (
         <OrganizationMembersCard
           members={members}
           isLoading={isMembersLoading}
@@ -268,13 +248,40 @@ export const OrganizationSettingsPage = () => {
           }
           onRemoveMember={memberId => void handleRemoveMember(memberId)}
         />
-      </section>
-
-      <section
-        id="organization-integrations"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="Organization integrations"
-      >
+      ),
+    },
+    {
+      id: "organization-invitations",
+      label: "Invitations",
+      icon: Mail01Icon,
+      content: (
+        <OrganizationInvitationsCard
+          key={activeOrganization?.id ?? "organization-invitations"}
+          canManage={canManage}
+          isLoading={isInvitationsLoading}
+          pendingInvitationsCount={pendingInvitationsCount}
+          invitations={invitations}
+          isInviteMemberPending={inviteMemberMutation.isPending}
+          isCancelInvitationPending={cancelInvitationMutation.isPending}
+          onInviteMember={handleInviteMember}
+          onCopyCreatedInviteLink={value =>
+            void copyToClipboard(value, "Invitation link copied.")
+          }
+          onCopyInvitationLink={invitationId =>
+            void copyToClipboard(
+              buildInvitationUrl(invitationId),
+              "Invitation link copied."
+            )
+          }
+          onCancelInvite={invitationId => void handleCancelInvite(invitationId)}
+        />
+      ),
+    },
+    {
+      id: "organization-integrations",
+      label: "Integrations",
+      icon: ConnectIcon,
+      content: (
         <OrganizationIntegrationsCard
           canManage={canManage}
           integrations={integrationsQuery.data ?? undefined}
@@ -308,39 +315,25 @@ export const OrganizationSettingsPage = () => {
             })
           }
         />
-      </section>
+      ),
+    },
+  ] as const;
 
-      <section
-        id="organization-invitations"
-        className="scroll-mt-24 md:scroll-mt-28"
-        aria-label="Organization invitations"
-      >
-        <OrganizationInvitationsCard
-          canManage={canManage}
-          isLoading={isInvitationsLoading}
-          pendingInvitationsCount={pendingInvitationsCount}
-          inviteEmail={inviteEmail}
-          inviteRole={inviteRole}
-          createdInviteLink={createdInviteLink}
-          invitations={invitations}
-          isInviteMemberPending={inviteMemberMutation.isPending}
-          isCancelInvitationPending={cancelInvitationMutation.isPending}
-          onInviteEmailChange={setInviteEmail}
-          onInviteRoleChange={setInviteRole}
-          onInviteMember={handleInviteMember}
-          onCopyCreatedInviteLink={() => {
-            if (!createdInviteLink) return;
-            void copyToClipboard(createdInviteLink, "Invitation link copied.");
-          }}
-          onCopyInvitationLink={invitationId =>
-            void copyToClipboard(
-              buildInvitationUrl(invitationId),
-              "Invitation link copied."
-            )
-          }
-          onCancelInvite={invitationId => void handleCancelInvite(invitationId)}
-        />
-      </section>
+  return (
+    <div className="space-y-4">
+      <HashTabsPage
+        ariaLabel="Organization sections"
+        className="max-w-4xl"
+        defaultSection="organization-profile"
+        sections={organizationSections.map(section => ({
+          ...section,
+          content: (
+            <section aria-label={section.label} id={section.id}>
+              {section.content}
+            </section>
+          ),
+        }))}
+      />
 
       {errorMessage ? (
         <p role="alert" className="text-sm text-destructive">

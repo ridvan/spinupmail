@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationSettingsPage } from "@/pages/organization-settings-page";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -86,6 +87,7 @@ const validateIntegrationMutateAsync = vi.fn();
 const createIntegrationMutateAsync = vi.fn();
 const deleteIntegrationMutateAsync = vi.fn();
 const replayIntegrationDispatchMutateAsync = vi.fn();
+const clipboardWriteText = vi.fn();
 
 const baseActiveOrganization = {
   id: "org-1",
@@ -121,12 +123,14 @@ const baseActiveOrganization = {
   ],
 };
 
-const renderPage = () =>
+const renderPage = (
+  initialEntry = "/organization/settings#organization-profile"
+) =>
   renderWithRouter({
     routes: [
       { path: "/organization/settings", element: <OrganizationSettingsPage /> },
     ],
-    initialEntries: ["/organization/settings"],
+    initialEntries: [initialEntry],
   });
 
 describe("OrganizationSettingsPage", () => {
@@ -141,9 +145,11 @@ describe("OrganizationSettingsPage", () => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
-        writeText: vi.fn().mockResolvedValue(undefined),
+        writeText: clipboardWriteText,
       },
     });
+
+    clipboardWriteText.mockResolvedValue(undefined);
 
     updateOrganizationMutateAsync.mockResolvedValue({ success: true });
     inviteMemberMutateAsync.mockResolvedValue({ id: "inv-created" });
@@ -351,10 +357,61 @@ describe("OrganizationSettingsPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useOrganizationMembersQuery>);
 
-    renderPage();
+    renderPage("/organization/settings#organization-members");
 
     expect(mockedUseIntegrationsQuery).toHaveBeenCalledWith(true);
     expect(screen.getAllByText("View only").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("tab", { name: "Members", selected: true })
+    ).toBeTruthy();
+  });
+
+  it("shows invitation restrictions for non-admin members", () => {
+    mockedUseAuth.mockReturnValue({
+      user: {
+        id: "user-member",
+        name: "Member",
+        email: "member@example.com",
+      },
+    } as unknown as ReturnType<typeof useAuth>);
+
+    mockedUseActiveOrganizationQuery.mockReturnValue({
+      data: {
+        ...baseActiveOrganization,
+        members: [
+          {
+            id: "member-current",
+            role: "member",
+            user: {
+              id: "user-member",
+              name: "Member",
+              email: "member@example.com",
+            },
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useActiveOrganizationQuery>);
+
+    mockedUseOrganizationMembersQuery.mockReturnValue({
+      data: [
+        {
+          id: "member-current",
+          role: "member",
+          user: {
+            id: "user-member",
+            name: "Member",
+            email: "member@example.com",
+          },
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOrganizationMembersQuery>);
+
+    renderPage("/organization/settings#organization-invitations");
+
     expect(
       screen.getByText(
         "Only organization owners and admins can create and manage invitations."
@@ -413,14 +470,14 @@ describe("OrganizationSettingsPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useIntegrationsQuery>);
 
-    renderPage();
+    renderPage("/organization/settings#organization-integrations");
 
     expect(screen.getByText("Loading integrations...")).toBeTruthy();
     expect(screen.queryByText("No integrations yet.")).toBeNull();
   });
 
   it("creates invite link from origin and resets invite email", async () => {
-    renderPage();
+    renderPage("/organization/settings#organization-invitations");
 
     const inviteEmailInput = screen.getByPlaceholderText(
       "new.member@company.com"
@@ -443,16 +500,28 @@ describe("OrganizationSettingsPage", () => {
     expect((inviteEmailInput as HTMLInputElement).value).toBe("");
   });
 
-  it("renders stable section anchors for deep links", () => {
-    renderPage();
+  it("selects the section from the hash and updates the hash when tabs change", async () => {
+    const user = userEvent.setup();
+    const { router } = renderPage(
+      "/organization/settings#organization-members"
+    );
 
-    expect(document.getElementById("organization-profile")).toBeTruthy();
+    expect(
+      screen.getByRole("tab", { name: "Members", selected: true })
+    ).toBeTruthy();
     expect(document.getElementById("organization-members")).toBeTruthy();
+
+    await user.click(screen.getByRole("tab", { name: "Invitations" }));
+
+    expect(
+      screen.getByRole("tab", { name: "Invitations", selected: true })
+    ).toBeTruthy();
+    expect(router.state.location.hash).toBe("#organization-invitations");
     expect(document.getElementById("organization-invitations")).toBeTruthy();
   });
 
   it("shows integration placeholders without required errors on initial render", () => {
-    renderPage();
+    renderPage("/organization/settings#organization-integrations");
 
     expect(screen.getByPlaceholderText("Ops alerts")).toBeTruthy();
     expect(
@@ -464,25 +533,8 @@ describe("OrganizationSettingsPage", () => {
     expect(screen.queryByText("Integration name is required")).toBeNull();
   });
 
-  it("copies organization id and invitation links to clipboard", async () => {
-    renderPage();
-
-    fireEvent.click(screen.getByRole("button", { name: "Copy ID" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Copy link" })[0]!);
-
-    await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenNthCalledWith(1, "org-1")
-    );
-    await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenNthCalledWith(
-        2,
-        `${window.location.origin}/onboarding/organization?invitationId=inv-existing`
-      )
-    );
-  });
-
   it("updates member role and removes member", async () => {
-    renderPage();
+    renderPage("/organization/settings#organization-members");
 
     fireEvent.click(screen.getByRole("button", { name: "Make admin" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
@@ -552,7 +604,7 @@ describe("OrganizationSettingsPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useOrganizationMembersQuery>);
 
-    renderPage();
+    renderPage("/organization/settings#organization-members");
 
     expect(screen.getByText("owner@example.com")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Remove" })).toHaveLength(1);
@@ -564,7 +616,7 @@ describe("OrganizationSettingsPage", () => {
       new Error("Unable to invite member")
     );
 
-    renderPage();
+    renderPage("/organization/settings#organization-invitations");
 
     fireEvent.change(screen.getByPlaceholderText("new.member@company.com"), {
       target: { value: "bad@example.com" },

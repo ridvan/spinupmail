@@ -98,9 +98,10 @@ test.describe("spinupmail protected pages", () => {
     await page.goto("/organization/settings");
 
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/organization/settings`);
-    await expect(cardTitle(page, "Organization Profile")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Profile" })).toBeVisible();
     await expect(cardDescription(page, "Organization Page Org")).toBeVisible();
-    await expect(cardTitle(page, "Members")).toBeVisible();
-    await expect(cardTitle(page, "Invitations")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Members" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Invitations" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Integrations" })).toBeVisible();
   });
 });

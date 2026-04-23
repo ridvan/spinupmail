@@ -14,7 +14,6 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChevronLeftIcon,
   type ChevronLeftIconHandle,
@@ -48,6 +47,7 @@ import type {
   ValidatedIntegrationConnection,
 } from "@/lib/api";
 import { useIntegrationDispatchesQuery } from "@/features/organization/hooks/use-integrations";
+import { OrganizationSettingsPanel } from "./organization-settings-panel";
 
 type OrganizationIntegrationsCardProps = {
   canManage: boolean;
@@ -430,7 +430,6 @@ export const OrganizationIntegrationsCard = ({
   const handleValidate = async () => {
     setSubmitAttempted(true);
     if (draftError) {
-      toast.error(draftError);
       return;
     }
 
@@ -451,7 +450,6 @@ export const OrganizationIntegrationsCard = ({
   const handleCreate = async () => {
     setSubmitAttempted(true);
     if (draftError) {
-      toast.error(draftError);
       return;
     }
     if (!isValidatedDraft) {
@@ -504,272 +502,250 @@ export const OrganizationIntegrationsCard = ({
 
   return (
     <>
-      <Card className="border-border/70 bg-card/60">
-        <CardHeader className="space-y-1 border-b border-border/70 pb-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="text-[15px]">Integrations</CardTitle>
-            </div>
-          </div>
-        </CardHeader>
+      <OrganizationSettingsPanel contentClassName="space-y-4">
+        {canManage ? (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="rounded-lg border border-border/70 bg-background/45 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={TelegramIcon}
+                  className="size-4 text-muted-foreground"
+                />
+                <p className="text-sm font-medium">Add Telegram integration</p>
+              </div>
 
-        <CardContent className="space-y-4 pt-4">
-          {canManage ? (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="rounded-lg border border-border/70 bg-background/70 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <HugeiconsIcon
-                    icon={TelegramIcon}
-                    className="size-4 text-muted-foreground"
-                  />
-                  <p className="text-sm font-medium">
-                    Add Telegram integration
+              <FieldGroup>
+                <div className="grid gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="integration-name">Name</FieldLabel>
+                    <Input
+                      id="integration-name"
+                      placeholder="Ops alerts"
+                      value={draft.name}
+                      maxLength={TELEGRAM_BOT_NAME_MAX_LENGTH}
+                      onBlur={() => handleFieldBlur("name")}
+                      onChange={event =>
+                        handleDraftChange("name", event.target.value)
+                      }
+                    />
+                    {showFieldError("name") ? (
+                      <FieldError errors={[{ message: draftErrors.name! }]} />
+                    ) : null}
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="integration-bot-token">
+                      Bot token
+                    </FieldLabel>
+                    <div className="relative">
+                      <Input
+                        id="integration-bot-token"
+                        type={isBotTokenVisible ? "text" : "password"}
+                        autoComplete="new-password"
+                        className="pr-10"
+                        placeholder="123456789:AAExampleBotToken"
+                        value={draft.botToken}
+                        maxLength={TELEGRAM_BOT_TOKEN_MAX_LENGTH}
+                        onBlur={() => handleFieldBlur("botToken")}
+                        onChange={event =>
+                          handleDraftChange("botToken", event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex w-9 items-center justify-center"
+                        aria-label={
+                          isBotTokenVisible
+                            ? "Hide bot token"
+                            : "Show bot token"
+                        }
+                        onClick={() =>
+                          setIsBotTokenVisible(current => !current)
+                        }
+                      >
+                        {isBotTokenVisible ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                    {showFieldError("botToken") ? (
+                      <FieldError
+                        errors={[{ message: draftErrors.botToken! }]}
+                      />
+                    ) : null}
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="integration-chat-id">
+                      Chat ID
+                    </FieldLabel>
+                    <Input
+                      id="integration-chat-id"
+                      placeholder="-1001234567890 or @ops_room"
+                      value={draft.chatId}
+                      maxLength={TELEGRAM_CHAT_ID_MAX_LENGTH}
+                      onBlur={() => handleFieldBlur("chatId")}
+                      onChange={event =>
+                        handleDraftChange("chatId", event.target.value)
+                      }
+                    />
+                    {showFieldError("chatId") ? (
+                      <FieldError errors={[{ message: draftErrors.chatId! }]} />
+                    ) : null}
+                  </Field>
+                </div>
+
+                {validationError ? (
+                  <FieldError errors={[{ message: validationError }]} />
+                ) : null}
+                {createError ? (
+                  <FieldError errors={[{ message: createError }]} />
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isValidating}
+                    onClick={() => void handleValidate()}
+                  >
+                    Validate
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={
+                      isCreating ||
+                      telegramIntegrations.length >=
+                        INTEGRATION_MAX_PER_ORGANIZATION
+                    }
+                    onClick={() => void handleCreate()}
+                  >
+                    Save Integration
+                  </Button>
+                </div>
+              </FieldGroup>
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-background/45 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Preview</p>
+                <Badge variant="outline">
+                  {isValidatedDraft ? "Validated" : "Draft"}
+                </Badge>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border/70 bg-muted/25 p-3">
+                <div className="space-y-1">
+                  <p className="font-medium">{previewName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Integration name
                   </p>
                 </div>
 
-                <FieldGroup>
-                  <div className="grid gap-3">
-                    <Field>
-                      <FieldLabel htmlFor="integration-name">Name</FieldLabel>
-                      <Input
-                        id="integration-name"
-                        placeholder="Ops alerts"
-                        value={draft.name}
-                        maxLength={TELEGRAM_BOT_NAME_MAX_LENGTH}
-                        onBlur={() => handleFieldBlur("name")}
-                        onChange={event =>
-                          handleDraftChange("name", event.target.value)
-                        }
-                      />
-                      {showFieldError("name") ? (
-                        <FieldError errors={[{ message: draftErrors.name! }]} />
-                      ) : null}
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="integration-bot-token">
-                        Bot token
-                      </FieldLabel>
-                      <div className="relative">
-                        <Input
-                          id="integration-bot-token"
-                          type={isBotTokenVisible ? "text" : "password"}
-                          autoComplete="new-password"
-                          className="pr-10"
-                          placeholder="123456789:AAExampleBotToken"
-                          value={draft.botToken}
-                          maxLength={TELEGRAM_BOT_TOKEN_MAX_LENGTH}
-                          onBlur={() => handleFieldBlur("botToken")}
-                          onChange={event =>
-                            handleDraftChange("botToken", event.target.value)
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex w-9 items-center justify-center"
-                          aria-label={
-                            isBotTokenVisible
-                              ? "Hide bot token"
-                              : "Show bot token"
-                          }
-                          onClick={() =>
-                            setIsBotTokenVisible(current => !current)
-                          }
-                        >
-                          {isBotTokenVisible ? (
-                            <EyeOff className="size-4" />
-                          ) : (
-                            <Eye className="size-4" />
-                          )}
-                        </button>
-                      </div>
-                      {showFieldError("botToken") ? (
-                        <FieldError
-                          errors={[{ message: draftErrors.botToken! }]}
-                        />
-                      ) : null}
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="integration-chat-id">
-                        Chat ID
-                      </FieldLabel>
-                      <Input
-                        id="integration-chat-id"
-                        placeholder="-1001234567890 or @ops_room"
-                        value={draft.chatId}
-                        maxLength={TELEGRAM_CHAT_ID_MAX_LENGTH}
-                        onBlur={() => handleFieldBlur("chatId")}
-                        onChange={event =>
-                          handleDraftChange("chatId", event.target.value)
-                        }
-                      />
-                      {showFieldError("chatId") ? (
-                        <FieldError
-                          errors={[{ message: draftErrors.chatId! }]}
-                        />
-                      ) : null}
-                    </Field>
-                  </div>
-
-                  {validationError ? (
-                    <FieldError errors={[{ message: validationError }]} />
-                  ) : null}
-                  {createError ? (
-                    <FieldError errors={[{ message: createError }]} />
-                  ) : null}
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isValidating}
-                      onClick={() => void handleValidate()}
-                    >
-                      Validate
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={
-                        isCreating ||
-                        telegramIntegrations.length >=
-                          INTEGRATION_MAX_PER_ORGANIZATION
-                      }
-                      onClick={() => void handleCreate()}
-                    >
-                      Save Integration
-                    </Button>
-                  </div>
-                </FieldGroup>
-              </div>
-
-              <div className="rounded-lg border border-border/70 bg-background/70 p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Preview</p>
-                  <Badge variant="outline">
-                    {isValidatedDraft ? "Validated" : "Draft"}
-                  </Badge>
-                </div>
-
-                <div className="space-y-3 rounded-md border border-border/70 bg-muted/25 p-3">
-                  <div className="space-y-1">
-                    <p className="font-medium">{previewName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Telegram delivery for mailbox events
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                      Bot
                     </p>
+                    <p>{previewBotIdentity}</p>
                   </div>
-
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        Bot
-                      </p>
-                      <p>{previewBotIdentity}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        Destination
-                      </p>
-                      <p>{previewChat}</p>
-                    </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                      Destination
+                    </p>
+                    <p>{previewChat}</p>
                   </div>
                 </div>
-
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {isValidatedDraft
-                    ? "The current draft matches a validated Telegram connection."
-                    : "Validate the bot token and chat before saving to confirm the final bot identity."}
-                </p>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Only organization owners and admins can manage integrations.
-            </p>
-          )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Only organization owners and admins can manage integrations.
+          </p>
+        )}
 
-          <Separator />
+        {canManage ? <Separator /> : null}
 
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">
-              Loading integrations...
-            </p>
-          ) : telegramIntegrations.length > 0 ? (
-            <div className="space-y-3">
-              {telegramIntegrations.map(integration => {
-                const isExpanded = Boolean(
-                  expandedIntegrationIds[integration.id]
-                );
-                return (
-                  <div
-                    key={integration.id}
-                    className="rounded-lg border border-border/70 bg-background/70 p-4"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{integration.name}</p>
-                          <Badge variant="outline">Telegram</Badge>
-                          <Badge variant="outline">
-                            {integration.status === "active"
-                              ? "Active"
-                              : "Archived"}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          <p>@{integration.publicConfig.botUsername}</p>
-                          <p>
-                            {integration.publicConfig.chatLabel ??
-                              integration.publicConfig.chatId}
-                          </p>
-                          <p>{integration.mailboxCount} mailbox assignments</p>
-                        </div>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">
+            Loading integrations...
+          </p>
+        ) : telegramIntegrations.length > 0 ? (
+          <div className="space-y-3">
+            {telegramIntegrations.map(integration => {
+              const isExpanded = Boolean(
+                expandedIntegrationIds[integration.id]
+              );
+              return (
+                <div
+                  key={integration.id}
+                  className="rounded-lg border border-border/70 bg-background/45 p-4"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{integration.name}</p>
+                        <Badge variant="outline">Telegram</Badge>
+                        <Badge variant="outline">
+                          {integration.status === "active"
+                            ? "Active"
+                            : "Archived"}
+                        </Badge>
                       </div>
+                      <div className="text-sm text-muted-foreground">
+                        <p>@{integration.publicConfig.botUsername}</p>
+                        <p>
+                          {integration.publicConfig.chatLabel ??
+                            integration.publicConfig.chatId}
+                        </p>
+                        <p>{integration.mailboxCount} mailbox assignments</p>
+                      </div>
+                    </div>
 
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleDispatchesPanel(integration.id)}
+                      >
+                        {isExpanded ? "Hide Dispatches" : "Show Dispatches"}
+                      </Button>
+                      {canManage ? (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
-                          onClick={() => toggleDispatchesPanel(integration.id)}
+                          disabled={isArchiving}
+                          onClick={() => setIntegrationToArchive(integration)}
                         >
-                          {isExpanded ? "Hide Dispatches" : "Show Dispatches"}
+                          Delete
                         </Button>
-                        {canManage ? (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            disabled={isArchiving}
-                            onClick={() => setIntegrationToArchive(integration)}
-                          >
-                            Delete
-                          </Button>
-                        ) : null}
-                      </div>
+                      ) : null}
                     </div>
-
-                    {isExpanded ? (
-                      <div className="mt-3">
-                        <DispatchesPanel
-                          integrationId={integration.id}
-                          replayingDispatchKey={replayingDispatchKey}
-                          onReplayDispatch={onReplayDispatch}
-                          setReplayingDispatchKey={setReplayingDispatchKey}
-                        />
-                      </div>
-                    ) : null}
                   </div>
-                );
-              })}
-            </div>
-          ) : hasResolvedIntegrations ? (
-            <p className="text-sm text-muted-foreground">
-              No integrations yet.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+
+                  {isExpanded ? (
+                    <div className="mt-3">
+                      <DispatchesPanel
+                        integrationId={integration.id}
+                        replayingDispatchKey={replayingDispatchKey}
+                        onReplayDispatch={onReplayDispatch}
+                        setReplayingDispatchKey={setReplayingDispatchKey}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : hasResolvedIntegrations ? (
+          <p className="text-sm text-muted-foreground">No integrations yet.</p>
+        ) : null}
+      </OrganizationSettingsPanel>
 
       <AlertDialog
         open={integrationToArchive !== null}

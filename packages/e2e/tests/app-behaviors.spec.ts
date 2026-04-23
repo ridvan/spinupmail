@@ -62,7 +62,7 @@ test.describe("spinupmail app behaviors", () => {
 
     await navButton(page, "Organization").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/organization/settings`);
-    await expect(cardTitle(page, "Organization Profile")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Profile" })).toBeVisible();
 
     await navButton(page, "Overview").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/`);
@@ -483,6 +483,7 @@ test.describe("spinupmail app behaviors", () => {
     await page.goto("/organization/settings");
 
     await expect(page.getByText("View only").first()).toBeVisible();
+    await page.getByRole("tab", { name: "Invitations" }).click();
     await expect(
       page.getByText(
         "Only organization owners and admins can create and manage invitations."
