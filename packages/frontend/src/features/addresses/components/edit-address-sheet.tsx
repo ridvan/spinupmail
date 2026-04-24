@@ -96,7 +96,7 @@ type EditAddressFormValues = {
   allowedFromDomains: string[];
   integrationIds: string[];
   maxReceivedEmailCount: number | undefined;
-  maxReceivedEmailAction: "cleanAll" | "rejectNew" | "";
+  maxReceivedEmailAction: "cleanAll" | "dropNew" | "";
   usernameChangeConfirmed: boolean;
 };
 
@@ -1035,7 +1035,7 @@ const EditAddressSheetForm = ({
                         className="grid gap-2 sm:grid-cols-2"
                         onValueChange={value =>
                           field.handleChange(
-                            (value ?? "") as "cleanAll" | "rejectNew" | ""
+                            (value ?? "") as "cleanAll" | "dropNew" | ""
                           )
                         }
                         onBlur={() => field.handleBlur()}
@@ -1052,14 +1052,14 @@ const EditAddressSheetForm = ({
                           <span className="font-medium">Delete all</span>
                         </label>
                         <label
-                          htmlFor="edit-address-max-received-action-reject-new"
+                          htmlFor="edit-address-max-received-action-drop-new"
                           className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 bg-background/70 px-3 py-2 text-sm transition-colors hover:bg-background"
                         >
                           <RadioGroupItem
-                            id="edit-address-max-received-action-reject-new"
-                            value="rejectNew"
+                            id="edit-address-max-received-action-drop-new"
+                            value="dropNew"
                           />
-                          <span className="font-medium">Reject new</span>
+                          <span className="font-medium">Drop new</span>
                         </label>
                       </RadioGroup>
                       {isInvalid ? (

@@ -165,7 +165,7 @@ export type EmailAddress = {
     maxBlockSeconds?: number;
   } | null;
   maxReceivedEmailCount: number | null;
-  maxReceivedEmailAction: "cleanAll" | "rejectNew" | null;
+  maxReceivedEmailAction: "cleanAll" | "dropNew" | null;
   createdAt: string | null;
   createdAtMs: number | null;
   expiresAt: string | null;
@@ -483,7 +483,7 @@ export const createEmailAddress = async (
     blockedSenderDomains?: string[];
     inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number;
-    maxReceivedEmailAction?: "cleanAll" | "rejectNew";
+    maxReceivedEmailAction?: "cleanAll" | "dropNew";
     integrationSubscriptions?: {
       integrationId: string;
       eventType: IntegrationEventType;
@@ -526,7 +526,7 @@ export const updateEmailAddress = async (
     blockedSenderDomains?: string[] | null;
     inboundRatePolicy?: EmailAddress["inboundRatePolicy"];
     maxReceivedEmailCount?: number | null;
-    maxReceivedEmailAction?: "cleanAll" | "rejectNew";
+    maxReceivedEmailAction?: "cleanAll" | "dropNew";
     integrationSubscriptions?: {
       integrationId: string;
       eventType: IntegrationEventType;

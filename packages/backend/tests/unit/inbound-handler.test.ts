@@ -245,7 +245,7 @@ describe("inbound email handler", () => {
     expect(mocks.readRawWithLimit).not.toHaveBeenCalled();
   });
 
-  it("rejects incoming mail when inbox limit is reached in reject mode", async () => {
+  it("drops incoming mail when inbox limit is reached in drop mode", async () => {
     const message = buildMessage();
     const ctx = buildCtx();
     mocks.findAddressByRecipient.mockResolvedValue({
@@ -254,7 +254,7 @@ describe("inbound email handler", () => {
       userId: "user-1",
       meta: JSON.stringify({
         maxReceivedEmailCount: 3,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       expiresAt: null,
     });
@@ -277,9 +277,7 @@ describe("inbound email handler", () => {
       ctx as never
     );
 
-    expect(message.setReject).toHaveBeenCalledWith(
-      "Address inbox limit reached"
-    );
+    expect(message.setReject).not.toHaveBeenCalled();
     expect(mocks.deleteEmailsForAddress).not.toHaveBeenCalled();
     expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
@@ -429,9 +427,7 @@ describe("inbound email handler", () => {
       ctx as never
     );
 
-    expect(message.setReject).toHaveBeenCalledWith(
-      "Address inbox limit reached"
-    );
+    expect(message.setReject).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
     expect(mocks.reserveInboxSlot).not.toHaveBeenCalled();
   });
@@ -480,7 +476,7 @@ describe("inbound email handler", () => {
       userId: "user-1",
       meta: JSON.stringify({
         maxReceivedEmailCount: 1,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       expiresAt: null,
     });
@@ -690,7 +686,7 @@ describe("inbound email handler", () => {
       userId: "user-1",
       meta: JSON.stringify({
         maxReceivedEmailCount: 10,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       expiresAt: null,
     });

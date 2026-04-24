@@ -91,7 +91,7 @@ type CreateAddressFormValues = {
   allowedFromDomains: string[];
   integrationIds: string[];
   maxReceivedEmailCount: number | undefined;
-  maxReceivedEmailAction: "cleanAll" | "rejectNew" | "";
+  maxReceivedEmailAction: "cleanAll" | "dropNew" | "";
   acceptedRiskNotice: boolean;
 };
 
@@ -909,7 +909,7 @@ export const CreateAddressForm = ({
                       className="grid gap-2 sm:grid-cols-2"
                       onValueChange={value =>
                         field.handleChange(
-                          (value ?? "") as "cleanAll" | "rejectNew" | ""
+                          (value ?? "") as "cleanAll" | "dropNew" | ""
                         )
                       }
                       onBlur={() => field.handleBlur()}
@@ -934,12 +934,12 @@ export const CreateAddressForm = ({
                         </span>
                       </label>
                       <label
-                        htmlFor="address-max-received-action-reject-new"
+                        htmlFor="address-max-received-action-drop-new"
                         className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md border border-border/80 px-3 py-2 text-sm transition-colors hover:bg-muted/45"
                       >
                         <RadioGroupItem
-                          id="address-max-received-action-reject-new"
-                          value="rejectNew"
+                          id="address-max-received-action-drop-new"
+                          value="dropNew"
                         />
                         <HugeiconsIcon
                           icon={Cancel01Icon}
@@ -947,8 +947,8 @@ export const CreateAddressForm = ({
                           className="size-3.5 shrink-0 text-muted-foreground"
                           aria-hidden="true"
                         />
-                        <span className="flex flex-col leading-tight">
-                          <span className="font-medium">Reject new</span>
+                        <span className="flex flex-col leading-tight -ml-0.5">
+                          <span className="font-medium">Drop new</span>
                         </span>
                       </label>
                     </RadioGroup>

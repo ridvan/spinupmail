@@ -137,7 +137,7 @@ describe("email addresses service", () => {
           senderDomainSoftWindowSeconds: 60,
         },
         maxReceivedEmailCount: 20,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       },
     });
 
@@ -164,7 +164,7 @@ describe("email addresses service", () => {
         senderDomainSoftWindowSeconds: 60,
       },
       maxReceivedEmailCount: 20,
-      maxReceivedEmailAction: "rejectNew",
+      maxReceivedEmailAction: "dropNew",
     });
 
     expect(result).toEqual({
@@ -183,7 +183,7 @@ describe("email addresses service", () => {
             senderDomainSoftWindowSeconds: 60,
           },
           maxReceivedEmailCount: 20,
-          maxReceivedEmailAction: "rejectNew",
+          maxReceivedEmailAction: "dropNew",
         },
         allowedFromDomains: ["foo.com"],
         blockedSenderDomains: ["bad.com", "mail.bad.com"],
@@ -192,7 +192,7 @@ describe("email addresses service", () => {
           senderDomainSoftWindowSeconds: 60,
         },
         maxReceivedEmailCount: 20,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
         integrations: [],
         emailCount: 0,
         createdAt: "2026-03-28T12:34:56.000Z",
@@ -611,7 +611,7 @@ describe("email addresses service", () => {
           senderDomainSoftMax: 5,
         },
         maxReceivedEmailCount: 10,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       emailCount: 7,
       createdAt: new Date("2026-03-20T10:00:00.000Z"),
@@ -723,7 +723,7 @@ describe("email addresses service", () => {
       domain: "spinupmail.com",
       meta: JSON.stringify({
         maxReceivedEmailCount: 100,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       emailCount: 2,
       createdAt: new Date("2026-03-20T10:00:00.000Z"),
@@ -754,7 +754,7 @@ describe("email addresses service", () => {
         domain: "spinupmail.com",
         meta: JSON.stringify({
           maxReceivedEmailCount: 100,
-          maxReceivedEmailAction: "rejectNew",
+          maxReceivedEmailAction: "dropNew",
         }),
         expiresAt: null,
       },
@@ -768,14 +768,14 @@ describe("email addresses service", () => {
         domain: "spinupmail.com",
         meta: {
           maxReceivedEmailCount: 100,
-          maxReceivedEmailAction: "rejectNew",
+          maxReceivedEmailAction: "dropNew",
         },
         emailCount: 2,
         allowedFromDomains: [],
         blockedSenderDomains: [],
         inboundRatePolicy: null,
         maxReceivedEmailCount: 100,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
         integrations: [],
         createdAt: "2026-03-20T10:00:00.000Z",
         createdAtMs: Date.parse("2026-03-20T10:00:00.000Z"),

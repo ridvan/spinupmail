@@ -391,7 +391,6 @@ export const handleIncomingEmail = async (
         return;
       }
       if (reservationFailureReason === "address_limit") {
-        message.setReject("Address inbox limit reached");
         return;
       }
 

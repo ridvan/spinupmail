@@ -138,9 +138,9 @@ const emailAddressFields: Array<ApiFieldSpec> = [
   },
   {
     name: "maxReceivedEmailAction",
-    type: '"cleanAll" | "rejectNew" | null',
+    type: '"cleanAll" | "dropNew" | null',
     description:
-      "Behavior applied when maxReceivedEmailCount is reached. Returns null when no count limit is active.",
+      "Behavior applied when maxReceivedEmailCount is reached. dropNew accepts and discards additional mail without sender rejection. Returns null when no count limit is active.",
   },
   isoTimestampField("createdAt", "When the address record was created."),
   msTimestampField("createdAtMs", "Millisecond representation of createdAt."),
@@ -904,7 +904,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
         "allowedFromDomains": ["github.com"],
         "blockedSenderDomains": ["spam.test"],
         "maxReceivedEmailCount": 25,
-        "maxReceivedEmailAction": "rejectNew"
+        "maxReceivedEmailAction": "dropNew"
       },
       "integrations": [
         {
@@ -919,7 +919,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       "blockedSenderDomains": ["spam.test"],
       "inboundRatePolicy": null,
       "maxReceivedEmailCount": 25,
-      "maxReceivedEmailAction": "rejectNew",
+      "maxReceivedEmailAction": "dropNew",
       "createdAt": "2026-03-08T09:00:00.000Z",
       "createdAtMs": 1772960400000,
       "expiresAt": "2026-03-08T11:00:00.000Z",
@@ -1168,10 +1168,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         name: "maxReceivedEmailAction",
-        type: '"cleanAll" | "rejectNew"',
+        type: '"cleanAll" | "dropNew"',
         required: false,
         description:
-          "Action applied when maxReceivedEmailCount is reached. When omitted, the backend stores cleanAll.",
+          "Action applied when maxReceivedEmailCount is reached. dropNew accepts and discards additional mail without sender rejection. When omitted, the backend stores cleanAll.",
         defaultValue: "cleanAll",
       },
       {
@@ -1280,7 +1280,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "allowedFromDomains": ["github.com", "example.com"],
     "blockedSenderDomains": ["spam.test"],
     "maxReceivedEmailCount": 25,
-    "maxReceivedEmailAction": "rejectNew",
+    "maxReceivedEmailAction": "dropNew",
     "acceptedRiskNotice": true
   }'`,
     exampleResponse: `{
@@ -1292,7 +1292,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
     "allowedFromDomains": ["github.com", "example.com"],
     "blockedSenderDomains": ["spam.test"],
     "maxReceivedEmailCount": 25,
-    "maxReceivedEmailAction": "rejectNew"
+    "maxReceivedEmailAction": "dropNew"
   },
   "integrations": [
     {
@@ -1307,7 +1307,7 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
   "blockedSenderDomains": ["spam.test"],
   "inboundRatePolicy": null,
   "maxReceivedEmailCount": 25,
-  "maxReceivedEmailAction": "rejectNew",
+  "maxReceivedEmailAction": "dropNew",
   "createdAt": "2026-03-08T09:00:00.000Z",
   "createdAtMs": 1772960400000,
   "expiresAt": "2026-03-08T11:00:00.000Z",
@@ -1507,10 +1507,10 @@ export const apiEndpointSpecs: Array<ApiEndpointSpec> = [
       },
       {
         name: "maxReceivedEmailAction",
-        type: '"cleanAll" | "rejectNew"',
+        type: '"cleanAll" | "dropNew"',
         required: false,
         description:
-          "Replacement action for maxReceivedEmailCount. Defaults to the existing action when omitted.",
+          "Replacement action for maxReceivedEmailCount. dropNew accepts and discards additional mail without sender rejection. Defaults to the existing action when omitted.",
       },
     ],
     responseFields: emailAddressFields,

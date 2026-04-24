@@ -34,6 +34,7 @@ import {
   sanitizeLocalPart,
 } from "@/shared/validation";
 import type { InboundRatePolicy } from "@/shared/validation";
+import type { AddressMaxReceivedEmailAction } from "@/shared/validation";
 import { clampNumber } from "@/shared/utils/dates";
 import {
   ADDRESS_ALLOWED_FROM_DOMAIN_MAX_LENGTH,
@@ -112,8 +113,10 @@ const parseUpdateBody = (payload: unknown): UpdateEmailAddressBody => {
   return parsed.data;
 };
 
-const normalizeMaxReceivedEmailAction = (value: unknown) =>
-  value === "rejectNew" ? "rejectNew" : "cleanAll";
+const normalizeMaxReceivedEmailAction = (
+  value: unknown
+): AddressMaxReceivedEmailAction =>
+  value === "dropNew" ? "dropNew" : "cleanAll";
 
 const validateMaxReceivedEmailCount = ({
   value,

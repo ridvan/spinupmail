@@ -15,7 +15,7 @@ export const recentAddressActivitySortBySchema = z.enum([
   "recentActivity",
   "createdAt",
 ]);
-export const maxReceivedEmailActionSchema = z.enum(["cleanAll", "rejectNew"]);
+export const maxReceivedEmailActionSchema = z.enum(["cleanAll", "dropNew"]);
 export const emailOrderSchema = sortDirectionSchema;
 
 export const inboundRatePolicySchema = z

@@ -126,20 +126,20 @@ describe("shared validation helpers", () => {
     const stored = applyMaxReceivedEmailLimitToMeta({
       meta: JSON.stringify({ hello: "world" }),
       maxReceivedEmailCount: 20,
-      maxReceivedEmailAction: "rejectNew",
+      maxReceivedEmailAction: "dropNew",
     });
     expect(stored).toBeTypeOf("string");
 
     const parsed = parseAddressMeta(stored as string);
     expect(getMaxReceivedEmailCountFromMeta(parsed)).toBe(20);
-    expect(getMaxReceivedEmailActionFromMeta(parsed)).toBe("rejectNew");
+    expect(getMaxReceivedEmailActionFromMeta(parsed)).toBe("dropNew");
   });
 
   it("removes max received email settings from metadata", () => {
     const stored = applyMaxReceivedEmailLimitToMeta({
       meta: JSON.stringify({
         maxReceivedEmailCount: 20,
-        maxReceivedEmailAction: "rejectNew",
+        maxReceivedEmailAction: "dropNew",
       }),
       maxReceivedEmailCount: null,
     });

@@ -8,7 +8,7 @@ export const ALLOWED_FROM_DOMAINS_MAX_ITEMS = 10;
 export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
 export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
   "cleanAll",
-  "rejectNew",
+  "dropNew",
 ] as const;
 export type AddressMaxReceivedEmailAction =
   (typeof ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS)[number];

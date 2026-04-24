@@ -12,7 +12,7 @@ export const ADDRESS_BLOCKED_SENDER_DOMAINS_MAX_ITEMS = 50;
 export const ADDRESS_MAX_RECEIVED_EMAIL_COUNT_MAX = 100_000;
 export const ADDRESS_MAX_RECEIVED_EMAIL_ACTIONS = [
   "cleanAll",
-  "rejectNew",
+  "dropNew",
 ] as const;
 const ADDRESS_LOCAL_PART_REGEX = /^[a-z0-9._+-]+$/i;
 const DOMAIN_HOSTNAME_REGEX =
