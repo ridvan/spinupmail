@@ -19,6 +19,7 @@ import {
   getDayKey,
   getRecentDayKeys,
 } from "@/features/timezone/lib/date-format";
+import { cn } from "@/lib/utils";
 
 const chartConfig = {
   total: {
@@ -32,9 +33,16 @@ const formatTickDate = (dateStr: string) => {
   return day.replace(/^0/, "") || dateStr;
 };
 
-export const InboxGrowthChart = () => {
+type InboxGrowthChartProps = {
+  variant?: "card" | "surface";
+};
+
+export const InboxGrowthChart = ({
+  variant = "card",
+}: InboxGrowthChartProps) => {
   const { data: addresses, isLoading } = useAllAddressesQuery();
   const { effectiveTimeZone } = useTimezone();
+  const isSurface = variant === "surface";
 
   const chartData = React.useMemo(() => {
     if (!addresses?.length) return [];
@@ -77,8 +85,17 @@ export const InboxGrowthChart = () => {
   const totalInboxes = addresses?.length ?? 0;
 
   return (
-    <Card className="flex min-w-0 flex-col border-border/70 bg-card/60 gap-0">
-      <CardHeader className="space-y-0.5 pb-1 pt-3">
+    <Card
+      className={cn(
+        "flex min-w-0 flex-col gap-0",
+        isSurface
+          ? "rounded-none bg-transparent py-0 ring-0"
+          : "border-border/70 bg-card/60"
+      )}
+    >
+      <CardHeader
+        className={cn("space-y-0.5 pb-1 pt-3", isSurface && "px-0 pt-0")}
+      >
         <div className="flex items-start justify-between">
           <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <HugeiconsIcon
@@ -102,7 +119,7 @@ export const InboxGrowthChart = () => {
           />
         </p>
       </CardHeader>
-      <CardContent className="mt-auto pb-0.5 pt-0">
+      <CardContent className={cn("mt-auto pb-0.5 pt-0", isSurface && "px-0")}>
         {isLoading ? (
           <div className="h-[130px] w-full overflow-visible px-1">
             <div className="flex h-full flex-col justify-end">

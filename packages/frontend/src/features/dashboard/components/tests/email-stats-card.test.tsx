@@ -167,5 +167,28 @@ describe("EmailStatsCard", () => {
           node.className.includes("h-1.5") && node.className.includes("w-full")
       )
     ).toBe(true);
+    expect(
+      Array.from(skeletons).filter(node => node.className.includes("h-5"))
+        .length
+    ).toBeGreaterThanOrEqual(6);
+  });
+
+  it("keeps summary rows visible when no summary data exists", () => {
+    mockedUseTimezone.mockReturnValue({
+      effectiveTimeZone: "UTC",
+    } as ReturnType<typeof useTimezone>);
+    mockedUseEmailSummaryQuery.mockReturnValue(
+      createEmailSummaryQueryResult({
+        attachmentSizeTotal: 0,
+        attachmentSizeLimit: 100 * 1024 * 1024,
+      })
+    );
+
+    renderCard();
+
+    expect(screen.getByText("Busiest inboxes:")).toBeTruthy();
+    expect(screen.getByText("Top Senders:")).toBeTruthy();
+    expect(screen.getByText("Dormant inboxes:")).toBeTruthy();
+    expect(screen.getAllByText("None")).toHaveLength(3);
   });
 });

@@ -439,9 +439,16 @@ const getLifecycleBadge = (expiresAt: string | null, timeZone: string) => {
   );
 };
 
-const RecentAddressActivityCardContent = () => {
+type RecentAddressActivityCardContentProps = {
+  variant?: "card" | "surface";
+};
+
+const RecentAddressActivityCardContent = ({
+  variant = "card",
+}: RecentAddressActivityCardContentProps) => {
   const { activeOrganizationId } = useAuth();
   const { effectiveTimeZone } = useTimezone();
+  const isSurface = variant === "surface";
   const queryClient = useQueryClient();
   const searchIconRef = React.useRef<SearchIconHandle | null>(null);
   const clearFilterIconRef = React.useRef<XIconHandle | null>(null);
@@ -762,8 +769,16 @@ const RecentAddressActivityCardContent = () => {
   );
 
   return (
-    <Card className="border-border/70 bg-card/60">
-      <CardHeader className="border-b border-border/70">
+    <Card
+      className={cn(
+        isSurface
+          ? "rounded-none bg-transparent py-0 ring-0"
+          : "border-border/70 bg-card/60"
+      )}
+    >
+      <CardHeader
+        className={cn("border-b border-border/70", isSurface && "px-0 pb-4")}
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2 text-[15px]">
             <HugeiconsIcon
@@ -773,7 +788,7 @@ const RecentAddressActivityCardContent = () => {
             />
             <span>Recent Address Activity</span>
           </CardTitle>
-          <div className="relative w-52 sm:ml-auto sm:max-w-xs">
+          <div className="relative w-full sm:ml-auto sm:w-64 sm:max-w-xs">
             <SearchIcon
               ref={searchIconRef}
               aria-hidden="true"
@@ -823,7 +838,7 @@ const RecentAddressActivityCardContent = () => {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className={cn("space-y-3", isSurface && "px-0 pb-0")}>
         <TooltipProvider delay={120}>
           <div
             className={cn(
@@ -1020,8 +1035,14 @@ const RecentAddressActivityCardContent = () => {
   );
 };
 
-export const RecentAddressActivityCard = () => (
+type RecentAddressActivityCardProps = {
+  variant?: "card" | "surface";
+};
+
+export const RecentAddressActivityCard = ({
+  variant = "card",
+}: RecentAddressActivityCardProps) => (
   <NuqsAdapter>
-    <RecentAddressActivityCardContent />
+    <RecentAddressActivityCardContent variant={variant} />
   </NuqsAdapter>
 );

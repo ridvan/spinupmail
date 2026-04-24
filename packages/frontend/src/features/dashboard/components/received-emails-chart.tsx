@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEmailActivityQuery } from "@/features/dashboard/hooks/use-email-activity";
 import { formatDashboardDayLabel } from "@/features/timezone/lib/date-format";
+import { cn } from "@/lib/utils";
 
 const chartConfig = {
   count: {
@@ -26,15 +27,31 @@ const formatTickDate = (dateStr: string) => {
   return day.replace(/^0/, "") || dateStr;
 };
 
-export const ReceivedEmailsChart = () => {
+type ReceivedEmailsChartProps = {
+  variant?: "card" | "surface";
+};
+
+export const ReceivedEmailsChart = ({
+  variant = "card",
+}: ReceivedEmailsChartProps) => {
   const { data: emailActivity, isLoading } = useEmailActivityQuery(14);
   const daily = emailActivity?.daily;
+  const isSurface = variant === "surface";
 
   const total = daily?.reduce((sum, d) => sum + d.count, 0) ?? 0;
 
   return (
-    <Card className="flex min-w-0 flex-col border-border/70 bg-card/60 gap-0">
-      <CardHeader className="space-y-0.5 pb-2 pt-3">
+    <Card
+      className={cn(
+        "flex min-w-0 flex-col gap-0",
+        isSurface
+          ? "rounded-none bg-transparent py-0 ring-0"
+          : "border-border/70 bg-card/60"
+      )}
+    >
+      <CardHeader
+        className={cn("space-y-0.5 pb-2 pt-3", isSurface && "px-0 pt-0")}
+      >
         <div className="flex items-start justify-between">
           <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <HugeiconsIcon
@@ -58,7 +75,7 @@ export const ReceivedEmailsChart = () => {
           />
         </p>
       </CardHeader>
-      <CardContent className="mt-auto pb-0.5 pt-0">
+      <CardContent className={cn("mt-auto pb-0.5 pt-0", isSurface && "px-0")}>
         {isLoading || !daily ? (
           <div className="h-[120px] w-full overflow-visible px-1">
             <div className="flex h-full flex-col justify-end">
