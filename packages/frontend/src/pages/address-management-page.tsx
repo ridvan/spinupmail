@@ -10,22 +10,21 @@ import { useIntegrationsQuery } from "@/features/organization/hooks/use-integrat
 
 export const AddressManagementPage = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, activeOrganizationId } = useAuth();
   const domainsQuery = useDomainsQuery();
   const activeOrganizationQuery = useActiveOrganizationQuery();
+  const activeOrganization = activeOrganizationQuery.data;
   const currentMember =
-    activeOrganizationQuery.data?.members.find(
-      member => member.user.id === user?.id
-    ) ?? null;
+    activeOrganization?.members.find(member => member.user.id === user?.id) ??
+    null;
   const canManageIntegrations =
     currentMember?.role === "owner" || currentMember?.role === "admin";
   const integrationsQuery = useIntegrationsQuery(canManageIntegrations);
   const integrations = canManageIntegrations
     ? (integrationsQuery.data ?? [])
     : [];
-  const defaultSection = location.pathname.startsWith("/addresses/edit/")
-    ? "addresses-list"
-    : "create-address";
+  const isEditRoute = location.pathname.startsWith("/addresses/edit/");
+  const defaultSection = isEditRoute ? "addresses-list" : "create-address";
 
   const createAddressForm = (
     <section
@@ -34,6 +33,7 @@ export const AddressManagementPage = () => {
       aria-label="Create email address"
     >
       <CreateAddressForm
+        key={activeOrganization?.id ?? activeOrganizationId ?? ""}
         domains={domainsQuery.data?.items ?? []}
         isDomainsLoading={domainsQuery.isLoading}
         forcedLocalPartPrefix={domainsQuery.data?.forcedLocalPartPrefix}
@@ -76,6 +76,7 @@ export const AddressManagementPage = () => {
       <HashTabsPage
         ariaLabel="Address sections"
         defaultSection={defaultSection}
+        forcedSection={isEditRoute ? "addresses-list" : undefined}
         tabsHeaderClassName="max-w-3xl"
         sections={[
           {

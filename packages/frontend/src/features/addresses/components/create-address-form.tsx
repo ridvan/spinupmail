@@ -973,7 +973,7 @@ export const CreateAddressForm = ({
             return (
               <Field data-invalid={isInvalid}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
                     <Checkbox
                       checked={field.state.value}
                       className="cursor-pointer"
@@ -984,7 +984,9 @@ export const CreateAddressForm = ({
                       aria-invalid={isInvalid}
                     />
                     <span>
-                      I agree to the{" "}
+                      <label htmlFor="address-legal-acknowledgement">
+                        I agree to the
+                      </label>{" "}
                       <Link
                         className="underline underline-offset-4"
                         target="_blank"
@@ -1001,7 +1003,7 @@ export const CreateAddressForm = ({
                         Privacy Policy
                       </Link>
                     </span>
-                  </label>
+                  </div>
                   <Button
                     variant="outline"
                     disabled={

@@ -23,6 +23,7 @@ type HashTabsPageProps = {
   sections: HashTabSection[];
   ariaLabel: string;
   defaultSection: string;
+  forcedSection?: string;
   className?: string;
   tabsHeaderClassName?: string;
   listClassName?: string;
@@ -45,6 +46,7 @@ export const HashTabsPage = ({
   sections,
   ariaLabel,
   defaultSection,
+  forcedSection,
   className,
   tabsHeaderClassName,
   listClassName,
@@ -57,11 +59,15 @@ export const HashTabsPage = ({
     () => new Set(sections.map(section => section.id)),
     [sections]
   );
-  const activeSection = getActiveHashSection({
+  const hashSection = getActiveHashSection({
     hash: location.hash,
     defaultSection,
     sectionIds,
   });
+  const activeSection =
+    forcedSection && sectionIds.has(forcedSection)
+      ? forcedSection
+      : hashSection;
 
   useLayoutEffect(() => {
     const activeTab = tabsScrollerRef.current?.querySelector<HTMLElement>(
@@ -82,6 +88,8 @@ export const HashTabsPage = ({
       )}
       value={activeSection}
       onValueChange={value => {
+        if (forcedSection && sectionIds.has(forcedSection)) return;
+
         const nextSection = getActiveHashSection({
           hash: String(value),
           defaultSection,

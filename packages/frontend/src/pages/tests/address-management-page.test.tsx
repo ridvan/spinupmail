@@ -160,17 +160,19 @@ describe("AddressManagementPage", () => {
     );
   });
 
-  it("selects the addresses tab by default on edit routes", () => {
+  it("forces the addresses tab on edit routes", () => {
     createAddressFormMock.mockClear();
     addressListMock.mockClear();
     mockedUseAuth.mockReturnValue({
       user: {
         id: "user-1",
       },
+      activeOrganizationId: "org-1",
     } as unknown as ReturnType<typeof useAuth>);
 
     mockedUseActiveOrganizationQuery.mockReturnValue({
       data: {
+        id: "org-1",
         members: [
           {
             role: "owner",
@@ -197,11 +199,18 @@ describe("AddressManagementPage", () => {
     } as unknown as ReturnType<typeof useDomainsQuery>);
 
     render(
-      <MemoryRouter initialEntries={["/addresses/edit/address-1"]}>
+      <MemoryRouter
+        initialEntries={["/addresses/edit/address-1#create-address"]}
+      >
         <AddressManagementPage />
       </MemoryRouter>
     );
 
+    expect(
+      screen
+        .getByRole("tab", { name: /Address List/ })
+        .getAttribute("aria-selected")
+    ).toBe("true");
     expect(screen.getByTestId("address-list").closest("section")?.id).toBe(
       "addresses-list"
     );
