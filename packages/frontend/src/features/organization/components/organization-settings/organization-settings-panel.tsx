@@ -24,7 +24,7 @@ export const OrganizationSettingsPanel = ({
 }: OrganizationSettingsPanelProps) => (
   <div
     className={cn(
-      "rounded-xl border border-border/70 bg-background/25 p-4 sm:p-5",
+      "rounded-lg border border-border/70 bg-background/25 p-4 sm:p-5",
       className
     )}
   >

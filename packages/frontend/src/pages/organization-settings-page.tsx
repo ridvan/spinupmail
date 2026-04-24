@@ -190,7 +190,7 @@ export const OrganizationSettingsPage = () => {
 
   if (!activeOrganization && !isProfileLoading) {
     return (
-      <Card className="border-border/70 bg-card/60">
+      <Card className="rounded-lg border-border/70 bg-card/60">
         <CardHeader className="space-y-1 border-b border-border/70 pb-4">
           <CardTitle>Organization Settings</CardTitle>
           <CardDescription>No active organization found.</CardDescription>
