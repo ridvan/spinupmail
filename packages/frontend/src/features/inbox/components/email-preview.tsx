@@ -13,7 +13,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -152,7 +151,7 @@ export const EmailPreview = ({
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground">
+      <div className="p-6 text-sm text-muted-foreground">
         Loading message preview...
       </div>
     );
@@ -160,7 +159,7 @@ export const EmailPreview = ({
 
   if (!email) {
     return (
-      <div className="rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground">
+      <div className="p-6 text-sm text-muted-foreground">
         Select a message to inspect headers, HTML body, and raw source.
       </div>
     );
@@ -207,8 +206,8 @@ export const EmailPreview = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
-      <div className="flex min-w-0 items-start justify-between gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-base font-semibold">
@@ -223,8 +222,8 @@ export const EmailPreview = ({
             From: {email.from}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <p className="text-right text-xs text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+          <p className="text-xs text-muted-foreground sm:text-right">
             {formatDate(email.receivedAt, effectiveTimeZone)}
           </p>
           <TooltipProvider delay={120}>
@@ -255,13 +254,12 @@ export const EmailPreview = ({
           </TooltipProvider>
         </div>
       </div>
-      <Separator />
 
       {email.html ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           {activeRemoteContentState.remoteContentBlocked &&
           !activeRemoteContentState.allowRemoteContent ? (
-            <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2">
               <p className="min-w-0 text-xs text-muted-foreground">
                 Remote images and CSS backgrounds are blocked until you load
                 them for this email.
@@ -278,7 +276,7 @@ export const EmailPreview = ({
             </div>
           ) : null}
           <div
-            className={`relative min-h-0 min-w-0 flex-1 overflow-auto rounded-md border border-border/70 bg-background ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
+            className={`relative min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-border/70 bg-background ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
           >
             <EmailHtmlRenderer
               allowRemoteContent={activeRemoteContentState.allowRemoteContent}
@@ -289,23 +287,23 @@ export const EmailPreview = ({
         </div>
       ) : email.text ? (
         <Textarea
-          className={`min-h-0 flex-1 bg-card text-foreground font-mono text-xs [-webkit-text-fill-color:currentColor] ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
+          className={`min-h-0 flex-1 bg-background text-foreground font-mono text-xs [-webkit-text-fill-color:currentColor] ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
           readOnly
           value={email.text}
         />
       ) : (
-        <div className="rounded-md border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+        <div className="rounded-lg bg-muted/35 p-4 text-sm text-muted-foreground">
           No previewable body is available for this message.
         </div>
       )}
 
       {email.raw ? (
-        <details className="rounded-md border border-border/70 px-3 py-2">
+        <details className="border-t border-border/70 pt-3">
           <summary className="cursor-pointer text-sm font-medium">
             Raw source
           </summary>
           <Textarea
-            className={`mt-2 min-h-72 bg-card text-foreground font-mono text-xs [-webkit-text-fill-color:currentColor] ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
+            className={`mt-2 min-h-72 bg-background text-foreground font-mono text-xs [-webkit-text-fill-color:currentColor] ${EMAIL_PREVIEW_SCROLLBAR_CLASS}`}
             readOnly
             value={email.raw}
           />
@@ -313,14 +311,14 @@ export const EmailPreview = ({
       ) : null}
 
       {attachments.length > 0 ? (
-        <div className="space-y-2 rounded-md border border-border/70 p-3">
+        <div className="flex flex-col gap-2 border-t border-border/70 pt-3">
           <p className="text-sm font-medium">
             Attachments ({attachments.length})
           </p>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {attachments.map(attachment => (
               <div
-                className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-lg bg-muted/35 px-3 py-2"
                 key={attachment.id}
               >
                 <div className="min-w-0">

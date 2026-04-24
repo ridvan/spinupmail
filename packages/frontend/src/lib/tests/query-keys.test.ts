@@ -54,11 +54,14 @@ describe("queryKeys", () => {
     expect(queryKeys.emailSummary("org-1")).not.toEqual(
       queryKeys.emailSummary("org-2")
     );
-    expect(queryKeys.emails("org-1", "address-1", "")).not.toEqual(
-      queryKeys.emails("org-1", "address-2", "")
+    expect(queryKeys.emails("org-1", "address-1", "", 1, 10)).not.toEqual(
+      queryKeys.emails("org-1", "address-2", "", 1, 10)
     );
-    expect(queryKeys.emails("org-1", "address-1", "welcome")).not.toEqual(
-      queryKeys.emails("org-1", "address-1", "invoice")
+    expect(
+      queryKeys.emails("org-1", "address-1", "welcome", 1, 10)
+    ).not.toEqual(queryKeys.emails("org-1", "address-1", "invoice", 1, 10));
+    expect(queryKeys.emails("org-1", "address-1", "", 1, 10)).not.toEqual(
+      queryKeys.emails("org-1", "address-1", "", 2, 10)
     );
     expect(
       queryKeys.addresses("org-1", 1, 20, "", "createdAt", "desc")

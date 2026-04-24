@@ -8,7 +8,7 @@ export const parseOptionalTimestamp = (value: string | null) => {
 };
 
 export const clampNumber = (
-  value: string | null,
+  value: string | number | null,
   min: number,
   max: number,
   fallback: number

@@ -219,6 +219,16 @@ export type EmailListItem = {
   receivedAtMs: number | null;
 };
 
+export type EmailListResponse = {
+  address: string;
+  addressId: string;
+  items: EmailListItem[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type EmailDetail = {
   id: string;
   addressId: string;
@@ -640,6 +650,8 @@ export const listEmails = async (options: {
   address?: string;
   search?: string;
   limit?: number;
+  page?: number;
+  pageSize?: number;
   order?: "asc" | "desc";
   signal?: AbortSignal;
   organizationId?: string | null;
@@ -649,12 +661,10 @@ export const listEmails = async (options: {
   if (options.address) query.set("address", options.address);
   if (options.search) query.set("search", options.search);
   if (options.limit) query.set("limit", String(options.limit));
+  if (options.page) query.set("page", String(options.page));
+  if (options.pageSize) query.set("pageSize", String(options.pageSize));
   if (options.order) query.set("order", options.order);
-  const data = await apiFetch<{
-    address: string;
-    addressId: string;
-    items: EmailListItem[];
-  }>(
+  const data = await apiFetch<EmailListResponse>(
     `/api/emails?${query.toString()}`,
     {
       signal: options.signal,

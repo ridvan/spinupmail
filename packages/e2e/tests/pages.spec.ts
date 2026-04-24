@@ -51,7 +51,7 @@ test.describe("spinupmail protected pages", () => {
     await expect(
       page.getByText("Select an address to view its emails.")
     ).toBeVisible();
-    await expect(page.getByText("No email selected")).toBeVisible();
+    await expect(page.getByText("Select an email to view")).toBeVisible();
   });
 
   test("renders the addresses page", async ({ authSeed, page }) => {

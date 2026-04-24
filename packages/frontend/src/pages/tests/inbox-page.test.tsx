@@ -33,24 +33,29 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
     selectedAddressId,
     selectedEmailId,
     emailSearch,
+    emailPage,
     onEmailSearchChange,
     onClearEmailSearch,
     onEmailSearchFocusChange,
+    onEmailPageChange,
     onSelectAddress,
     onSelectEmail,
   }: {
     selectedAddressId: string | null;
     selectedEmailId: string | null;
     emailSearch: string;
+    emailPage: number;
     onEmailSearchChange: (value: string) => void;
     onClearEmailSearch?: () => void;
     onEmailSearchFocusChange?: (focused: boolean) => void;
+    onEmailPageChange: (page: number) => void;
     onSelectAddress: (addressId: string) => void;
     onSelectEmail: (emailId: string) => void;
   }) => (
     <div>
       <p>selected-address:{selectedAddressId ?? "none"}</p>
       <p>selected-email:{selectedEmailId ?? "none"}</p>
+      <p>email-page:{emailPage}</p>
       <input
         aria-label="search-emails"
         onBlur={() => onEmailSearchFocusChange?.(false)}
@@ -63,6 +68,9 @@ vi.mock("@/features/inbox/components/inbox-view", () => ({
       </button>
       <button onClick={() => onClearEmailSearch?.()} type="button">
         clear-search
+      </button>
+      <button onClick={() => onEmailPageChange(2)} type="button">
+        go-email-page-2
       </button>
       <button onClick={() => onSelectEmail("e2")} type="button">
         select-email-e2
@@ -125,7 +133,7 @@ describe("InboxPage", () => {
     ] as unknown as ReturnType<typeof useLocalStorage>);
 
     mockedUseInboxEmailsQuery.mockImplementation(
-      (addressId, search) =>
+      (addressId, search, page = 1) =>
         ({
           data: {
             items:
@@ -134,6 +142,12 @@ describe("InboxPage", () => {
                 : addressId
                   ? (emailsByAddress[addressId] ?? [])
                   : [],
+            page,
+            pageSize: 10,
+            totalItems: addressId
+              ? (emailsByAddress[addressId]?.length ?? 0)
+              : 0,
+            totalPages: 2,
           },
           isLoading: false,
           isFetching: false,
@@ -295,6 +309,16 @@ describe("InboxPage", () => {
     );
   });
 
+  it("requests the selected backend email page", async () => {
+    renderInboxRoute(["/inbox/a1"]);
+
+    expect(screen.getByText("email-page:1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "go-email-page-2" }));
+
+    expect(await screen.findByText("email-page:2")).toBeTruthy();
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "", 2, 10);
+  });
+
   it("renders errors from addresses, emails, and email detail queries", () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: addresses,
@@ -329,13 +353,13 @@ describe("InboxPage", () => {
 
     renderInboxRoute(["/inbox/a1"]);
 
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "", 1, 10);
 
     fireEvent.change(screen.getByLabelText("search-emails"), {
       target: { value: "  reset   password  " },
     });
 
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "", 1, 10);
 
     await act(async () => {
       vi.advanceTimersByTime(250);
@@ -343,7 +367,9 @@ describe("InboxPage", () => {
 
     expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
       "a1",
-      "reset password"
+      "reset password",
+      1,
+      10
     );
   });
 
@@ -365,7 +391,9 @@ describe("InboxPage", () => {
 
     expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
       "a1",
-      overlongSearch.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH)
+      overlongSearch.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH),
+      1,
+      10
     );
   });
 
@@ -382,7 +410,12 @@ describe("InboxPage", () => {
       vi.advanceTimersByTime(250);
     });
 
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "invoice");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
+      "a1",
+      "invoice",
+      1,
+      10
+    );
     vi.useRealTimers();
 
     fireEvent.click(screen.getByRole("button", { name: "select-address-a2" }));
@@ -393,7 +426,7 @@ describe("InboxPage", () => {
     expect(
       (screen.getByLabelText("search-emails") as HTMLInputElement).value
     ).toBe("");
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "", 1, 10);
   });
 
   it("cancels a pending debounced search when selecting a different address", async () => {
@@ -426,7 +459,7 @@ describe("InboxPage", () => {
         ([addressId, search]) => addressId === "a2" && search === "invoice"
       )
     ).toBe(false);
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a2", "", 1, 10);
   });
 
   it("cancels a pending debounced search when clearing the search", async () => {
@@ -453,7 +486,7 @@ describe("InboxPage", () => {
         ([addressId, search]) => addressId === "a1" && search === "invoice"
       )
     ).toBe(false);
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "", 1, 10);
     expect(
       (screen.getByLabelText("search-emails") as HTMLInputElement).value
     ).toBe("");
@@ -473,7 +506,12 @@ describe("InboxPage", () => {
       vi.advanceTimersByTime(250);
     });
 
-    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "nomatch");
+    expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith(
+      "a1",
+      "nomatch",
+      1,
+      10
+    );
     expect(router.state.location.pathname).toBe("/inbox/a1/e1");
 
     fireEvent.blur(searchInput);

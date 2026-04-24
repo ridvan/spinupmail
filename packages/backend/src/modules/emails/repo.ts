@@ -254,6 +254,7 @@ export const listEmailsForAddress = ({
   before,
   order,
   limit,
+  offset = 0,
 }: {
   db: AppDb;
   addressId: string;
@@ -261,6 +262,7 @@ export const listEmailsForAddress = ({
   before?: Date;
   order: "asc" | "desc";
   limit: number;
+  offset?: number;
 }) => {
   const conditions = [eq(emails.addressId, addressId)];
 
@@ -293,7 +295,40 @@ export const listEmailsForAddress = ({
     .from(emails)
     .where(whereClause)
     .orderBy(order === "asc" ? asc(emails.receivedAt) : desc(emails.receivedAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
+};
+
+export const countEmailsForAddress = ({
+  db,
+  addressId,
+  after,
+  before,
+}: {
+  db: AppDb;
+  addressId: string;
+  after?: Date;
+  before?: Date;
+}) => {
+  const conditions = [eq(emails.addressId, addressId)];
+
+  if (after !== undefined) {
+    conditions.push(gte(emails.receivedAt, after));
+  }
+  if (before !== undefined) {
+    conditions.push(lte(emails.receivedAt, before));
+  }
+
+  const whereClause =
+    conditions.length > 1 ? and(...conditions) : conditions[0];
+
+  return db
+    .select({
+      count: sql<number>`count(*)`,
+    })
+    .from(emails)
+    .where(whereClause)
+    .get();
 };
 
 export const searchEmailsForAddress = async ({
@@ -301,11 +336,13 @@ export const searchEmailsForAddress = async ({
   addressId,
   search,
   limit,
+  offset = 0,
 }: {
   db: AppDb;
   addressId: string;
   search: string;
   limit: number;
+  offset?: number;
 }) => {
   const matchQuery = buildEmailSearchMatchQuery(search);
   if (!matchQuery) {
@@ -355,9 +392,10 @@ export const searchEmailsForAddress = async ({
           relevance ASC,
           emails.received_at DESC
         LIMIT ?
+        OFFSET ?
       `
     )
-    .bind(matchQuery, addressId, limit)
+    .bind(matchQuery, addressId, limit, offset)
     .all<{
       id: string;
       addressId: string;
@@ -381,6 +419,35 @@ export const searchEmailsForAddress = async ({
     receivedAt:
       typeof row.receivedAtMs === "number" ? new Date(row.receivedAtMs) : null,
   }));
+};
+
+export const countSearchEmailsForAddress = async ({
+  db,
+  addressId,
+  search,
+}: {
+  db: AppDb;
+  addressId: string;
+  search: string;
+}) => {
+  const matchQuery = buildEmailSearchMatchQuery(search);
+  if (!matchQuery) {
+    return 0;
+  }
+
+  const result = await db.$client
+    .prepare(
+      `
+        SELECT count(*) AS count
+        FROM emails_search
+        INNER JOIN emails ON emails.id = emails_search.email_id
+        WHERE emails_search MATCH ? AND emails.address_id = ?
+      `
+    )
+    .bind(matchQuery, addressId)
+    .first<{ count?: number | string | null }>();
+
+  return Number(result?.count ?? 0) || 0;
 };
 
 export const findAttachmentCountsForEmails = (

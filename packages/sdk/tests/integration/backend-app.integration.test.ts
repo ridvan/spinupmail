@@ -215,6 +215,10 @@ describe("SpinupMail SDK backend app integration", () => {
           address: "sdk@spinupmail.dev",
           addressId: "addr-1",
           items: [],
+          page: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
         },
       })
       .mockResolvedValueOnce({
@@ -242,6 +246,10 @@ describe("SpinupMail SDK backend app integration", () => {
               receivedAtMs: 1775901660000,
             },
           ],
+          page: 1,
+          pageSize: 10,
+          totalItems: 1,
+          totalPages: 1,
         },
       });
     emailServiceMocks.getEmailDetail.mockResolvedValue({

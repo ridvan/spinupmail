@@ -365,6 +365,10 @@ export const emailListResponseSchema = z.object({
   address: z.string().min(1),
   addressId: z.string().min(1),
   items: z.array(emailListItemSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
 });
 
 export const listEmailsParamsSchema = z.object({
@@ -372,6 +376,8 @@ export const listEmailsParamsSchema = z.object({
   addressId: z.string().min(1).optional(),
   search: z.string().max(30).optional(),
   limit: z.number().int().positive().optional(),
+  page: z.number().int().positive().optional(),
+  pageSize: z.number().int().positive().optional(),
   order: emailOrderSchema.optional(),
   after: z.union([z.string(), z.number()]).optional(),
   before: z.union([z.string(), z.number()]).optional(),

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   getDb: vi.fn(),
   findAddressByIdAndOrganization: vi.fn(),
   findAddressByValueAndOrganization: vi.fn(),
+  countEmailsForAddress: vi.fn(),
+  countSearchEmailsForAddress: vi.fn(),
   listEmailsForAddress: vi.fn(),
   searchEmailsForAddress: vi.fn(),
   findAttachmentCountsForEmails: vi.fn(),
@@ -37,6 +39,8 @@ vi.mock("@/modules/emails/repo", () => ({
     mocks.buildDeleteEmailSearchEntryByEmailIdStatement,
   findAddressByIdAndOrganization: mocks.findAddressByIdAndOrganization,
   findAddressByValueAndOrganization: mocks.findAddressByValueAndOrganization,
+  countEmailsForAddress: mocks.countEmailsForAddress,
+  countSearchEmailsForAddress: mocks.countSearchEmailsForAddress,
   listEmailsForAddress: mocks.listEmailsForAddress,
   searchEmailsForAddress: mocks.searchEmailsForAddress,
   findAttachmentCountsForEmails: mocks.findAttachmentCountsForEmails,
@@ -56,6 +60,8 @@ describe("emails service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getDb.mockReturnValue({});
+    mocks.countEmailsForAddress.mockResolvedValue({ count: 1 });
+    mocks.countSearchEmailsForAddress.mockResolvedValue(1);
     mocks.findAttachmentCountsForEmails.mockResolvedValue([]);
     mocks.findAttachmentKeysByEmailAndOrganization.mockResolvedValue([]);
   });
@@ -198,6 +204,44 @@ describe("emails service", () => {
     });
   });
 
+  it("returns backend pagination metadata for listed emails", async () => {
+    mocks.findAddressByIdAndOrganization.mockResolvedValue({
+      id: "address-1",
+      address: "inbox@example.com",
+    });
+    mocks.countEmailsForAddress.mockResolvedValue({ count: 23 });
+    mocks.listEmailsForAddress.mockResolvedValue([]);
+
+    const result = await listEmails({
+      env: {} as CloudflareBindings,
+      organizationId: "org-1",
+      queryPayload: {
+        addressId: "address-1",
+        page: "3",
+        pageSize: "10",
+      },
+    });
+
+    expect(mocks.listEmailsForAddress).toHaveBeenCalledWith({
+      db: {},
+      addressId: "address-1",
+      after: undefined,
+      before: undefined,
+      order: "desc",
+      limit: 10,
+      offset: 20,
+    });
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        page: 3,
+        pageSize: 10,
+        totalItems: 23,
+        totalPages: 3,
+      },
+    });
+  });
+
   it("uses ranked search when a search query is provided", async () => {
     mocks.findAddressByIdAndOrganization.mockResolvedValue({
       id: "address-1",
@@ -236,6 +280,7 @@ describe("emails service", () => {
       addressId: "address-1",
       search: "reset pass",
       limit: 10,
+      offset: 0,
     });
     expect(mocks.listEmailsForAddress).not.toHaveBeenCalled();
     expect(result.status).toBe(200);
@@ -271,6 +316,7 @@ describe("emails service", () => {
       addressId: "address-1",
       search: overlongSearch.slice(0, 30),
       limit: 20,
+      offset: 0,
     });
     expect(result.status).toBe(200);
   });

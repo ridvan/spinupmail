@@ -50,7 +50,7 @@ test.describe("spinupmail app behaviors", () => {
 
     await navButton(page, "Inbox").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/inbox`);
-    await expect(page.getByText("No email selected")).toBeVisible();
+    await expect(page.getByText("Select an email to view")).toBeVisible();
 
     await navButton(page, "Addresses").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/addresses`);

@@ -13,6 +13,7 @@ import {
 import { APP_NAME } from "@/lib/app";
 
 const inboxTitleMaxLength = 72;
+const inboxEmailPageSize = 10;
 
 const buildInboxPath = (addressId: string | null, mailId?: string | null) => {
   if (!addressId) return "/inbox";
@@ -51,11 +52,13 @@ export const InboxPage = () => {
   const [emailSearchInput, setEmailSearchInput] = React.useState("");
   const deferredEmailSearchInput = React.useDeferredValue(emailSearchInput);
   const [emailSearch, setEmailSearch] = React.useState("");
+  const [emailPage, setEmailPage] = React.useState(1);
   const [isEmailSearchFocused, setIsEmailSearchFocused] = React.useState(false);
   const emailSearchDebounceTimerRef = React.useRef<number | null>(null);
   const clearEmailSearch = React.useCallback(() => {
     setEmailSearchInput("");
     setEmailSearch("");
+    setEmailPage(1);
     if (emailSearchDebounceTimerRef.current !== null) {
       window.clearTimeout(emailSearchDebounceTimerRef.current);
       emailSearchDebounceTimerRef.current = null;
@@ -63,6 +66,7 @@ export const InboxPage = () => {
   }, []);
   const handleEmailSearchChange = React.useCallback((value: string) => {
     setEmailSearchInput(value.slice(0, INBOX_EMAIL_SEARCH_MAX_LENGTH));
+    setEmailPage(1);
   }, []);
 
   React.useEffect(() => {
@@ -132,8 +136,16 @@ export const InboxPage = () => {
 
   const emailsQuery = useInboxEmailsQuery(
     resolvedSelectedAddressId,
-    emailSearch
+    emailSearch,
+    emailPage,
+    inboxEmailPageSize
   );
+  const totalEmailPages = Math.max(1, emailsQuery.data?.totalPages ?? 1);
+  const currentEmailPage = Math.min(
+    emailsQuery.data?.page ?? emailPage,
+    totalEmailPages
+  );
+
   const currentEmails = React.useMemo(
     () => emailsQuery.data?.items ?? [],
     [emailsQuery.data?.items]
@@ -199,8 +211,20 @@ export const InboxPage = () => {
   const previewEmail = resolvedSelectedEmailId
     ? (emailDetailQuery.data ?? null)
     : null;
-  const previewEmailLoading =
-    Boolean(resolvedSelectedEmailId) && emailDetailQuery.isLoading;
+
+  const isAddressLoading = addressesQuery.isLoading;
+  const hasAddresses = currentAddresses.length > 0;
+
+  const isEmailsLoading =
+    isAddressLoading ||
+    isRouteAddressRefreshing ||
+    (hasAddresses && emailsQuery.isPending);
+
+  const isPreviewLoading =
+    isEmailsLoading ||
+    isRouteEmailRefreshing ||
+    (Boolean(resolvedSelectedEmailId) && emailDetailQuery.isPending);
+
   const selectedAddress =
     currentAddresses.find(
       address => address.id === resolvedSelectedAddressId
@@ -214,57 +238,65 @@ export const InboxPage = () => {
       : `${truncateInboxTitle(previewEmail?.subject ?? selectedEmailListItem?.subject)} - ${selectedAddress.address} | ${APP_NAME}`;
   useDocumentTitle(inboxDocumentTitle);
 
-  if (nextInboxPath) {
-    return <Navigate replace to={nextInboxPath} />;
-  }
-
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
-      {addressesQuery.error ? (
-        <p className="text-sm text-destructive">
-          {addressesQuery.error.message}
-        </p>
-      ) : null}
+    <>
+      {nextInboxPath ? <Navigate replace to={nextInboxPath} /> : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6">
+        {addressesQuery.error ? (
+          <p className="text-sm text-destructive">
+            {addressesQuery.error.message}
+          </p>
+        ) : null}
 
-      {emailsQuery.error ? (
-        <p className="text-sm text-destructive">{emailsQuery.error.message}</p>
-      ) : null}
+        {emailsQuery.error ? (
+          <p className="text-sm text-destructive">
+            {emailsQuery.error.message}
+          </p>
+        ) : null}
 
-      {emailDetailQuery.error ? (
-        <p className="text-sm text-destructive">
-          {emailDetailQuery.error.message}
-        </p>
-      ) : null}
+        {emailDetailQuery.error ? (
+          <p className="text-sm text-destructive">
+            {emailDetailQuery.error.message}
+          </p>
+        ) : null}
 
-      <InboxView
-        addresses={addressesQuery.data ?? []}
-        addressesLoading={addressesQuery.isLoading}
-        emailSearch={emailSearchInput}
-        onEmailSearchChange={handleEmailSearchChange}
-        onClearEmailSearch={clearEmailSearch}
-        onEmailSearchFocusChange={setIsEmailSearchFocused}
-        emails={emailsQuery.data?.items ?? []}
-        emailsLoading={emailsQuery.isLoading}
-        previewEmail={previewEmail}
-        previewEmailLoading={previewEmailLoading}
-        onSelectAddress={addressId => {
-          clearEmailSearch();
-          setPreferredAddressId(addressId);
-          const nextPath = buildInboxPath(addressId);
-          if (nextPath !== currentInboxPath) {
-            void navigate(nextPath);
-          }
-        }}
-        onSelectEmail={emailId => {
-          if (!resolvedSelectedAddressId) return;
-          const nextPath = buildInboxPath(resolvedSelectedAddressId, emailId);
-          if (nextPath !== currentInboxPath) {
-            void navigate(nextPath);
-          }
-        }}
-        selectedAddressId={resolvedSelectedAddressId}
-        selectedEmailId={resolvedSelectedEmailId}
-      />
-    </div>
+        <InboxView
+          addresses={addressesQuery.data ?? []}
+          addressesLoading={addressesQuery.isLoading}
+          emailSearch={emailSearchInput}
+          onEmailSearchChange={handleEmailSearchChange}
+          onClearEmailSearch={clearEmailSearch}
+          onEmailSearchFocusChange={setIsEmailSearchFocused}
+          emails={emailsQuery.data?.items ?? []}
+          emailsLoading={isEmailsLoading}
+          emailsFetching={emailsQuery.isFetching}
+          emailPage={currentEmailPage}
+          emailPageSize={inboxEmailPageSize}
+          emailTotalItems={emailsQuery.data?.totalItems ?? 0}
+          emailTotalPages={totalEmailPages}
+          onEmailPageChange={setEmailPage}
+          previewEmail={previewEmail}
+          previewEmailLoading={isPreviewLoading}
+          onSelectAddress={addressId => {
+            clearEmailSearch();
+            setEmailPage(1);
+            setPreferredAddressId(addressId);
+            const nextPath = buildInboxPath(addressId);
+            if (nextPath !== currentInboxPath) {
+              void navigate(nextPath);
+            }
+          }}
+          onSelectEmail={emailId => {
+            if (!resolvedSelectedAddressId) return;
+            const nextPath = buildInboxPath(resolvedSelectedAddressId, emailId);
+            if (nextPath !== currentInboxPath) {
+              void navigate(nextPath);
+            }
+          }}
+          selectedAddressId={resolvedSelectedAddressId}
+          selectedEmailId={resolvedSelectedEmailId}
+        />
+      </div>
+    </>
   );
 };

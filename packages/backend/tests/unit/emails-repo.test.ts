@@ -332,7 +332,12 @@ describe("emails repo", () => {
       },
     ]);
     expect(statement.query).toContain("bm25(emails_search");
-    expect(statement.values).toEqual(['"invoice" AND "2026"*', "address-1", 5]);
+    expect(statement.values).toEqual([
+      '"invoice" AND "2026"*',
+      "address-1",
+      5,
+      0,
+    ]);
   });
 
   it("treats a trailing space as a completed final token in FTS queries", async () => {
@@ -368,6 +373,7 @@ describe("emails repo", () => {
       where?: unknown;
       orderBy?: unknown[];
       limit?: number;
+      offset?: number;
     } = {};
     const chain = {
       from: vi.fn(() => chain),
@@ -383,6 +389,10 @@ describe("emails repo", () => {
         state.limit = value;
         return chain;
       }),
+      offset: vi.fn((value: number) => {
+        state.offset = value;
+        return chain;
+      }),
     };
     const db = {
       select: vi.fn(() => chain),
@@ -395,9 +405,11 @@ describe("emails repo", () => {
       before: new Date("2026-03-28T11:00:00.000Z"),
       order: "asc",
       limit: 50,
+      offset: 100,
     });
 
     expect(state.limit).toBe(50);
+    expect(state.offset).toBe(100);
     const where = renderSql(state.where);
     expect(where.sql).toContain('"emails"."address_id" = ?');
     expect(where.sql).toContain('"emails"."received_at" >= ?');

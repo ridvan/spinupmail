@@ -27,6 +27,10 @@ const listResponse = (items: Array<{ id: string; subject: string }>) =>
         receivedAt: "2026-04-11T12:00:00.000Z",
         receivedAtMs: 1775908800000,
       })),
+      page: 1,
+      pageSize: 50,
+      totalItems: items.length,
+      totalPages: 1,
     }),
     {
       status: 200,

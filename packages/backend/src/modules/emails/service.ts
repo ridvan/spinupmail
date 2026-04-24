@@ -31,6 +31,8 @@ import {
   buildDecrementAddressEmailCountStatement,
   buildDeleteEmailByIdAndAddressStatement,
   buildDeleteEmailSearchEntryByEmailIdStatement,
+  countEmailsForAddress,
+  countSearchEmailsForAddress,
   findAddressByIdAndOrganization,
   findAddressByValueAndOrganization,
   findAttachmentByIdsAndOrganization,
@@ -51,6 +53,14 @@ const parseListQuery = (payload: unknown): ListEmailsQuery => {
     if (!payload || typeof payload !== "object") return {};
 
     const candidate = payload as Record<string, unknown>;
+    const toNumber = (value: unknown) => {
+      if (typeof value === "number") return value;
+      if (typeof value !== "string") return undefined;
+
+      const parsedValue = Number(value);
+      return Number.isFinite(parsedValue) ? parsedValue : undefined;
+    };
+
     return {
       address:
         typeof candidate.address === "string" ? candidate.address : undefined,
@@ -60,7 +70,9 @@ const parseListQuery = (payload: unknown): ListEmailsQuery => {
           : undefined,
       search:
         typeof candidate.search === "string" ? candidate.search : undefined,
-      limit: typeof candidate.limit === "string" ? candidate.limit : undefined,
+      limit: toNumber(candidate.limit),
+      page: toNumber(candidate.page),
+      pageSize: toNumber(candidate.pageSize),
       order: typeof candidate.order === "string" ? candidate.order : undefined,
       after: typeof candidate.after === "string" ? candidate.after : undefined,
       before:
@@ -126,12 +138,14 @@ export const listEmails = async ({
   const query = parseListQuery(queryPayload);
   const addressParam = query.address;
   const addressIdParam = query.addressId;
-  const limit = clampNumber(
-    query.limit ?? null,
+  const page = clampNumber(query.page ?? null, 1, Number.MAX_SAFE_INTEGER, 1);
+  const pageSize = clampNumber(
+    query.pageSize ?? query.limit ?? null,
     1,
     EMAIL_LIST_LIMIT_MAX,
     EMAIL_LIST_LIMIT_DEFAULT
   );
+  const offset = (page - 1) * pageSize;
   const order = query.order === "asc" ? "asc" : "desc";
 
   if (!addressParam && !addressIdParam) {
@@ -175,21 +189,39 @@ export const listEmails = async ({
     };
   }
 
-  const rows = search
-    ? await searchEmailsForAddress({
-        db,
-        addressId: addressRow.id,
-        search,
-        limit,
-      })
-    : await listEmailsForAddress({
-        db,
-        addressId: addressRow.id,
-        after,
-        before,
-        order,
-        limit,
-      });
+  const [totalItems, rows] = search
+    ? await Promise.all([
+        countSearchEmailsForAddress({
+          db,
+          addressId: addressRow.id,
+          search,
+        }),
+        searchEmailsForAddress({
+          db,
+          addressId: addressRow.id,
+          search,
+          limit: pageSize,
+          offset,
+        }),
+      ])
+    : await Promise.all([
+        countEmailsForAddress({
+          db,
+          addressId: addressRow.id,
+          after,
+          before,
+        }).then(row => Number(row?.count ?? 0)),
+        listEmailsForAddress({
+          db,
+          addressId: addressRow.id,
+          after,
+          before,
+          order,
+          limit: pageSize,
+          offset,
+        }),
+      ]);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   const emailIds = rows.map(row => row.id);
   const attachmentCountRows = attachmentsEnabled
@@ -230,6 +262,10 @@ export const listEmails = async ({
       address: addressRow.address,
       addressId: addressRow.id,
       items,
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
     },
   };
 };

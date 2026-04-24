@@ -95,7 +95,9 @@ export const queryKeys = {
   emails: (
     organizationId: string | null,
     addressId: string | null,
-    search: string
+    search: string,
+    page: number,
+    pageSize: number
   ) =>
     [
       "app",
@@ -104,6 +106,8 @@ export const queryKeys = {
       "emails",
       addressId,
       search,
+      page,
+      pageSize,
     ] as const,
   emailDetail: (organizationId: string | null, emailId: string | null) =>
     ["app", "organizations", organizationId, "email-detail", emailId] as const,

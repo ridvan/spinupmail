@@ -111,6 +111,10 @@ describe("SpinupMail SDK client", () => {
           address: "sdk@spinupmail.dev",
           addressId: "addr-1",
           items: [],
+          page: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 1,
         }),
         {
           status: 200,

@@ -1,24 +1,46 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { deleteEmail, getEmail, listEmails } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 export const useInboxEmailsQuery = (
   addressId: string | null,
-  search: string
+  search: string,
+  page: number,
+  pageSize: number
 ) => {
   const { activeOrganizationId, isOrganizationSwitching } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.emails(activeOrganizationId, addressId, search),
+    queryKey: queryKeys.emails(
+      activeOrganizationId,
+      addressId,
+      search,
+      page,
+      pageSize
+    ),
     queryFn: async ({ signal }) => {
       if (!addressId) {
-        return { address: "", addressId: "", items: [] };
+        return {
+          address: "",
+          addressId: "",
+          items: [],
+          page,
+          pageSize,
+          totalItems: 0,
+          totalPages: 1,
+        };
       }
 
       return listEmails({
         addressId,
-        limit: 40,
+        page,
+        pageSize,
         order: search ? undefined : "desc",
         search: search || undefined,
         signal,
@@ -28,6 +50,7 @@ export const useInboxEmailsQuery = (
     enabled: Boolean(
       activeOrganizationId && addressId && !isOrganizationSwitching
     ),
+    placeholderData: keepPreviousData,
     staleTime: 10_000,
   });
 };
