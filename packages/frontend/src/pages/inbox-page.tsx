@@ -188,6 +188,7 @@ export const InboxPage = () => {
     }
 
     if (!routeMailId && emailsQuery.isLoading) return;
+    if (emailsQuery.isFetching && emailsQuery.isPlaceholderData) return;
     if (isRouteEmailRefreshing) return;
 
     const nextPath = buildInboxPath(
@@ -198,7 +199,9 @@ export const InboxPage = () => {
   }, [
     addressesQuery.isLoading,
     currentInboxPath,
+    emailsQuery.isFetching,
     emailsQuery.isLoading,
+    emailsQuery.isPlaceholderData,
     isEmailSearchFocused,
     isRouteAddressRefreshing,
     isRouteEmailRefreshing,

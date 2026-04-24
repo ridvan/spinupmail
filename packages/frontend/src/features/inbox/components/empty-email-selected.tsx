@@ -7,6 +7,8 @@ export const EmptyEmailSelected = () => {
 
         {/* Animated SVG */}
         <svg
+          aria-hidden="true"
+          focusable="false"
           viewBox="0 0 120 120"
           className="relative z-10 size-full text-primary/80 drop-shadow-sm"
           fill="none"

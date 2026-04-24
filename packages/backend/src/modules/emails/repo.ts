@@ -294,7 +294,10 @@ export const listEmailsForAddress = ({
     })
     .from(emails)
     .where(whereClause)
-    .orderBy(order === "asc" ? asc(emails.receivedAt) : desc(emails.receivedAt))
+    .orderBy(
+      order === "asc" ? asc(emails.receivedAt) : desc(emails.receivedAt),
+      order === "asc" ? asc(emails.id) : desc(emails.id)
+    )
     .limit(limit)
     .offset(offset);
 };
@@ -390,7 +393,8 @@ export const searchEmailsForAddress = async ({
         ORDER BY
           searchPriority ASC,
           relevance ASC,
-          emails.received_at DESC
+          emails.received_at DESC,
+          emails.id DESC
         LIMIT ?
         OFFSET ?
       `

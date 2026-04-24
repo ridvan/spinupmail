@@ -73,6 +73,68 @@ describe("InboxView", () => {
     expect(screen.queryByText("sender@example.com")).toBeNull();
   });
 
+  it("keeps existing email rows visible during background email fetches", async () => {
+    await renderWithAct(
+      <MemoryRouter>
+        <InboxView
+          addresses={[
+            {
+              id: "address-1",
+              address: "inbox@example.com",
+              localPart: "inbox",
+              domain: "example.com",
+              emailCount: 0,
+              createdAt: null,
+              createdAtMs: null,
+              expiresAt: null,
+              expiresAtMs: null,
+              lastReceivedAt: null,
+              lastReceivedAtMs: null,
+              maxReceivedEmailCount: null,
+              maxReceivedEmailAction: null,
+              integrations: [],
+            },
+          ]}
+          addressesLoading={false}
+          selectedAddressId="address-1"
+          onSelectAddress={vi.fn()}
+          emails={[
+            {
+              id: "email-1",
+              addressId: "address-1",
+              to: "inbox@example.com",
+              from: "sender@example.com",
+              sender: "John Smith <sender@example.com>",
+              senderLabel: "John Smith",
+              subject: "Hello",
+              messageId: "message-1",
+              rawSize: 42,
+              rawTruncated: false,
+              isSample: false,
+              hasHtml: true,
+              hasText: false,
+              attachmentCount: 0,
+              receivedAt: "2026-03-09T00:00:00.000Z",
+              receivedAtMs: 1741478400000,
+            },
+          ]}
+          emailsLoading={false}
+          emailsFetching={true}
+          emailSearch=""
+          onEmailSearchChange={vi.fn()}
+          onEmailSearchFocusChange={vi.fn()}
+          selectedEmailId={null}
+          onSelectEmail={vi.fn()}
+          previewEmail={null}
+          previewEmailLoading={false}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId("inbox-email-row")).toBeTruthy();
+    expect(screen.getByText("Hello")).toBeTruthy();
+  });
+
   it("renders an email search input above the email list", async () => {
     const onEmailSearchChange = vi.fn();
     const onClearEmailSearch = vi.fn();

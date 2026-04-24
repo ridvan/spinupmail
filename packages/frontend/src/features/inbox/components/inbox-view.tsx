@@ -492,7 +492,7 @@ export const InboxView = ({
         </div>
 
         <ScrollArea className="h-48 min-h-0 md:h-auto md:flex-1">
-          {emailsLoading || emailsFetching ? (
+          {emailsLoading ? (
             <div className="flex flex-col gap-1 p-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div

@@ -319,6 +319,55 @@ describe("InboxPage", () => {
     expect(mockedUseInboxEmailsQuery).toHaveBeenLastCalledWith("a1", "", 2, 10);
   });
 
+  it("waits for placeholder email data before replacing an address route", async () => {
+    let emailsQueryState = {
+      data: {
+        items: emailsByAddress.a1,
+        page: 1,
+        pageSize: 10,
+        totalItems: 2,
+        totalPages: 1,
+      },
+      isLoading: false,
+      isFetching: true,
+      isPlaceholderData: true,
+      error: null,
+    };
+
+    mockedUseInboxEmailsQuery.mockImplementation(
+      () =>
+        emailsQueryState as unknown as ReturnType<typeof useInboxEmailsQuery>
+    );
+
+    const { router } = renderInboxRoute(["/inbox/a1"]);
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/inbox/a1")
+    );
+
+    emailsQueryState = {
+      data: {
+        items: [{ id: "e2", subject: "second", from: "from2@example.com" }],
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        totalPages: 1,
+      },
+      isLoading: false,
+      isFetching: false,
+      isPlaceholderData: false,
+      error: null,
+    };
+
+    await act(async () => {
+      await router.navigate("/inbox/a1?fresh=1");
+    });
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/inbox/a1/e2")
+    );
+  });
+
   it("renders errors from addresses, emails, and email detail queries", () => {
     mockedUseAllAddressesQuery.mockReturnValue({
       data: addresses,
