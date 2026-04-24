@@ -246,6 +246,7 @@ export const InboxView = ({
   const totalPages = Math.max(1, emailTotalPages);
   const currentPage = Math.min(emailPage, totalPages);
   const totalItems = emailTotalItems ?? emails.length;
+  const hasPagination = Boolean(onEmailPageChange) && totalPages > 1;
 
   let startPage = Math.max(1, currentPage - 2);
   let endPage = Math.min(totalPages, currentPage + 2);
@@ -568,8 +569,8 @@ export const InboxView = ({
           )}
         </ScrollArea>
 
-        {selectedAddressId || emailsLoading || emailsFetching ? (
-          <div className="grid gap-2 border-t border-border/70 p-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center md:grid-cols-1 lg:grid-cols-[1fr_auto_1fr]">
+        {hasPagination ? (
+          <div className="grid gap-2 border-t border-border/70 py-2 px-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center md:grid-cols-1 lg:grid-cols-[1fr_auto_1fr]">
             <p
               aria-live="polite"
               className="text-center text-xs text-muted-foreground sm:text-left md:text-center lg:text-left"
@@ -580,7 +581,7 @@ export const InboxView = ({
                   ? "0 of 0"
                   : startItem === endItem
                     ? `${startItem} of ${totalItems}`
-                    : `${startItem}-${endItem} of ${totalItems}`}
+                    : `${startItem}-${endItem}`}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button

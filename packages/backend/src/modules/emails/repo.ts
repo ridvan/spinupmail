@@ -46,6 +46,27 @@ const buildEmailSearchMatchQuery = (value: string) => {
     .join(" AND ");
 };
 
+const buildEmailFilters = ({
+  addressId,
+  after,
+  before,
+}: {
+  addressId: string;
+  after?: Date;
+  before?: Date;
+}) => {
+  const conditions = [eq(emails.addressId, addressId)];
+
+  if (after !== undefined) {
+    conditions.push(gte(emails.receivedAt, after));
+  }
+  if (before !== undefined) {
+    conditions.push(lte(emails.receivedAt, before));
+  }
+
+  return conditions.length > 1 ? and(...conditions) : conditions[0];
+};
+
 export const findAddressByIdAndOrganization = (
   db: AppDb,
   organizationId: string,
@@ -264,17 +285,7 @@ export const listEmailsForAddress = ({
   limit: number;
   offset?: number;
 }) => {
-  const conditions = [eq(emails.addressId, addressId)];
-
-  if (after !== undefined) {
-    conditions.push(gte(emails.receivedAt, after));
-  }
-  if (before !== undefined) {
-    conditions.push(lte(emails.receivedAt, before));
-  }
-
-  const whereClause =
-    conditions.length > 1 ? and(...conditions) : conditions[0];
+  const whereClause = buildEmailFilters({ addressId, after, before });
 
   return db
     .select({
@@ -313,17 +324,7 @@ export const countEmailsForAddress = ({
   after?: Date;
   before?: Date;
 }) => {
-  const conditions = [eq(emails.addressId, addressId)];
-
-  if (after !== undefined) {
-    conditions.push(gte(emails.receivedAt, after));
-  }
-  if (before !== undefined) {
-    conditions.push(lte(emails.receivedAt, before));
-  }
-
-  const whereClause =
-    conditions.length > 1 ? and(...conditions) : conditions[0];
+  const whereClause = buildEmailFilters({ addressId, after, before });
 
   return db
     .select({

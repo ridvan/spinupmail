@@ -1,9 +1,52 @@
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+const getPrefersReducedMotion = () => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+};
+
+const subscribeToReducedMotion = (onStoreChange: () => void) => {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return () => {};
+  }
+
+  const mediaQueryList = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQueryList.addEventListener("change", onStoreChange);
+  return () => mediaQueryList.removeEventListener("change", onStoreChange);
+};
+
+const usePrefersReducedMotion = () =>
+  React.useSyncExternalStore(
+    subscribeToReducedMotion,
+    getPrefersReducedMotion,
+    () => false
+  );
+
 export const EmptyEmailSelected = () => {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   return (
     <div className="flex h-full min-h-72 flex-col items-center justify-center gap-6 px-6 text-center">
       <div className="relative flex size-32 items-center justify-center">
         {/* Decorative background blur */}
-        <div className="absolute inset-0 z-0 animate-pulse rounded-full bg-primary/5 blur-2xl" />
+        <div
+          className={cn(
+            "absolute inset-0 z-0 rounded-full bg-primary/5 blur-2xl",
+            !prefersReducedMotion && "animate-pulse"
+          )}
+        />
 
         {/* Animated SVG */}
         <svg
@@ -16,51 +59,61 @@ export const EmptyEmailSelected = () => {
         >
           {/* Pulsing Background Circles */}
           <circle cx="60" cy="60" r="45" fill="currentColor" opacity="0.03">
-            <animate
-              attributeName="r"
-              values="40;48;40"
-              dur="4s"
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="opacity"
-              values="0.03;0.06;0.03"
-              dur="4s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <>
+                <animate
+                  attributeName="r"
+                  values="40;48;40"
+                  dur="4s"
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="opacity"
+                  values="0.03;0.06;0.03"
+                  dur="4s"
+                  repeatCount="indefinite"
+                />
+              </>
+            )}
           </circle>
           <circle cx="60" cy="60" r="30" fill="currentColor" opacity="0.06">
-            <animate
-              attributeName="r"
-              values="28;34;28"
-              dur="4s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <animate
+                attributeName="r"
+                values="28;34;28"
+                dur="4s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
 
           {/* Floating Mail Illustration */}
           <g>
-            <animateTransform
-              attributeName="transform"
-              type="translate"
-              values="0,0; 0,-4; 0,0"
-              dur="5s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
-            />
-
-            {/* Paper sticking out */}
-            <g>
+            {prefersReducedMotion ? null : (
               <animateTransform
                 attributeName="transform"
                 type="translate"
-                values="0,0; 0,-6; 0,0"
+                values="0,0; 0,-4; 0,0"
                 dur="5s"
                 repeatCount="indefinite"
                 calcMode="spline"
                 keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
               />
+            )}
+
+            {/* Paper sticking out */}
+            <g>
+              {prefersReducedMotion ? null : (
+                <animateTransform
+                  attributeName="transform"
+                  type="translate"
+                  values="0,0; 0,-6; 0,0"
+                  dur="5s"
+                  repeatCount="indefinite"
+                  calcMode="spline"
+                  keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
+                />
+              )}
               <rect
                 x="45"
                 y="42"
@@ -140,36 +193,44 @@ export const EmptyEmailSelected = () => {
 
           {/* Small decorative particles (stars/dots) */}
           <circle cx="30" cy="40" r="1.5" fill="currentColor" opacity="0.4">
-            <animate
-              attributeName="opacity"
-              values="0.2;0.6;0.2"
-              dur="3s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <animate
+                attributeName="opacity"
+                values="0.2;0.6;0.2"
+                dur="3s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
           <circle cx="90" cy="50" r="2" fill="currentColor" opacity="0.3">
-            <animate
-              attributeName="opacity"
-              values="0.1;0.5;0.1"
-              dur="4s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <animate
+                attributeName="opacity"
+                values="0.1;0.5;0.1"
+                dur="4s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
           <circle cx="80" cy="35" r="1" fill="currentColor" opacity="0.5">
-            <animate
-              attributeName="opacity"
-              values="0.3;0.8;0.3"
-              dur="2.5s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <animate
+                attributeName="opacity"
+                values="0.3;0.8;0.3"
+                dur="2.5s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
           <circle cx="40" cy="85" r="1.5" fill="currentColor" opacity="0.3">
-            <animate
-              attributeName="opacity"
-              values="0.1;0.4;0.1"
-              dur="3.5s"
-              repeatCount="indefinite"
-            />
+            {prefersReducedMotion ? null : (
+              <animate
+                attributeName="opacity"
+                values="0.1;0.4;0.1"
+                dur="3.5s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
         </svg>
       </div>
