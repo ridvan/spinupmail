@@ -24,10 +24,12 @@ export { default as Delete02Icon } from "@hugeicons/core-free-icons/Delete02Icon
 export { default as FolderIcon } from "@hugeicons/core-free-icons/Folder01Icon";
 export { default as InformationCircleIcon } from "@hugeicons/core-free-icons/InformationCircleIcon";
 export { default as Key01Icon } from "@hugeicons/core-free-icons/Key01Icon";
+export { default as LeftToRightListDashIcon } from "@hugeicons/core-free-icons/LeftToRightListDashIcon";
 export { default as Loading03Icon } from "@hugeicons/core-free-icons/Loading03Icon";
 export { default as LockIcon } from "@hugeicons/core-free-icons/LockIcon";
 export { default as LogoutIcon } from "@hugeicons/core-free-icons/Logout01Icon";
 export { default as Mail01Icon } from "@hugeicons/core-free-icons/Mail01Icon";
+export { default as MailAdd01Icon } from "@hugeicons/core-free-icons/MailAdd01Icon";
 export { default as MailOpen01Icon } from "@hugeicons/core-free-icons/MailOpen01Icon";
 export { default as MailOpenIcon } from "@hugeicons/core-free-icons/MailOpenIcon";
 export { default as Mailbox01Icon } from "@hugeicons/core-free-icons/Mailbox01Icon";

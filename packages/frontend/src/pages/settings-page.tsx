@@ -41,7 +41,7 @@ export const SettingsPage = () => {
   return (
     <HashTabsPage
       ariaLabel="Settings sections"
-      className="max-w-2xl"
+      className="max-w-3xl"
       defaultSection="profile"
       sections={settingsSections.map(section => ({
         id: section.id,

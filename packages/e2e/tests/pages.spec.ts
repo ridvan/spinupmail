@@ -64,9 +64,10 @@ test.describe("spinupmail protected pages", () => {
     await page.goto("/addresses");
 
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/addresses`);
-    await expect(cardTitle(page, "Create Email Address")).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Username" })).toBeVisible();
-    await expect(cardTitle(page, "Addresses")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Address List", exact: true }).click();
+
     await expect(page.getByText("No addresses created yet.")).toBeVisible();
   });
 

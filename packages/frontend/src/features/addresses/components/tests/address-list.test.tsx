@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddressList } from "@/features/addresses/components/address-list";
 import {
@@ -15,7 +15,11 @@ const testState = vi.hoisted(() => ({
     page: "1",
     addressesFilter: "",
   } as Record<string, string>,
-  redirectTo: null as null | { pathname?: string; search?: string },
+  redirectTo: null as null | {
+    pathname?: string;
+    search?: string;
+    hash?: string;
+  },
   location: {
     pathname: "/addresses",
     search: "",
@@ -285,6 +289,7 @@ describe("AddressList", () => {
       expect(testState.redirectTo).toEqual({
         pathname: "/addresses",
         search: "?page=2",
+        hash: "#addresses-list",
       })
     );
     expect(screen.queryByText(/No addresses match/i)).toBeNull();
@@ -303,6 +308,20 @@ describe("AddressList", () => {
 
     expect(screen.getAllByText("Unable to load addresses")).toHaveLength(2);
     expect(screen.queryByText(/No addresses match/i)).toBeNull();
+  });
+
+  it("keeps the address tab hash when opening the edit sheet", () => {
+    render(<AddressList domains={["example.com"]} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit support@example.com" })
+    );
+
+    expect(testState.navigate).toHaveBeenCalledWith({
+      pathname: "/addresses/edit/address-1",
+      search: "",
+      hash: "#addresses-list",
+    });
   });
 
   it("surfaces an edit-sheet error instead of leaving the sheet on a loading spinner", () => {

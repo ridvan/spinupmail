@@ -1,7 +1,6 @@
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  AddressBookIcon,
   ArrowUpDownIcon,
   Calendar03Icon,
   Clock03Icon,
@@ -38,7 +37,6 @@ import {
   type ChevronRightIconHandle,
 } from "@/components/ui/chevron-right";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyIcon, type CopyIconHandle } from "@/components/ui/copy";
 import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import {
@@ -775,6 +773,7 @@ const AddressListContent = ({
       {
         pathname: "/addresses",
         search: preservedSearch,
+        hash: "#addresses-list",
       },
       { replace: true }
     );
@@ -808,6 +807,7 @@ const AddressListContent = ({
       void navigate({
         pathname: `/addresses/edit/${encodeURIComponent(address.id)}`,
         search: preservedSearch,
+        hash: "#addresses-list",
       });
     },
     [navigate, preservedSearch]
@@ -869,23 +869,16 @@ const AddressListContent = ({
         to={{
           pathname: location.pathname,
           search: clampedPageSearch,
+          hash: "#addresses-list",
         }}
       />
     );
   }
 
   return (
-    <Card className="border-border/70 bg-card/60">
-      <CardHeader className="flex flex-col gap-2 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="flex items-center gap-2 text-[15px]">
-          <HugeiconsIcon
-            icon={AddressBookIcon}
-            strokeWidth={2}
-            className="size-4 text-muted-foreground"
-          />
-          Addresses
-        </CardTitle>
-        <div className="relative w-52 sm:ml-auto sm:max-w-xs">
+    <>
+      <div className="flex flex-col gap-4">
+        <div className="relative w-full sm:w-72">
           <SearchIcon
             ref={searchIconRef}
             aria-hidden="true"
@@ -943,8 +936,7 @@ const AddressListContent = ({
             </Button>
           ) : null}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+
         {showEmptyState ? (
           <p className="text-sm text-muted-foreground">
             No addresses created yet.
@@ -1245,7 +1237,7 @@ const AddressListContent = ({
             )}
           </div>
         </div>
-      </CardContent>
+      </div>
 
       <AlertDialog
         open={Boolean(pendingDeleteAddress)}
@@ -1300,7 +1292,7 @@ const AddressListContent = ({
         open={isEditSheetOpen}
         onOpenChange={handleEditSheetOpenChange}
       />
-    </Card>
+    </>
   );
 };
 

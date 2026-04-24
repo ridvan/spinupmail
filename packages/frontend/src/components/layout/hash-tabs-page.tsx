@@ -24,6 +24,7 @@ type HashTabsPageProps = {
   ariaLabel: string;
   defaultSection: string;
   className?: string;
+  tabsHeaderClassName?: string;
   listClassName?: string;
 } & Omit<ComponentProps<typeof Tabs>, "children" | "value" | "onValueChange">;
 
@@ -45,6 +46,7 @@ export const HashTabsPage = ({
   ariaLabel,
   defaultSection,
   className,
+  tabsHeaderClassName,
   listClassName,
   ...tabsProps
 }: HashTabsPageProps) => {
@@ -99,7 +101,12 @@ export const HashTabsPage = ({
       }}
       {...tabsProps}
     >
-      <div className="min-w-0 max-w-full overflow-hidden border-b border-border/70">
+      <div
+        className={cn(
+          "min-w-0 max-w-full overflow-hidden border-b border-border/70",
+          tabsHeaderClassName
+        )}
+      >
         <div
           ref={tabsScrollerRef}
           className="max-w-full overflow-x-auto overflow-y-hidden [scrollbar-color:var(--color-border)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb:hover]:bg-border/80"

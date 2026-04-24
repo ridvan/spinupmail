@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { AddressManagementPage } from "@/pages/address-management-page";
 import { useDomainsQuery } from "@/features/addresses/hooks/use-addresses";
@@ -79,11 +80,18 @@ describe("AddressManagementPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useDomainsQuery>);
 
-    render(<AddressManagementPage />);
+    render(
+      <MemoryRouter>
+        <AddressManagementPage />
+      </MemoryRouter>
+    );
 
     expect(
       screen.getByTestId("create-address-form").closest("section")?.id
     ).toBe("create-address");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Address List/ }));
+
     expect(screen.getByTestId("address-list").closest("section")?.id).toBe(
       "addresses-list"
     );
@@ -129,7 +137,11 @@ describe("AddressManagementPage", () => {
       error: null,
     } as unknown as ReturnType<typeof useDomainsQuery>);
 
-    render(<AddressManagementPage />);
+    render(
+      <MemoryRouter>
+        <AddressManagementPage />
+      </MemoryRouter>
+    );
 
     expect(createAddressFormMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -137,11 +149,61 @@ describe("AddressManagementPage", () => {
         integrations: [],
       })
     );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Address List/ }));
+
     expect(addressListMock).toHaveBeenCalledWith(
       expect.objectContaining({
         canManageIntegrations: false,
         integrations: [],
       })
+    );
+  });
+
+  it("selects the addresses tab by default on edit routes", () => {
+    createAddressFormMock.mockClear();
+    addressListMock.mockClear();
+    mockedUseAuth.mockReturnValue({
+      user: {
+        id: "user-1",
+      },
+    } as unknown as ReturnType<typeof useAuth>);
+
+    mockedUseActiveOrganizationQuery.mockReturnValue({
+      data: {
+        members: [
+          {
+            role: "owner",
+            user: {
+              id: "user-1",
+            },
+          },
+        ],
+      },
+    } as unknown as ReturnType<typeof useActiveOrganizationQuery>);
+
+    mockedUseIntegrationsQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useIntegrationsQuery>);
+
+    mockedUseDomainsQuery.mockReturnValue({
+      data: {
+        items: [],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useDomainsQuery>);
+
+    render(
+      <MemoryRouter initialEntries={["/addresses/edit/address-1"]}>
+        <AddressManagementPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId("address-list").closest("section")?.id).toBe(
+      "addresses-list"
     );
   });
 });

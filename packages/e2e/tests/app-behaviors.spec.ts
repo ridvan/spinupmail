@@ -54,7 +54,7 @@ test.describe("spinupmail app behaviors", () => {
 
     await navButton(page, "Addresses").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/addresses`);
-    await expect(cardTitle(page, "Create Email Address")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Username" })).toBeVisible();
 
     await navButton(page, "Settings").click();
     await expect(page).toHaveURL(`${e2eFrontendBaseUrl}/settings`);
@@ -191,6 +191,8 @@ test.describe("spinupmail app behaviors", () => {
 
     await expect(page.getByText("Address created.")).toBeVisible();
 
+    await page.getByRole("tab", { name: "Address List", exact: true }).click();
+
     await expect(
       page.getByRole("link", { name: new RegExp(localPart, "i") }).first()
     ).toBeVisible({ timeout: 30_000 });
@@ -241,6 +243,8 @@ test.describe("spinupmail app behaviors", () => {
       .click();
 
     await expect(page.getByText("Address created.")).toBeVisible();
+
+    await page.getByRole("tab", { name: "Address List", exact: true }).click();
 
     await expect(
       page

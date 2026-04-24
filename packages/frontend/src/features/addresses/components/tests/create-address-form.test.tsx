@@ -78,7 +78,7 @@ describe("CreateAddressForm", () => {
     expect(
       (screen.getByLabelText("Max stored emails") as HTMLInputElement).value
     ).toBe("100");
-    expect(screen.getByText("Required")).toBeTruthy();
+    expect(screen.getByText("Inbox Limits")).toBeTruthy();
 
     await rerenderWithAct(
       view,
@@ -208,12 +208,12 @@ describe("CreateAddressForm", () => {
       );
     });
 
-    expect(screen.getAllByText("0/1")).toHaveLength(2);
+    expect(screen.getByText("0/1")).toBeTruthy();
 
     fireEvent.click(
       await screen.findByRole("checkbox", { name: "Ops alerts" })
     );
 
-    expect(await screen.findAllByText("1/1")).toHaveLength(2);
+    expect(await screen.findByText("1/1")).toBeTruthy();
   });
 });
