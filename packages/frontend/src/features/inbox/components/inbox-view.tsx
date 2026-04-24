@@ -211,6 +211,12 @@ const formatAddressLastReceivedExact = (
       })
     : "No received mail yet";
 
+const toPositiveInteger = (value: number | undefined, fallback: number) => {
+  const normalizedValue =
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(1, Math.floor(normalizedValue));
+};
+
 export const InboxView = ({
   addresses,
   addressesLoading,
@@ -243,8 +249,9 @@ export const InboxView = ({
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   const selectedAddress = addresses.find(a => a.id === selectedAddressId);
-  const totalPages = Math.max(1, emailTotalPages);
-  const currentPage = Math.min(emailPage, totalPages);
+  const totalPages = toPositiveInteger(emailTotalPages, 1);
+  const currentPage = Math.min(totalPages, toPositiveInteger(emailPage, 1));
+  const pageSize = toPositiveInteger(emailPageSize, 10);
   const totalItems = emailTotalItems ?? emails.length;
   const hasPagination = Boolean(onEmailPageChange) && totalPages > 1;
 
@@ -266,8 +273,7 @@ export const InboxView = ({
 
   const isPaginationDisabled = emailsLoading || emailsFetching;
 
-  const startItem =
-    totalItems === 0 ? 0 : (currentPage - 1) * emailPageSize + 1;
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = totalItems === 0 ? 0 : startItem + emails.length - 1;
 
   React.useEffect(() => {

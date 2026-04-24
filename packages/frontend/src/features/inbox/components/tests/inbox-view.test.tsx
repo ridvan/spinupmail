@@ -244,6 +244,39 @@ describe("InboxView", () => {
     expect(onEmailPageChange).toHaveBeenCalledWith(2);
   });
 
+  it("sanitizes invalid pagination inputs before rendering ranges", async () => {
+    await renderInboxView({
+      emails: [inboxEmail],
+      emailPage: 2.9,
+      emailPageSize: 2.9,
+      emailTotalItems: 30,
+      emailTotalPages: 3,
+      onEmailPageChange: vi.fn(),
+    });
+
+    expect(screen.getByText("3 of 30")).toBeTruthy();
+  });
+
+  it("clamps pagination inputs to a positive first page", async () => {
+    await renderInboxView({
+      emails: [inboxEmail],
+      emailPage: -1,
+      emailPageSize: 0,
+      emailTotalItems: 30,
+      emailTotalPages: 3,
+      onEmailPageChange: vi.fn(),
+    });
+
+    expect(screen.getByText("1 of 30")).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Go to previous page",
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true);
+  });
+
   it("renders an email search input above the email list", async () => {
     const onEmailSearchChange = vi.fn();
     const onClearEmailSearch = vi.fn();
