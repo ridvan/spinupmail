@@ -156,22 +156,12 @@ describe("starter inbox provisioning", () => {
     uuidSpy.mockRestore();
   });
 
-  it("reuses fully seeded auto-created addresses without inserting duplicates", async () => {
+  it("returns existing auto-created address without reseeding samples", async () => {
     const latestReceivedAt = new Date("2026-01-01T00:02:00.000Z");
     mocks.findAutoCreatedAddressByOrganization.mockResolvedValue({
       id: "address-1",
       address: "starter@spinupmail.com",
     });
-    mocks.listSampleEmailsForAddress.mockResolvedValue([
-      {
-        subject: "Welcome to SpinupMail",
-        receivedAt: new Date("2026-01-01T00:00:00.000Z"),
-      },
-      {
-        subject: "Check your first test email",
-        receivedAt: latestReceivedAt,
-      },
-    ]);
 
     const result = await seedStarterInbox({
       env: { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings,
@@ -182,55 +172,14 @@ describe("starter inbox provisioning", () => {
 
     expect(mocks.insertAddress).not.toHaveBeenCalled();
     expect(mocks.insertInboundEmail).not.toHaveBeenCalled();
-    expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledWith(
-      {},
-      "address-1",
-      latestReceivedAt
-    );
+    expect(mocks.listSampleEmailsForAddress).not.toHaveBeenCalled();
+    expect(mocks.updateAddressLastReceivedAt).not.toHaveBeenCalled();
     expect(result).toEqual({
       starterAddressId: "address-1",
       starterAddress: "starter@spinupmail.com",
       seededSampleEmailCount: 0,
       createdStarterAddress: false,
     });
-  });
-
-  it("backfills missing sample emails for an existing auto-created address", async () => {
-    const uuidSpy = vi
-      .spyOn(crypto, "randomUUID")
-      .mockReturnValueOnce("sample-2")
-      .mockReturnValueOnce("sample-3");
-    const existingReceivedAt = new Date("2026-01-01T00:00:00.000Z");
-
-    mocks.findAutoCreatedAddressByOrganization.mockResolvedValue({
-      id: "address-1",
-      address: "starter@spinupmail.com",
-    });
-    mocks.listSampleEmailsForAddress.mockResolvedValue([
-      {
-        subject: "Welcome to SpinupMail",
-        receivedAt: existingReceivedAt,
-      },
-    ]);
-
-    const result = await seedStarterInbox({
-      env: { EMAIL_DOMAINS: "spinupmail.com" } as CloudflareBindings,
-      organizationId: "org-1",
-      userId: "user-1",
-      organizationName: "Acme Org",
-    });
-
-    expect(mocks.insertAddress).not.toHaveBeenCalled();
-    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(1);
-    expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      starterAddressId: "address-1",
-      starterAddress: "starter@spinupmail.com",
-      seededSampleEmailCount: 1,
-      createdStarterAddress: false,
-    });
-
-    uuidSpy.mockRestore();
   });
 
   it("fails cleanly when EMAIL_DOMAINS is missing", async () => {

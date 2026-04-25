@@ -154,6 +154,7 @@ export const insertEmailAttachmentIfOrganizationQuotaAllows = async (
 export const listSampleEmailsForAddress = (db: AppDb, addressId: string) =>
   db
     .select({
+      messageId: emails.messageId,
       subject: emails.subject,
       receivedAt: emails.receivedAt,
     })

@@ -14,7 +14,6 @@ import {
 } from "@/modules/email-addresses/repo";
 import {
   insertInboundEmail,
-  listSampleEmailsForAddress,
   updateAddressLastReceivedAt,
 } from "@/modules/inbound-email/repo";
 
@@ -375,32 +374,19 @@ const ensureStarterSampleEmails = async ({
   addressId,
   address,
   organizationName,
-  existingSampleEmails,
 }: {
   db: ReturnType<typeof getDb>;
   addressId: string;
   address: string;
   organizationName: string;
-  existingSampleEmails: Array<{
-    subject: string | null;
-    receivedAt: Date;
-  }>;
 }) => {
   const samples = buildSampleEmails({
     organizationName,
     address,
     now: Date.now(),
   });
-  const existingSubjects = new Set(
-    existingSampleEmails.flatMap(email =>
-      typeof email.subject === "string" ? [email.subject] : []
-    )
-  );
-  const missingSamples = samples.filter(
-    sample => !existingSubjects.has(sample.subject)
-  );
 
-  for (const sample of missingSamples) {
+  for (const sample of samples) {
     const emailId = crypto.randomUUID();
     const raw = buildSampleEmailRaw({
       emailId,
@@ -429,10 +415,7 @@ const ensureStarterSampleEmails = async ({
     });
   }
 
-  const latestReceivedAt = [
-    ...existingSampleEmails,
-    ...missingSamples,
-  ].reduce<Date | null>(
+  const latestReceivedAt = samples.reduce<Date | null>(
     (latest, sample) =>
       latest === null || sample.receivedAt.getTime() > latest.getTime()
         ? sample.receivedAt
@@ -445,7 +428,7 @@ const ensureStarterSampleEmails = async ({
   }
 
   return {
-    seededSampleEmailCount: missingSamples.length,
+    seededSampleEmailCount: samples.length,
   };
 };
 
@@ -480,22 +463,10 @@ export const seedStarterInbox = async ({
   );
 
   if (existingStarter) {
-    const existingSampleEmails = await listSampleEmailsForAddress(
-      db,
-      existingStarter.id
-    );
-    const { seededSampleEmailCount } = await ensureStarterSampleEmails({
-      db,
-      addressId: existingStarter.id,
-      address: existingStarter.address,
-      organizationName,
-      existingSampleEmails,
-    });
-
     return {
       starterAddressId: existingStarter.id,
       starterAddress: existingStarter.address,
-      seededSampleEmailCount,
+      seededSampleEmailCount: 0,
       createdStarterAddress: false,
     };
   }
@@ -554,7 +525,6 @@ export const seedStarterInbox = async ({
     addressId: starterAddress.id,
     address: starterAddress.address,
     organizationName,
-    existingSampleEmails: [],
   });
 
   return {
