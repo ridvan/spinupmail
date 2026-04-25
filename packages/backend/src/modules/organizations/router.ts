@@ -4,11 +4,15 @@ import type { AppHonoEnv } from "@/app/types";
 import { requireAuth } from "@/app/middleware/require-auth";
 import {
   createOrganization,
+  deleteOrganization,
   getEmailActivityStats,
   getEmailSummaryStats,
   getOrganizationStats,
 } from "./service";
-import { createOrganizationBodySchema } from "./schemas";
+import {
+  createOrganizationBodySchema,
+  deleteOrganizationBodySchema,
+} from "./schemas";
 
 export const createOrganizationsRouter = () => {
   const router = new Hono<AppHonoEnv>();
@@ -37,6 +41,40 @@ export const createOrganizationsRouter = () => {
         session,
         payload,
       });
+
+      return c.json(result.body, result.status);
+    }
+  );
+
+  router.delete(
+    "/organizations/:organizationId",
+    requireAuth,
+    zValidator("json", deleteOrganizationBodySchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: "confirmation name is required" }, 400);
+      }
+      return undefined;
+    }),
+    async c => {
+      const auth = c.get("auth");
+      const session = c.get("session");
+      const organizationId = c.req.param("organizationId");
+      const payload = c.req.valid("json");
+
+      const result = await deleteOrganization({
+        env: c.env,
+        auth,
+        headers: c.req.raw.headers,
+        session,
+        organizationId,
+        payload,
+      });
+
+      if ("headers" in result && result.headers) {
+        for (const [name, value] of Object.entries(result.headers)) {
+          c.header(name, value);
+        }
+      }
 
       return c.json(result.body, result.status);
     }

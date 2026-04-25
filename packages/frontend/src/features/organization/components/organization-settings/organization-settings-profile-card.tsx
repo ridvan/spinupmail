@@ -1,9 +1,21 @@
+import { useRef, useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { Copy01Icon } from "@/lib/hugeicons";
+import { Copy01Icon, Delete02Icon } from "@/lib/hugeicons";
 import { z } from "zod";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardDescription } from "@/components/ui/card";
+import { DeleteIcon, type DeleteIconHandle } from "@/components/ui/delete";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Input } from "@/components/ui/input";
@@ -33,7 +45,9 @@ type OrganizationProfileCardProps = {
   pendingInvitationsCount: number;
   currentUserRole: string;
   isRenamePending: boolean;
+  isDeletePending: boolean;
   onRenameOrganization: (organizationName: string) => Promise<void>;
+  onDeleteOrganization: (confirmationName: string) => Promise<void>;
   onCopyOrganizationId: () => void;
 };
 
@@ -45,11 +59,19 @@ export const OrganizationProfileCard = ({
   pendingInvitationsCount,
   currentUserRole,
   isRenamePending,
+  isDeletePending,
   onRenameOrganization,
+  onDeleteOrganization,
   onCopyOrganizationId,
 }: OrganizationProfileCardProps) => {
   const fieldRowClassName =
     "grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start";
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(
+    null
+  );
+  const confirmDeleteIconRef = useRef<DeleteIconHandle>(null);
   const form = useForm({
     defaultValues: {
       organizationName: activeOrganization?.name ?? "",
@@ -66,6 +88,33 @@ export const OrganizationProfileCard = ({
       }
     },
   });
+  const canDelete = currentUserRole
+    .split(",")
+    .map(role => role.trim())
+    .includes("owner");
+  const deleteConfirmationMatches =
+    deleteConfirmationName === activeOrganization?.name;
+  const handleDeleteDialogOpenChange = (open: boolean) => {
+    if (isDeletePending) return;
+    setIsDeleteDialogOpen(open);
+    if (!open) {
+      setDeleteConfirmationName("");
+      setDeleteErrorMessage(null);
+    }
+  };
+  const handleConfirmDelete = async () => {
+    if (!activeOrganization || !deleteConfirmationMatches) return;
+
+    try {
+      setDeleteErrorMessage(null);
+      await onDeleteOrganization(deleteConfirmationName);
+      handleDeleteDialogOpenChange(false);
+    } catch (error) {
+      setDeleteErrorMessage(
+        error instanceof Error ? error.message : "Unable to delete organization"
+      );
+    }
+  };
 
   if (isLoading || !activeOrganization) {
     return (
@@ -285,6 +334,101 @@ export const OrganizationProfileCard = ({
           </div>
         </div>
       </div>
+
+      {canDelete ? (
+        <div className="mt-6 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Delete organization</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Deletes addresses, emails, attachments, and all related data.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isDeletePending}
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <HugeiconsIcon
+              icon={Delete02Icon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            Delete
+          </Button>
+        </div>
+      ) : null}
+
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={handleDeleteDialogOpenChange}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete organization?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium">{activeOrganization.name}</span> and
+              all related organization data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-2">
+            <Field data-invalid={Boolean(deleteErrorMessage)}>
+              <FieldLabel htmlFor="delete-organization-confirmation">
+                Type
+                <span className="font-medium font-mono">
+                  `{activeOrganization.name}`
+                </span>
+                to confirm
+              </FieldLabel>
+              <Input
+                id="delete-organization-confirmation"
+                aria-label={`Type ${activeOrganization.name} to confirm`}
+                value={deleteConfirmationName}
+                disabled={isDeletePending}
+                aria-invalid={Boolean(deleteErrorMessage)}
+                onChange={event =>
+                  setDeleteConfirmationName(event.target.value)
+                }
+              />
+              {deleteErrorMessage ? (
+                <FieldError errors={[{ message: deleteErrorMessage }]} />
+              ) : null}
+            </Field>
+          </div>
+          <AlertDialogFooter className="[&>button]:cursor-pointer">
+            <AlertDialogCancel disabled={isDeletePending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!deleteConfirmationMatches || isDeletePending}
+              onMouseEnter={() => {
+                confirmDeleteIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => {
+                confirmDeleteIconRef.current?.stopAnimation();
+              }}
+              onClick={event => {
+                event.preventDefault();
+                void handleConfirmDelete();
+              }}
+            >
+              {isDeletePending ? (
+                <Spinner aria-hidden="true" data-icon="inline-start" />
+              ) : (
+                <DeleteIcon
+                  ref={confirmDeleteIconRef}
+                  size={16}
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                />
+              )}
+              {isDeletePending ? "Deleting..." : "Delete organization"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </OrganizationSettingsPanel>
   );
 };

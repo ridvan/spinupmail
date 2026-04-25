@@ -1,6 +1,37 @@
 import { and, asc, desc, eq, gte, inArray, lte, lt, sql } from "drizzle-orm";
-import { emailAddresses, emailAttachments, emails, members } from "@/db";
+import {
+  emailAddresses,
+  emailAttachments,
+  emails,
+  members,
+  organizations,
+  sessions,
+} from "@/db";
 import type { AppDb } from "@/platform/db/client";
+
+export const findOrganizationById = async (
+  db: AppDb,
+  organizationId: string
+) => {
+  return db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .get();
+};
+
+export const clearActiveOrganizationSessions = async (
+  db: AppDb,
+  organizationId: string
+) => {
+  await db
+    .update(sessions)
+    .set({ activeOrganizationId: null })
+    .where(eq(sessions.activeOrganizationId, organizationId));
+};
 
 export const findOrganizationIdsForUser = async (db: AppDb, userId: string) => {
   const membershipRows = await db

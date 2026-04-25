@@ -429,6 +429,18 @@ export const createOrganization = async (name: string) =>
     body: JSON.stringify({ name }),
   });
 
+export const deleteOrganization = async (
+  organizationId: string,
+  payload: { confirmationName: string }
+) =>
+  apiFetch<{ id: string; deleted: true }>(
+    `/api/organizations/${encodeURIComponent(organizationId)}`,
+    {
+      method: "DELETE",
+      body: JSON.stringify(payload),
+    }
+  );
+
 export type EmailActivityDay = {
   date: string;
   count: number;

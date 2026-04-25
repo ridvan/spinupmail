@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   useActiveOrganizationQuery,
   useCancelInvitationMutation,
+  useDeleteOrganizationMutation,
   useInviteMemberMutation,
   useOrganizationInvitationsQuery,
   useOrganizationMembersQuery,
@@ -33,6 +34,7 @@ vi.mock("@/features/organization/hooks/use-organizations", () => ({
   useUpdateOrganizationMutation: vi.fn(),
   useInviteMemberMutation: vi.fn(),
   useCancelInvitationMutation: vi.fn(),
+  useDeleteOrganizationMutation: vi.fn(),
   useUpdateMemberRoleMutation: vi.fn(),
   useRemoveMemberMutation: vi.fn(),
 }));
@@ -60,6 +62,9 @@ const mockedUseInviteMemberMutation = vi.mocked(useInviteMemberMutation);
 const mockedUseCancelInvitationMutation = vi.mocked(
   useCancelInvitationMutation
 );
+const mockedUseDeleteOrganizationMutation = vi.mocked(
+  useDeleteOrganizationMutation
+);
 const mockedUseUpdateMemberRoleMutation = vi.mocked(
   useUpdateMemberRoleMutation
 );
@@ -81,6 +86,7 @@ const mockedUseReplayIntegrationDispatchMutation = vi.mocked(
 const updateOrganizationMutateAsync = vi.fn();
 const inviteMemberMutateAsync = vi.fn();
 const cancelInvitationMutateAsync = vi.fn();
+const deleteOrganizationMutateAsync = vi.fn();
 const updateMemberRoleMutateAsync = vi.fn();
 const removeMemberMutateAsync = vi.fn();
 const validateIntegrationMutateAsync = vi.fn();
@@ -154,6 +160,12 @@ describe("OrganizationSettingsPage", () => {
     updateOrganizationMutateAsync.mockResolvedValue({ success: true });
     inviteMemberMutateAsync.mockResolvedValue({ id: "inv-created" });
     cancelInvitationMutateAsync.mockResolvedValue({ success: true });
+    deleteOrganizationMutateAsync.mockResolvedValue({
+      id: "org-1",
+      deleted: true,
+      deletedActiveOrganization: true,
+      fallbackOrganizationId: null,
+    });
     updateMemberRoleMutateAsync.mockResolvedValue({ success: true });
     removeMemberMutateAsync.mockResolvedValue({ success: true });
     validateIntegrationMutateAsync.mockResolvedValue({
@@ -249,6 +261,11 @@ describe("OrganizationSettingsPage", () => {
       mutateAsync: cancelInvitationMutateAsync,
       isPending: false,
     } as unknown as ReturnType<typeof useCancelInvitationMutation>);
+
+    mockedUseDeleteOrganizationMutation.mockReturnValue({
+      mutateAsync: deleteOrganizationMutateAsync,
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteOrganizationMutation>);
 
     mockedUseUpdateMemberRoleMutation.mockReturnValue({
       mutateAsync: updateMemberRoleMutateAsync,
@@ -535,6 +552,121 @@ describe("OrganizationSettingsPage", () => {
       screen.getByPlaceholderText("-1001234567890 or @ops_room")
     ).toBeTruthy();
     expect(screen.queryByText("Integration name is required")).toBeNull();
+  });
+
+  it("shows organization deletion only to owners", () => {
+    const organizationWithAdminViewer = {
+      ...baseActiveOrganization,
+      members: [
+        {
+          id: "member-owner",
+          role: "owner",
+          user: {
+            id: "user-owner",
+            name: "Owner",
+            email: "owner@example.com",
+          },
+        },
+        {
+          id: "member-admin",
+          role: "admin",
+          user: {
+            id: "user-1",
+            name: "Admin",
+            email: "admin@example.com",
+          },
+        },
+      ],
+    };
+
+    mockedUseActiveOrganizationQuery.mockReturnValue({
+      data: organizationWithAdminViewer,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useActiveOrganizationQuery>);
+    mockedUseOrganizationMembersQuery.mockReturnValue({
+      data: organizationWithAdminViewer.members,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOrganizationMembersQuery>);
+
+    renderPage();
+
+    expect(screen.queryByText("Delete organization")).toBeNull();
+  });
+
+  it("requires exact organization name confirmation before deleting", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await screen.findByRole("alertdialog");
+    const confirmButton = screen.getByRole("button", {
+      name: "Delete organization",
+    }) as HTMLButtonElement;
+
+    expect(confirmButton.disabled).toBe(true);
+
+    await user.type(screen.getByLabelText("Type Acme Org to confirm"), "Acme");
+    expect(confirmButton.disabled).toBe(true);
+
+    await user.clear(screen.getByLabelText("Type Acme Org to confirm"));
+    await user.type(
+      screen.getByLabelText("Type Acme Org to confirm"),
+      "Acme Org"
+    );
+    expect(confirmButton.disabled).toBe(false);
+
+    await user.click(confirmButton);
+
+    await waitFor(() =>
+      expect(deleteOrganizationMutateAsync).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        confirmationName: "Acme Org",
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+
+  it("routes to onboarding after deleting the only active organization", async () => {
+    const user = userEvent.setup();
+    const { router } = renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.type(
+      await screen.findByLabelText("Type Acme Org to confirm"),
+      "Acme Org"
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Delete organization" })
+    );
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/onboarding/organization")
+    );
+  });
+
+  it("keeps the delete dialog open when deletion fails", async () => {
+    const user = userEvent.setup();
+    deleteOrganizationMutateAsync.mockRejectedValueOnce(
+      new Error("Unable to delete organization")
+    );
+
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.type(
+      await screen.findByLabelText("Type Acme Org to confirm"),
+      "Acme Org"
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Delete organization" })
+    );
+
+    expect(
+      await screen.findAllByText("Unable to delete organization")
+    ).toHaveLength(2);
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
   });
 
   it("updates member role and removes member", async () => {

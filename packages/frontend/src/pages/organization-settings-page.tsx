@@ -1,8 +1,9 @@
 import * as React from "react";
+import { useNavigate } from "react-router";
 import {
   ConnectIcon,
+  PropertyEditIcon,
   Mail01Icon,
-  Settings02Icon,
   UserMultiple02Icon,
 } from "@/lib/hugeicons";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import {
   useActiveOrganizationQuery,
   useCancelInvitationMutation,
+  useDeleteOrganizationMutation,
   useInviteMemberMutation,
   useOrganizationInvitationsQuery,
   useOrganizationMembersQuery,
@@ -50,7 +52,17 @@ const toErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const hasOrganizationRole = (
+  role: string | null | undefined,
+  expectedRole: string
+) =>
+  (role ?? "")
+    .split(",")
+    .map(value => value.trim())
+    .includes(expectedRole);
+
 export const OrganizationSettingsPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const activeOrganizationQuery = useActiveOrganizationQuery();
   const activeOrganization = activeOrganizationQuery.data;
@@ -58,13 +70,15 @@ export const OrganizationSettingsPage = () => {
   const currentMember = activeOrganizationMembers.find(
     member => member.user.id === user?.id
   );
+  const isOwner = hasOrganizationRole(currentMember?.role, "owner");
   const canManage =
-    currentMember?.role === "owner" || currentMember?.role === "admin";
+    isOwner || hasOrganizationRole(currentMember?.role, "admin");
 
   const membersQuery = useOrganizationMembersQuery(Boolean(activeOrganization));
   const invitationsQuery = useOrganizationInvitationsQuery(canManage);
 
   const updateOrganizationMutation = useUpdateOrganizationMutation();
+  const deleteOrganizationMutation = useDeleteOrganizationMutation();
   const inviteMemberMutation = useInviteMemberMutation();
   const cancelInvitationMutation = useCancelInvitationMutation();
   const updateMemberRoleMutation = useUpdateMemberRoleMutation();
@@ -109,6 +123,29 @@ export const OrganizationSettingsPage = () => {
       toast.success("Organization name updated.");
     } catch (error) {
       handleError(error, "Unable to update organization name");
+      throw error;
+    }
+  };
+
+  const handleDeleteOrganization = async (confirmationName: string) => {
+    if (!activeOrganization || !isOwner) return;
+    setErrorMessage(null);
+
+    try {
+      const result = await deleteOrganizationMutation.mutateAsync({
+        organizationId: activeOrganization.id,
+        confirmationName,
+      });
+      toast.success("Organization deleted.");
+
+      if (result.deletedActiveOrganization) {
+        navigate(
+          result.fallbackOrganizationId ? "/" : "/onboarding/organization",
+          { replace: true }
+        );
+      }
+    } catch (error) {
+      handleError(error, "Unable to delete organization");
       throw error;
     }
   };
@@ -206,8 +243,8 @@ export const OrganizationSettingsPage = () => {
   const organizationSections = [
     {
       id: "organization-profile",
-      label: "Profile",
-      icon: Settings02Icon,
+      label: "General",
+      icon: PropertyEditIcon,
       content: (
         <OrganizationProfileCard
           key={activeOrganization?.id ?? "organization-profile"}
@@ -218,7 +255,9 @@ export const OrganizationSettingsPage = () => {
           pendingInvitationsCount={pendingInvitationsCount}
           currentUserRole={currentUserRole}
           isRenamePending={updateOrganizationMutation.isPending}
+          isDeletePending={deleteOrganizationMutation.isPending}
           onRenameOrganization={handleRenameOrganization}
+          onDeleteOrganization={handleDeleteOrganization}
           onCopyOrganizationId={() =>
             activeOrganization
               ? void copyToClipboard(

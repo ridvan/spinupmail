@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { setLastActiveOrganizationId } from "@/features/organization/utils/active-organization-storage";
+import {
+  clearLastActiveOrganizationId,
+  getLastActiveOrganizationId,
+  setLastActiveOrganizationId,
+} from "@/features/organization/utils/active-organization-storage";
 import { createOrganizationWithGeneratedSlug } from "@/features/organization/utils/create-organization";
-import { listOrganizationStats } from "@/lib/api";
+import { deleteOrganization, listOrganizationStats } from "@/lib/api";
 import { authClient } from "@/lib/auth";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -288,6 +292,76 @@ export const useUpdateOrganizationMutation = () => {
     },
     onSuccess: async () => {
       await invalidateOrganizationQueries(queryClient);
+    },
+  });
+};
+
+export const useDeleteOrganizationMutation = () => {
+  const queryClient = useQueryClient();
+  const {
+    activeOrganizationId,
+    user,
+    refreshSession,
+    cancelOrganizationSwitch,
+  } = useAuth();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      organizationId: string;
+      confirmationName: string;
+    }) => {
+      const result = await deleteOrganization(payload.organizationId, {
+        confirmationName: payload.confirmationName,
+      });
+      const deletedActiveOrganization =
+        activeOrganizationId === payload.organizationId;
+
+      await queryClient.cancelQueries({ queryKey: ["app"] });
+      queryClient.removeQueries({ queryKey: ["app"] });
+
+      if (getLastActiveOrganizationId(user?.id) === payload.organizationId) {
+        clearLastActiveOrganizationId(user?.id);
+      }
+
+      if (deletedActiveOrganization) {
+        cancelOrganizationSwitch(null);
+      }
+
+      await refreshSession();
+      await invalidateOrganizationQueries(queryClient);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.organizationStats,
+      });
+
+      const organizationsResult = await authClient.organization.list();
+      let fallbackOrganization: OrganizationItem | null = null;
+      if (!organizationsResult.error) {
+        fallbackOrganization =
+          (organizationsResult.data ?? []).find(
+            organization => organization.id !== payload.organizationId
+          ) ?? null;
+      }
+
+      if (deletedActiveOrganization && fallbackOrganization) {
+        const setActiveResult = await authClient.organization.setActive({
+          organizationId: fallbackOrganization.id,
+        });
+        if (setActiveResult.error) {
+          fallbackOrganization = null;
+        } else {
+          setLastActiveOrganizationId(user?.id, fallbackOrganization.id);
+          await refreshSession();
+        }
+      }
+
+      await invalidateOrganizationQueries(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ["app"] });
+
+      return {
+        ...result,
+        deletedActiveOrganization,
+        fallbackOrganizationId: fallbackOrganization?.id ?? null,
+      };
     },
   });
 };

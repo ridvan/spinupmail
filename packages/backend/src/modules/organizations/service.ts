@@ -2,20 +2,30 @@ import {
   getMaxTotalAttachmentStoragePerOrganization,
   isEmailAttachmentsEnabled,
 } from "@/shared/env";
-import { createOrganizationBodySchema } from "./schemas";
+import {
+  createOrganizationBodySchema,
+  deleteOrganizationBodySchema,
+} from "./schemas";
 import { clampNumber } from "@/shared/utils/dates";
 import { getDb } from "@/platform/db/client";
 import { getAllowedDomains } from "@/shared/env";
 import {
+  clearActiveOrganizationSessions,
   findEmailActivity,
   findEmailSummary,
+  findOrganizationById,
   findOrganizationCounts,
   findOrganizationIdsForUser,
 } from "./repo";
+import { getOrganizationMemberRole, isOrganizationOwnerRole } from "./access";
 import { seedStarterInbox } from "./starter-inbox";
+import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
+import { hashForRateLimitKey } from "@/shared/utils/crypto";
 import type { AuthInstance, AuthSession } from "@/app/types";
 
 const MAX_ORGANIZATION_CREATE_ATTEMPTS = 6;
+const ORGANIZATION_DELETE_RATE_LIMIT_MAX = 5;
+const ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 
 const DEFAULT_TIMEZONE = "UTC";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,6 +97,50 @@ const getErrorStatus = (error: unknown, fallback: number) => {
   }
 
   return fallback;
+};
+
+const getWindowRetryAfterSeconds = (
+  nowSeconds: number,
+  windowSeconds: number
+) => Math.max(1, windowSeconds - (nowSeconds % windowSeconds));
+
+const consumeOrganizationDeleteRateLimit = async ({
+  env,
+  userId,
+}: {
+  env: CloudflareBindings;
+  userId: string;
+}) => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const windowSlot = Math.floor(
+    nowSeconds / ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS
+  );
+  const userHash = await hashForRateLimitKey(userId);
+  const key = `organizations:delete:user:${userHash}:slot:${windowSlot}`;
+  const current = Number((await env.SUM_KV.get(key)) ?? "0");
+
+  if (
+    Number.isFinite(current) &&
+    current >= ORGANIZATION_DELETE_RATE_LIMIT_MAX
+  ) {
+    return {
+      allowed: false as const,
+      retryAfterSeconds: getWindowRetryAfterSeconds(
+        nowSeconds,
+        ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS
+      ),
+    };
+  }
+
+  await env.SUM_KV.put(
+    key,
+    String((Number.isFinite(current) ? current : 0) + 1),
+    {
+      expirationTtl: ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS + 30,
+    }
+  );
+
+  return { allowed: true as const };
 };
 
 export const createOrganization = async ({
@@ -230,6 +284,129 @@ export const createOrganization = async ({
   return {
     status: 409 as const,
     body: { error: "Unable to create organization. Please try again." },
+  };
+};
+
+export const deleteOrganization = async ({
+  env,
+  auth,
+  headers,
+  session,
+  organizationId,
+  payload,
+}: {
+  env: CloudflareBindings;
+  auth: AuthInstance;
+  headers: Headers;
+  session: AuthSession;
+  organizationId: string;
+  payload: unknown;
+}) => {
+  const parsed = deleteOrganizationBodySchema.safeParse(payload);
+  if (!parsed.success) {
+    return {
+      status: 400 as const,
+      body: { error: "confirmation name is required" },
+    };
+  }
+
+  const db = getDb(env);
+  const organization = await findOrganizationById(db, organizationId);
+  if (!organization) {
+    return {
+      status: 404 as const,
+      body: { error: "organization not found" },
+    };
+  }
+
+  const role = await getOrganizationMemberRole({
+    db,
+    organizationId,
+    userId: session.user.id,
+  });
+  if (!isOrganizationOwnerRole(role)) {
+    return {
+      status: 403 as const,
+      body: { error: "forbidden" },
+    };
+  }
+
+  if (parsed.data.confirmationName !== organization.name) {
+    return {
+      status: 400 as const,
+      body: { error: "organization name confirmation does not match" },
+    };
+  }
+
+  const rateLimit = await consumeOrganizationDeleteRateLimit({
+    env,
+    userId: session.user.id,
+  });
+  if (!rateLimit.allowed) {
+    return {
+      status: 429 as const,
+      headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      body: {
+        error: "too many organization deletion attempts",
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+      },
+    };
+  }
+
+  if (env.R2_BUCKET) {
+    try {
+      await Promise.all([
+        deleteR2ObjectsByPrefix({
+          bucket: env.R2_BUCKET,
+          prefix: `email-attachments/${organizationId}/`,
+        }),
+        deleteR2ObjectsByPrefix({
+          bucket: env.R2_BUCKET,
+          prefix: `email-raw/${organizationId}/`,
+        }),
+      ]);
+    } catch (error) {
+      console.error("[organization] Failed to delete R2 objects", {
+        organizationId,
+        error,
+      });
+      return {
+        status: 500 as const,
+        body: { error: "failed to clean up organization files" },
+      };
+    }
+  }
+
+  try {
+    const authApi = auth.api as typeof auth.api & {
+      deleteOrganization: (args: {
+        body: { organizationId: string };
+        headers: Headers;
+      }) => Promise<unknown>;
+    };
+
+    await authApi.deleteOrganization({
+      body: { organizationId },
+      headers,
+    });
+    await clearActiveOrganizationSessions(db, organizationId);
+  } catch (error) {
+    console.error("[organization] Failed to delete organization", {
+      organizationId,
+      error,
+    });
+    return {
+      status: getErrorStatus(error, 500) as 400 | 401 | 403 | 404 | 500,
+      body: { error: "Unable to delete organization" },
+    };
+  }
+
+  return {
+    status: 200 as const,
+    body: {
+      id: organizationId,
+      deleted: true,
+    },
   };
 };
 

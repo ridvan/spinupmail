@@ -39,6 +39,7 @@ export { default as MoreHorizontalCircle01Icon } from "@hugeicons/core-free-icon
 export { default as MultiplicationSignCircleIcon } from "@hugeicons/core-free-icons/MultiplicationSignCircleIcon";
 export { default as NotificationIcon } from "@hugeicons/core-free-icons/Notification01Icon";
 export { default as PlusSignIcon } from "@hugeicons/core-free-icons/PlusSignIcon";
+export { default as PropertyEditIcon } from "@hugeicons/core-free-icons/PropertyEditIcon";
 export { default as QrCodeIcon } from "@hugeicons/core-free-icons/QrCodeIcon";
 export { default as Search01Icon } from "@hugeicons/core-free-icons/Search01Icon";
 export { default as SearchIcon } from "@hugeicons/core-free-icons/Search01Icon";

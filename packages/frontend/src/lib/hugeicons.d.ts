@@ -41,6 +41,7 @@ export declare const MoreHorizontalCircle01Icon: IconSvgElement;
 export declare const MultiplicationSignCircleIcon: IconSvgElement;
 export declare const NotificationIcon: IconSvgElement;
 export declare const PlusSignIcon: IconSvgElement;
+export declare const PropertyEditIcon: IconSvgElement;
 export declare const QrCodeIcon: IconSvgElement;
 export declare const Search01Icon: IconSvgElement;
 export declare const SearchIcon: IconSvgElement;
