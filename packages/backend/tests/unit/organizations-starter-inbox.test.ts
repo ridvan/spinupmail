@@ -38,7 +38,7 @@ describe("starter inbox provisioning", () => {
     mocks.updateAddressLastReceivedAt.mockResolvedValue(undefined);
   });
 
-  it("creates one auto-created address and seeds three sample emails", async () => {
+  it("creates one auto-created address and seeds two sample emails", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
     const uuidSpy = vi
       .spyOn(crypto, "randomUUID")
@@ -65,7 +65,7 @@ describe("starter inbox provisioning", () => {
       }),
       100
     );
-    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(3);
+    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(2);
     expect(mocks.insertInboundEmail).toHaveBeenNthCalledWith(
       1,
       {},
@@ -86,7 +86,7 @@ describe("starter inbox provisioning", () => {
     );
     expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledTimes(1);
     expect(result.starterAddressId).toBe("addr-uuid");
-    expect(result.seededSampleEmailCount).toBe(3);
+    expect(result.seededSampleEmailCount).toBe(2);
     expect(result.createdStarterAddress).toBe(true);
 
     randomSpy.mockRestore();
@@ -164,16 +164,12 @@ describe("starter inbox provisioning", () => {
     });
     mocks.listSampleEmailsForAddress.mockResolvedValue([
       {
-        subject: "Welcome to Spinupmail",
+        subject: "Welcome to SpinupMail",
         receivedAt: new Date("2026-01-01T00:00:00.000Z"),
       },
       {
-        subject: "Send your first test email",
+        subject: "Check your first test email",
         receivedAt: latestReceivedAt,
-      },
-      {
-        subject: "What to explore next",
-        receivedAt: new Date("2026-01-01T00:01:00.000Z"),
       },
     ]);
 
@@ -212,7 +208,7 @@ describe("starter inbox provisioning", () => {
     });
     mocks.listSampleEmailsForAddress.mockResolvedValue([
       {
-        subject: "Welcome to Spinupmail",
+        subject: "Welcome to SpinupMail",
         receivedAt: existingReceivedAt,
       },
     ]);
@@ -225,12 +221,12 @@ describe("starter inbox provisioning", () => {
     });
 
     expect(mocks.insertAddress).not.toHaveBeenCalled();
-    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(2);
+    expect(mocks.insertInboundEmail).toHaveBeenCalledTimes(1);
     expect(mocks.updateAddressLastReceivedAt).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       starterAddressId: "address-1",
       starterAddress: "starter@spinupmail.com",
-      seededSampleEmailCount: 2,
+      seededSampleEmailCount: 1,
       createdStarterAddress: false,
     });
 

@@ -40,29 +40,29 @@ const NOUNS = [
   "spark",
 ];
 
-const SAMPLE_SENDER = "Spinupmail Team <hello@spinupmail.app>";
-const SAMPLE_FROM = "hello@spinupmail.app";
-const STARTER_EMAIL_BG_COLOR = "#f3efe8";
-const STARTER_EMAIL_SURFACE_COLOR = "#fffdf9";
-const STARTER_EMAIL_PANEL_COLOR = "#f7f3ec";
-const STARTER_EMAIL_BORDER_COLOR = "#e6ddd1";
+const SAMPLE_SENDER = "SpinupMail Team <hello@spinupmail.dev>";
+const SAMPLE_FROM = "hello@spinupmail.dev";
+const STARTER_EMAIL_BG_COLOR = "#f5f5f5";
+const STARTER_EMAIL_SURFACE_COLOR = "#ffffff";
+const STARTER_EMAIL_PANEL_COLOR = "#f4f4f5";
+const STARTER_EMAIL_BORDER_COLOR = "#d4d4d8";
 const STARTER_EMAIL_TEXT_COLOR = "#171717";
-const STARTER_EMAIL_MUTED_COLOR = "#5f5a52";
-const STARTER_EMAIL_BADGE_BG_COLOR = "#171717";
-const STARTER_EMAIL_BADGE_TEXT_COLOR = "#f8f5ef";
-const STARTER_EMAIL_PILL_BG_COLOR = "#f0ebe3";
-const STARTER_EMAIL_PILL_TEXT_COLOR = "#2b2824";
-const STARTER_EMAIL_FOOTER_COLOR = "#787168";
-const STARTER_EMAIL_DARK_BG_COLOR = "#12100d";
-const STARTER_EMAIL_DARK_SURFACE_COLOR = "#191612";
-const STARTER_EMAIL_DARK_PANEL_COLOR = "#211d18";
-const STARTER_EMAIL_DARK_BORDER_COLOR = "#322c25";
-const STARTER_EMAIL_DARK_TEXT_COLOR = "#f5f1ea";
-const STARTER_EMAIL_DARK_MUTED_COLOR = "#b7aea2";
-const STARTER_EMAIL_DARK_BADGE_BG_COLOR = "#f5f1ea";
-const STARTER_EMAIL_DARK_BADGE_TEXT_COLOR = "#171717";
-const STARTER_EMAIL_DARK_PILL_BG_COLOR = "#2b251f";
-const STARTER_EMAIL_DARK_FOOTER_COLOR = "#978e82";
+const STARTER_EMAIL_MUTED_COLOR = "#52525b";
+const STARTER_EMAIL_BADGE_BG_COLOR = "#18181b";
+const STARTER_EMAIL_BADGE_TEXT_COLOR = "#fafafa";
+const STARTER_EMAIL_PILL_BG_COLOR = "#e4e4e7";
+const STARTER_EMAIL_PILL_TEXT_COLOR = "#27272a";
+const STARTER_EMAIL_FOOTER_COLOR = "#71717a";
+const STARTER_EMAIL_DARK_BG_COLOR = "#09090b";
+const STARTER_EMAIL_DARK_SURFACE_COLOR = "#111113";
+const STARTER_EMAIL_DARK_PANEL_COLOR = "#18181b";
+const STARTER_EMAIL_DARK_BORDER_COLOR = "#27272a";
+const STARTER_EMAIL_DARK_TEXT_COLOR = "#f4f4f5";
+const STARTER_EMAIL_DARK_MUTED_COLOR = "#a1a1aa";
+const STARTER_EMAIL_DARK_BADGE_BG_COLOR = "#f4f4f5";
+const STARTER_EMAIL_DARK_BADGE_TEXT_COLOR = "#18181b";
+const STARTER_EMAIL_DARK_PILL_BG_COLOR = "#1f1f23";
+const STARTER_EMAIL_DARK_FOOTER_COLOR = "#a1a1aa";
 const RAW_TEXT_ENCODER = new TextEncoder();
 
 /**
@@ -104,7 +104,7 @@ const buildStarterEmailHeader = ({
     '<div style="display:none;max-height:0;overflow:hidden;opacity:0;">',
     `  ${escapeHtml(preheader)}`,
     "</div>",
-    `<p class="spinupmail-sample-muted" style="margin:0;font-size:12px;line-height:1;text-transform:uppercase;letter-spacing:0.18em;color:${STARTER_EMAIL_MUTED_COLOR};">Spinupmail starter inbox</p>`,
+    `<p class="spinupmail-sample-muted" style="margin:0;font-size:12px;line-height:1;text-transform:uppercase;letter-spacing:0.18em;color:${STARTER_EMAIL_MUTED_COLOR};">SpinupMail starter inbox</p>`,
     `<h1 class="spinupmail-sample-text" style="margin:18px 0 0 0;font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-0.03em;color:${STARTER_EMAIL_TEXT_COLOR};">${escapeHtml(title)}</h1>`,
     `<p class="spinupmail-sample-muted" style="margin:18px 0 0 0;font-size:16px;line-height:1.7;color:${STARTER_EMAIL_MUTED_COLOR};">${escapeHtml(intro)}</p>`,
   ].join("\n");
@@ -119,11 +119,11 @@ const buildStarterAddressCard = ({
   hint: string;
 }) =>
   [
-    `<table class="spinupmail-sample-panel" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:28px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_PANEL_COLOR};border-radius:24px;">`,
+    `<table class="spinupmail-sample-panel" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:28px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_PANEL_COLOR};border-radius:16px;">`,
     "  <tr>",
     '    <td style="padding:24px;">',
     `      <p class="spinupmail-sample-muted" style="margin:0;font-size:12px;line-height:1;text-transform:uppercase;letter-spacing:0.16em;color:${STARTER_EMAIL_MUTED_COLOR};">${escapeHtml(label)}</p>`,
-    `      <p style="margin:14px 0 0 0;"><span class="spinupmail-sample-pill" style="display:inline-block;padding:12px 16px;border-radius:999px;background:${STARTER_EMAIL_PILL_BG_COLOR};font-size:15px;line-height:1.4;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,monospace;color:${STARTER_EMAIL_PILL_TEXT_COLOR};">${escapeHtml(address)}</span></p>`,
+    `      <p style="margin:14px 0 0 0;"><span class="spinupmail-sample-pill" style="display:inline-block;padding:12px 16px;border-radius:12px;background:${STARTER_EMAIL_PILL_BG_COLOR};font-size:15px;line-height:1.4;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,monospace;color:${STARTER_EMAIL_PILL_TEXT_COLOR};">${escapeHtml(address)}</span></p>`,
     `      <p class="spinupmail-sample-muted" style="margin:16px 0 0 0;font-size:14px;line-height:1.7;color:${STARTER_EMAIL_MUTED_COLOR};">${escapeHtml(hint)}</p>`,
     "    </td>",
     "  </tr>",
@@ -138,7 +138,7 @@ const buildStarterChecklistCard = ({
   items: string[];
 }) =>
   [
-    `<table class="spinupmail-sample-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_SURFACE_COLOR};border-radius:24px;">`,
+    `<table class="spinupmail-sample-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_SURFACE_COLOR};border-radius:16px;">`,
     "  <tr>",
     '    <td style="padding:24px;">',
     `      <p class="spinupmail-sample-text" style="margin:0 0 18px 0;font-size:18px;line-height:1.4;font-weight:600;color:${STARTER_EMAIL_TEXT_COLOR};">${escapeHtml(title)}</p>`,
@@ -158,29 +158,6 @@ const buildStarterChecklistCard = ({
     "  </tr>",
     "</table>",
   ].join("\n");
-
-const buildStarterStepCards = (
-  steps: Array<{
-    label: string;
-    title: string;
-    body: string;
-  }>
-) =>
-  steps
-    .map(step =>
-      [
-        `<table class="spinupmail-sample-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:16px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_SURFACE_COLOR};border-radius:24px;">`,
-        "  <tr>",
-        '    <td style="padding:22px 24px;">',
-        `      <p class="spinupmail-sample-muted" style="margin:0;font-size:12px;line-height:1;text-transform:uppercase;letter-spacing:0.16em;color:${STARTER_EMAIL_MUTED_COLOR};">${escapeHtml(step.label)}</p>`,
-        `      <p class="spinupmail-sample-text" style="margin:12px 0 0 0;font-size:18px;line-height:1.45;font-weight:600;color:${STARTER_EMAIL_TEXT_COLOR};">${escapeHtml(step.title)}</p>`,
-        `      <p class="spinupmail-sample-muted" style="margin:10px 0 0 0;font-size:15px;line-height:1.7;color:${STARTER_EMAIL_MUTED_COLOR};">${escapeHtml(step.body)}</p>`,
-        "    </td>",
-        "  </tr>",
-        "</table>",
-      ].join("\n")
-    )
-    .join("\n");
 
 const buildStarterEmailHtmlDocument = ({
   preheader,
@@ -245,10 +222,10 @@ const buildStarterEmailHtmlDocument = ({
     `    <table class="spinupmail-sample-canvas" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${STARTER_EMAIL_BG_COLOR};padding:28px 12px;">`,
     "      <tr>",
     '        <td align="center">',
-    `          <table class="spinupmail-sample-shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_SURFACE_COLOR};border-radius:32px;">`,
+    `          <table class="spinupmail-sample-shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;border:1px solid ${STARTER_EMAIL_BORDER_COLOR};background:${STARTER_EMAIL_SURFACE_COLOR};border-radius:20px;">`,
     "            <tr>",
     '              <td style="padding:16px 24px 0 24px;">',
-    `                <span class="spinupmail-sample-badge" style="display:inline-block;padding:8px 12px;border-radius:999px;background:${STARTER_EMAIL_BADGE_BG_COLOR};font-size:11px;line-height:1;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${STARTER_EMAIL_BADGE_TEXT_COLOR};">Sample email</span>`,
+    `                <span class="spinupmail-sample-badge" style="display:inline-block;padding:8px 12px;border-radius:10px;background:${STARTER_EMAIL_BADGE_BG_COLOR};font-size:11px;line-height:1;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${STARTER_EMAIL_BADGE_TEXT_COLOR};">Sample email</span>`,
     "              </td>",
     "            </tr>",
     "            <tr>",
@@ -262,7 +239,7 @@ const buildStarterEmailHtmlDocument = ({
     "              </td>",
     "            </tr>",
     "          </table>",
-    `          <p class="spinupmail-sample-footer" style="max-width:560px;margin:18px auto 0 auto;font-size:12px;line-height:1.7;color:${STARTER_EMAIL_FOOTER_COLOR};">Created automatically for your new organization so you can preview how messages look inside Spinupmail.</p>`,
+    `          <p class="spinupmail-sample-footer" style="max-width:560px;margin:18px auto 0 auto;font-size:12px;line-height:1.7;color:${STARTER_EMAIL_FOOTER_COLOR};">Created automatically for your new organization.</p>`,
     "        </td>",
     "      </tr>",
     "    </table>",
@@ -320,7 +297,7 @@ const buildSampleEmails = ({
 }) => {
   return [
     {
-      subject: "Welcome to Spinupmail",
+      subject: "Welcome to SpinupMail",
       bodyText: [
         `Welcome to ${organizationName}.`,
         "",
@@ -355,7 +332,7 @@ const buildSampleEmails = ({
       receivedAt: new Date(now - 2 * 60 * 1000),
     },
     {
-      subject: "Send your first test email",
+      subject: "Check your first test email",
       bodyText: [
         `Try sending a message to ${address}.`,
         "",
@@ -368,13 +345,13 @@ const buildSampleEmails = ({
       ].join("\n"),
       bodyHtml: buildStarterEmailHtmlDocument({
         preheader: `Send your first test email to ${address}.`,
-        title: "Send your first test email",
-        intro: `A real message to ${address} is the fastest end-to-end check for your new inbox.`,
+        title: "Check your first test email",
+        intro: `You can send a test email to the address below.`,
         sections: [
           buildStarterAddressCard({
             label: "Send to",
             address,
-            hint: "Use any mail provider you already trust. The point is to watch one real message arrive end to end.",
+            hint: "",
           }),
           buildStarterChecklistCard({
             title: "After it lands, confirm",
@@ -387,41 +364,6 @@ const buildSampleEmails = ({
         ],
       }),
       receivedAt: new Date(now),
-    },
-    {
-      subject: "What to explore next",
-      bodyText: [
-        "Next up:",
-        "- Create more addresses for different workflows",
-        "- Invite teammates into the organization",
-        "- Compare preview, text, and raw message views",
-      ].join("\n"),
-      bodyHtml: buildStarterEmailHtmlDocument({
-        preheader: `A few next steps for ${organizationName}.`,
-        title: "What to explore next",
-        intro:
-          "Once the starter inbox feels familiar, a few small setup steps make the workspace more useful for ongoing email work.",
-        sections: [
-          buildStarterStepCards([
-            {
-              label: "01",
-              title: "Create more addresses",
-              body: "Set up dedicated inboxes for signups, QA flows, support replies, or any workflow that deserves its own stream.",
-            },
-            {
-              label: "02",
-              title: "Invite teammates",
-              body: "Bring collaborators into the organization so everyone can inspect incoming messages without sharing a personal inbox.",
-            },
-            {
-              label: "03",
-              title: "Compare every view",
-              body: "Use rendered preview, plain text, and raw source together when you need to debug how a message was delivered.",
-            },
-          ]),
-        ],
-      }),
-      receivedAt: new Date(now - 60 * 1000),
     },
   ];
 };
