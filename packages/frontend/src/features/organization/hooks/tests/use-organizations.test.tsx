@@ -107,6 +107,7 @@ describe("organization mutations", () => {
       deleted: true,
       deletedActiveOrganization: true,
       fallbackOrganizationId: "org-2",
+      fallbackSelectionFailed: false,
     });
   });
 
@@ -140,6 +141,7 @@ describe("organization mutations", () => {
 
     expect(getLastActiveOrganizationId("user-1")).toBeNull();
     expect(mocks.setActiveOrganization).not.toHaveBeenCalled();
-    expect(deleted?.fallbackOrganizationId).toBeNull();
+    expect(deleted?.fallbackOrganizationId).toBeUndefined();
+    expect(deleted?.fallbackSelectionFailed).toBe(false);
   });
 });

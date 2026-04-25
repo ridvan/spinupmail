@@ -164,7 +164,8 @@ describe("OrganizationSettingsPage", () => {
       id: "org-1",
       deleted: true,
       deletedActiveOrganization: true,
-      fallbackOrganizationId: null,
+      fallbackOrganizationId: undefined,
+      fallbackSelectionFailed: false,
     });
     updateMemberRoleMutateAsync.mockResolvedValue({ success: true });
     removeMemberMutateAsync.mockResolvedValue({ success: true });

@@ -20,12 +20,14 @@ import {
 import { getOrganizationMemberRole, isOrganizationOwnerRole } from "./access";
 import { seedStarterInbox } from "./starter-inbox";
 import { deleteR2ObjectsByPrefix } from "@/shared/utils/r2";
+import { consumeFixedWindowRateLimit } from "@/shared/rate-limiter";
 import { hashForRateLimitKey } from "@/shared/utils/crypto";
 import type { AuthInstance, AuthSession } from "@/app/types";
 
 const MAX_ORGANIZATION_CREATE_ATTEMPTS = 6;
 const ORGANIZATION_DELETE_RATE_LIMIT_MAX = 5;
 const ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const ORGANIZATION_DELETE_RATE_LIMITER_KEY_PREFIX = "organizations:delete:user";
 
 const DEFAULT_TIMEZONE = "UTC";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -97,50 +99,6 @@ const getErrorStatus = (error: unknown, fallback: number) => {
   }
 
   return fallback;
-};
-
-const getWindowRetryAfterSeconds = (
-  nowSeconds: number,
-  windowSeconds: number
-) => Math.max(1, windowSeconds - (nowSeconds % windowSeconds));
-
-const consumeOrganizationDeleteRateLimit = async ({
-  env,
-  userId,
-}: {
-  env: CloudflareBindings;
-  userId: string;
-}) => {
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const windowSlot = Math.floor(
-    nowSeconds / ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS
-  );
-  const userHash = await hashForRateLimitKey(userId);
-  const key = `organizations:delete:user:${userHash}:slot:${windowSlot}`;
-  const current = Number((await env.SUM_KV.get(key)) ?? "0");
-
-  if (
-    Number.isFinite(current) &&
-    current >= ORGANIZATION_DELETE_RATE_LIMIT_MAX
-  ) {
-    return {
-      allowed: false as const,
-      retryAfterSeconds: getWindowRetryAfterSeconds(
-        nowSeconds,
-        ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS
-      ),
-    };
-  }
-
-  await env.SUM_KV.put(
-    key,
-    String((Number.isFinite(current) ? current : 0) + 1),
-    {
-      expirationTtl: ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS + 30,
-    }
-  );
-
-  return { allowed: true as const };
 };
 
 export const createOrganization = async ({
@@ -331,16 +289,12 @@ export const deleteOrganization = async ({
     };
   }
 
-  if (parsed.data.confirmationName !== organization.name) {
-    return {
-      status: 400 as const,
-      body: { error: "organization name confirmation does not match" },
-    };
-  }
-
-  const rateLimit = await consumeOrganizationDeleteRateLimit({
-    env,
-    userId: session.user.id,
+  const userHash = await hashForRateLimitKey(session.user.id);
+  const rateLimit = await consumeFixedWindowRateLimit({
+    namespace: env.FIXED_WINDOW_RATE_LIMITERS,
+    key: `${ORGANIZATION_DELETE_RATE_LIMITER_KEY_PREFIX}:${userHash}`,
+    windowSeconds: ORGANIZATION_DELETE_RATE_LIMIT_WINDOW_SECONDS,
+    maxAttempts: ORGANIZATION_DELETE_RATE_LIMIT_MAX,
   });
   if (!rateLimit.allowed) {
     return {
@@ -350,6 +304,13 @@ export const deleteOrganization = async ({
         error: "too many organization deletion attempts",
         retryAfterSeconds: rateLimit.retryAfterSeconds,
       },
+    };
+  }
+
+  if (parsed.data.confirmationName !== organization.name) {
+    return {
+      status: 400 as const,
+      body: { error: "organization name confirmation does not match" },
     };
   }
 
@@ -389,27 +350,21 @@ export const deleteOrganization = async ({
   }
 
   if (env.R2_BUCKET) {
-    try {
-      await Promise.all([
-        deleteR2ObjectsByPrefix({
-          bucket: env.R2_BUCKET,
-          prefix: `email-attachments/${organizationId}/`,
-        }),
-        deleteR2ObjectsByPrefix({
-          bucket: env.R2_BUCKET,
-          prefix: `email-raw/${organizationId}/`,
-        }),
-      ]);
-    } catch (error) {
+    void Promise.all([
+      deleteR2ObjectsByPrefix({
+        bucket: env.R2_BUCKET,
+        prefix: `email-attachments/${organizationId}/`,
+      }),
+      deleteR2ObjectsByPrefix({
+        bucket: env.R2_BUCKET,
+        prefix: `email-raw/${organizationId}/`,
+      }),
+    ]).catch(error => {
       console.error("[organization] Failed to delete R2 objects", {
         organizationId,
         error,
       });
-      return {
-        status: 500 as const,
-        body: { error: "failed to clean up organization files" },
-      };
-    }
+    });
   }
 
   return {

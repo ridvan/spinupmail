@@ -324,10 +324,22 @@ export const useDeleteOrganizationMutation = () => {
         cancelOrganizationSwitch(null);
       }
 
-      let fallbackOrganizationId: string | null = null;
+      let fallbackOrganizationId: string | undefined;
+      let fallbackSelectionFailed = false;
       if (deletedActiveOrganization) {
         try {
           const organizationsResult = await authClient.organization.list();
+          if (organizationsResult.error) {
+            fallbackSelectionFailed = true;
+            console.warn(
+              "[organization] Failed to list fallback organizations",
+              {
+                organizationId: payload.organizationId,
+                error: organizationsResult.error,
+              }
+            );
+          }
+
           const fallbackOrganization = organizationsResult.error
             ? null
             : ((organizationsResult.data ?? []).find(
@@ -340,6 +352,7 @@ export const useDeleteOrganizationMutation = () => {
             });
 
             if (setActiveResult.error) {
+              fallbackSelectionFailed = true;
               console.warn(
                 "[organization] Failed to select fallback organization",
                 {
@@ -349,11 +362,12 @@ export const useDeleteOrganizationMutation = () => {
                 }
               );
             } else {
-              fallbackOrganizationId = fallbackOrganization.id;
-              setLastActiveOrganizationId(user?.id, fallbackOrganization.id);
               try {
                 await refreshSession();
+                fallbackOrganizationId = fallbackOrganization.id;
+                setLastActiveOrganizationId(user?.id, fallbackOrganization.id);
               } catch (error) {
+                fallbackSelectionFailed = true;
                 console.warn(
                   "[organization] Failed to refresh fallback session",
                   {
@@ -366,6 +380,7 @@ export const useDeleteOrganizationMutation = () => {
             }
           }
         } catch (error) {
+          fallbackSelectionFailed = true;
           console.warn(
             "[organization] Failed to select fallback organization",
             {
@@ -385,7 +400,6 @@ export const useDeleteOrganizationMutation = () => {
           await queryClient.invalidateQueries({
             queryKey: queryKeys.organizationStats,
           });
-          await invalidateOrganizationQueries(queryClient);
           await queryClient.invalidateQueries({ queryKey: ["app"] });
         } catch (error) {
           console.warn("[organization] Failed to refresh after delete", {
@@ -399,6 +413,7 @@ export const useDeleteOrganizationMutation = () => {
         ...result,
         deletedActiveOrganization,
         fallbackOrganizationId,
+        fallbackSelectionFailed,
       };
     },
   });

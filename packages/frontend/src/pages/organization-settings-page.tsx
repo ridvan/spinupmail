@@ -132,7 +132,9 @@ export const OrganizationSettingsPage = () => {
 
       if (result.deletedActiveOrganization) {
         navigate(
-          result.fallbackOrganizationId ? "/" : "/onboarding/organization",
+          result.fallbackOrganizationId || result.fallbackSelectionFailed
+            ? "/"
+            : "/onboarding/organization",
           { replace: true }
         );
       }

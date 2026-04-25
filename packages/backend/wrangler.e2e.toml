@@ -13,9 +13,17 @@ mode = "smart"
 tag = "v1"
 new_sqlite_classes = ["InboundAbuseCounterDurableObject"]
 
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["FixedWindowRateLimiterDurableObject"]
+
 [[durable_objects.bindings]]
 name = "ABUSE_COUNTERS"
 class_name = "InboundAbuseCounterDurableObject"
+
+[[durable_objects.bindings]]
+name = "FIXED_WINDOW_RATE_LIMITERS"
+class_name = "FixedWindowRateLimiterDurableObject"
 
 [[d1_databases]]
 binding = "SUM_DB"

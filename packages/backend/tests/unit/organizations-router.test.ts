@@ -18,19 +18,15 @@ vi.mock("@/platform/db/client", () => ({
   getDb: mocks.getDb,
 }));
 
-vi.mock("@/modules/organizations/access", () => ({
-  getOrganizationMemberRole: mocks.getOrganizationMemberRole,
-  isOrganizationAdminRole: (role: string | null | undefined) =>
-    (role ?? "")
-      .split(",")
-      .map(value => value.trim())
-      .some(value => value === "owner" || value === "admin"),
-  isOrganizationOwnerRole: (role: string | null | undefined) =>
-    (role ?? "")
-      .split(",")
-      .map(value => value.trim())
-      .includes("owner"),
-}));
+vi.mock("@/modules/organizations/access", async importOriginal => {
+  const actual =
+    await importOriginal<typeof import("@/modules/organizations/access")>();
+
+  return {
+    ...actual,
+    getOrganizationMemberRole: mocks.getOrganizationMemberRole,
+  };
+});
 
 vi.mock("@/modules/organizations/repo", async importOriginal => {
   const actual =
@@ -92,9 +88,40 @@ const buildApp = (authApiOverrides?: Record<string, unknown>) => {
   return app;
 };
 
+const createFakeFixedWindowRateLimiters = () => {
+  const counters = new Map<string, Map<number, number>>();
+
+  return {
+    idFromName: (name: string) => name,
+    get: (id: string) => ({
+      consume: (windowSeconds: number, maxAttempts: number) => {
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        const windowSlot = Math.floor(nowSeconds / windowSeconds);
+        const counter = counters.get(id) ?? new Map<number, number>();
+        counters.set(id, counter);
+
+        const current = counter.get(windowSlot) ?? 0;
+        if (current >= maxAttempts) {
+          return {
+            allowed: false as const,
+            retryAfterSeconds: Math.max(
+              1,
+              windowSeconds - (nowSeconds % windowSeconds)
+            ),
+          };
+        }
+
+        counter.set(windowSlot, current + 1);
+        return { allowed: true as const };
+      },
+    }),
+  } as unknown as CloudflareBindings["FIXED_WINDOW_RATE_LIMITERS"];
+};
+
 const buildEnv = (overrides: Partial<CloudflareBindings> = {}) =>
   ({
     SUM_KV: new FakeKvNamespace(),
+    FIXED_WINDOW_RATE_LIMITERS: createFakeFixedWindowRateLimiters(),
     ...overrides,
   }) as unknown as CloudflareBindings;
 
@@ -420,7 +447,51 @@ describe("organizations router", () => {
     });
   });
 
-  it("reports R2 cleanup failure after organization deletion succeeds", async () => {
+  it("rate limits failed organization deletion confirmation attempts", async () => {
+    await withFixedNow("2026-04-25T10:20:00.000Z", async () => {
+      const deleteOrganization = vi.fn().mockResolvedValue({ deleted: true });
+      const app = buildApp({ deleteOrganization });
+      const env = buildEnv();
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const response = await app.request(
+          "/api/organizations/org-1",
+          {
+            method: "DELETE",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ confirmationName: "Wrong Org" }),
+          },
+          env
+        );
+
+        expect(response.status).toBe(400);
+      }
+
+      const response = await app.request(
+        "/api/organizations/org-1",
+        {
+          method: "DELETE",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ confirmationName: "Wrong Org" }),
+        },
+        env
+      );
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("2400");
+      await expect(response.json()).resolves.toEqual({
+        error: "too many organization deletion attempts",
+        retryAfterSeconds: 2400,
+      });
+      expect(deleteOrganization).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not fail organization deletion when R2 cleanup fails", async () => {
     mocks.deleteR2ObjectsByPrefix.mockRejectedValueOnce(new Error("r2 down"));
     const deleteOrganization = vi.fn().mockResolvedValue({ deleted: true });
     const app = buildApp({ deleteOrganization });
@@ -437,9 +508,10 @@ describe("organizations router", () => {
       buildEnv({ R2_BUCKET: {} as R2Bucket })
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      error: "failed to clean up organization files",
+      id: "org-1",
+      deleted: true,
     });
     expect(deleteOrganization).toHaveBeenCalledWith({
       body: { organizationId: "org-1" },
