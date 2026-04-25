@@ -420,7 +420,7 @@ describe("organizations router", () => {
     });
   });
 
-  it("blocks organization deletion when R2 cleanup fails", async () => {
+  it("reports R2 cleanup failure after organization deletion succeeds", async () => {
     mocks.deleteR2ObjectsByPrefix.mockRejectedValueOnce(new Error("r2 down"));
     const deleteOrganization = vi.fn().mockResolvedValue({ deleted: true });
     const app = buildApp({ deleteOrganization });
@@ -441,7 +441,13 @@ describe("organizations router", () => {
     await expect(response.json()).resolves.toEqual({
       error: "failed to clean up organization files",
     });
-    expect(deleteOrganization).not.toHaveBeenCalled();
-    expect(mocks.clearActiveOrganizationSessions).not.toHaveBeenCalled();
+    expect(deleteOrganization).toHaveBeenCalledWith({
+      body: { organizationId: "org-1" },
+      headers: expect.any(Headers),
+    });
+    expect(mocks.clearActiveOrganizationSessions).toHaveBeenCalledWith(
+      { id: "db" },
+      "org-1"
+    );
   });
 });

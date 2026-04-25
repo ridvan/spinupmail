@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { OrganizationAvatar } from "@/features/organization/components/organization-avatar";
 import type { ActiveOrganization } from "@/features/organization/hooks/use-organizations";
+import { hasOrganizationRole } from "@/features/organization/utils/organization-roles";
 import { formatRole, roleBadgeVariant } from "./organization-settings-utils";
 import { OrganizationSettingsPanel } from "./organization-settings-panel";
 import { toFieldErrors } from "@/lib/forms/to-field-errors";
@@ -88,10 +89,7 @@ export const OrganizationProfileCard = ({
       }
     },
   });
-  const canDelete = currentUserRole
-    .split(",")
-    .map(role => role.trim())
-    .includes("owner");
+  const canDelete = hasOrganizationRole(currentUserRole, "owner");
   const deleteConfirmationMatches =
     deleteConfirmationName === activeOrganization?.name;
   const handleDeleteDialogOpenChange = (open: boolean) => {

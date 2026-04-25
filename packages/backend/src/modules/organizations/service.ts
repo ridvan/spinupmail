@@ -353,6 +353,41 @@ export const deleteOrganization = async ({
     };
   }
 
+  try {
+    const authApi = auth.api as typeof auth.api & {
+      deleteOrganization: (args: {
+        body: { organizationId: string };
+        headers: Headers;
+      }) => Promise<unknown>;
+    };
+
+    await authApi.deleteOrganization({
+      body: { organizationId },
+      headers,
+    });
+  } catch (error) {
+    console.error("[organization] Failed to delete organization", {
+      organizationId,
+      error,
+    });
+    return {
+      status: getErrorStatus(error, 500) as 400 | 401 | 403 | 404 | 500,
+      body: { error: "Unable to delete organization" },
+    };
+  }
+
+  try {
+    await clearActiveOrganizationSessions(db, organizationId);
+  } catch (error) {
+    console.warn(
+      "[organization] Failed to clear active organization sessions",
+      {
+        organizationId,
+        error,
+      }
+    );
+  }
+
   if (env.R2_BUCKET) {
     try {
       await Promise.all([
@@ -375,30 +410,6 @@ export const deleteOrganization = async ({
         body: { error: "failed to clean up organization files" },
       };
     }
-  }
-
-  try {
-    const authApi = auth.api as typeof auth.api & {
-      deleteOrganization: (args: {
-        body: { organizationId: string };
-        headers: Headers;
-      }) => Promise<unknown>;
-    };
-
-    await authApi.deleteOrganization({
-      body: { organizationId },
-      headers,
-    });
-    await clearActiveOrganizationSessions(db, organizationId);
-  } catch (error) {
-    console.error("[organization] Failed to delete organization", {
-      organizationId,
-      error,
-    });
-    return {
-      status: getErrorStatus(error, 500) as 400 | 401 | 403 | 404 | 500,
-      body: { error: "Unable to delete organization" },
-    };
   }
 
   return {

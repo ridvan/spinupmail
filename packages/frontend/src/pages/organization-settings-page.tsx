@@ -39,6 +39,7 @@ import {
   useReplayIntegrationDispatchMutation,
   useValidateIntegrationMutation,
 } from "@/features/organization/hooks/use-integrations";
+import { hasOrganizationRole } from "@/features/organization/utils/organization-roles";
 
 const buildInvitationUrl = (invitationId: string) => {
   const base = window.location.origin;
@@ -51,15 +52,6 @@ const toErrorMessage = (error: unknown, fallback: string) => {
   }
   return fallback;
 };
-
-const hasOrganizationRole = (
-  role: string | null | undefined,
-  expectedRole: string
-) =>
-  (role ?? "")
-    .split(",")
-    .map(value => value.trim())
-    .includes(expectedRole);
 
 export const OrganizationSettingsPage = () => {
   const navigate = useNavigate();

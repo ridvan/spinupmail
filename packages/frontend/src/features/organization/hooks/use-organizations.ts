@@ -316,9 +316,6 @@ export const useDeleteOrganizationMutation = () => {
       const deletedActiveOrganization =
         activeOrganizationId === payload.organizationId;
 
-      await queryClient.cancelQueries({ queryKey: ["app"] });
-      queryClient.removeQueries({ queryKey: ["app"] });
-
       if (getLastActiveOrganizationId(user?.id) === payload.organizationId) {
         clearLastActiveOrganizationId(user?.id);
       }
@@ -327,40 +324,81 @@ export const useDeleteOrganizationMutation = () => {
         cancelOrganizationSwitch(null);
       }
 
-      await refreshSession();
-      await invalidateOrganizationQueries(queryClient);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.organizationStats,
-      });
+      let fallbackOrganizationId: string | null = null;
+      if (deletedActiveOrganization) {
+        try {
+          const organizationsResult = await authClient.organization.list();
+          const fallbackOrganization = organizationsResult.error
+            ? null
+            : ((organizationsResult.data ?? []).find(
+                organization => organization.id !== payload.organizationId
+              ) ?? null);
 
-      const organizationsResult = await authClient.organization.list();
-      let fallbackOrganization: OrganizationItem | null = null;
-      if (!organizationsResult.error) {
-        fallbackOrganization =
-          (organizationsResult.data ?? []).find(
-            organization => organization.id !== payload.organizationId
-          ) ?? null;
-      }
+          if (fallbackOrganization) {
+            const setActiveResult = await authClient.organization.setActive({
+              organizationId: fallbackOrganization.id,
+            });
 
-      if (deletedActiveOrganization && fallbackOrganization) {
-        const setActiveResult = await authClient.organization.setActive({
-          organizationId: fallbackOrganization.id,
-        });
-        if (setActiveResult.error) {
-          fallbackOrganization = null;
-        } else {
-          setLastActiveOrganizationId(user?.id, fallbackOrganization.id);
-          await refreshSession();
+            if (setActiveResult.error) {
+              console.warn(
+                "[organization] Failed to select fallback organization",
+                {
+                  organizationId: payload.organizationId,
+                  fallbackOrganizationId: fallbackOrganization.id,
+                  error: setActiveResult.error,
+                }
+              );
+            } else {
+              fallbackOrganizationId = fallbackOrganization.id;
+              setLastActiveOrganizationId(user?.id, fallbackOrganization.id);
+              try {
+                await refreshSession();
+              } catch (error) {
+                console.warn(
+                  "[organization] Failed to refresh fallback session",
+                  {
+                    organizationId: payload.organizationId,
+                    fallbackOrganizationId: fallbackOrganization.id,
+                    error,
+                  }
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(
+            "[organization] Failed to select fallback organization",
+            {
+              organizationId: payload.organizationId,
+              error,
+            }
+          );
         }
       }
 
-      await invalidateOrganizationQueries(queryClient);
-      await queryClient.invalidateQueries({ queryKey: ["app"] });
+      void (async () => {
+        try {
+          await queryClient.cancelQueries({ queryKey: ["app"] });
+          queryClient.removeQueries({ queryKey: ["app"] });
+          await refreshSession();
+          await invalidateOrganizationQueries(queryClient);
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.organizationStats,
+          });
+          await invalidateOrganizationQueries(queryClient);
+          await queryClient.invalidateQueries({ queryKey: ["app"] });
+        } catch (error) {
+          console.warn("[organization] Failed to refresh after delete", {
+            organizationId: payload.organizationId,
+            error,
+          });
+        }
+      })();
 
       return {
         ...result,
         deletedActiveOrganization,
-        fallbackOrganizationId: fallbackOrganization?.id ?? null,
+        fallbackOrganizationId,
       };
     },
   });
