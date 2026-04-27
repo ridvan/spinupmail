@@ -48,6 +48,28 @@ describe("queryKeys", () => {
       "email-detail",
       "email-1",
     ]);
+    expect(
+      queryKeys.adminAnomalies(
+        2,
+        10,
+        "error",
+        "system_error",
+        "org-1",
+        "2026-04-01",
+        "2026-04-27"
+      )
+    ).toEqual([
+      "app",
+      "admin",
+      "anomalies",
+      2,
+      10,
+      "error",
+      "system_error",
+      "org-1",
+      "2026-04-01",
+      "2026-04-27",
+    ]);
   });
 
   it("changes key when parameters change", () => {

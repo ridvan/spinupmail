@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createOrganization,
   downloadEmailAttachment,
+  listAdminAnomalies,
   listAllEmailAddresses,
   listDomains,
 } from "../api";
@@ -157,6 +158,43 @@ describe("api client helpers", () => {
     expect(url).toContain("/api/organizations");
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ name: "Acme" }));
+  });
+
+  it("builds admin anomaly filter query parameters", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [],
+          page: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }
+      )
+    );
+
+    await listAdminAnomalies({
+      page: 1,
+      pageSize: 10,
+      severity: "error",
+      type: "system_error",
+      organizationId: "org-1",
+      from: "2026-04-01T00:00:00.000Z",
+      to: "2026-04-27T23:59:59.999Z",
+    });
+
+    const [input] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit];
+    const url = toUrl(input);
+    expect(url.pathname).toBe("/api/admin/anomalies");
+    expect(url.searchParams.get("severity")).toBe("error");
+    expect(url.searchParams.get("type")).toBe("system_error");
+    expect(url.searchParams.get("organizationId")).toBe("org-1");
+    expect(url.searchParams.get("from")).toBe("2026-04-01T00:00:00.000Z");
+    expect(url.searchParams.get("to")).toBe("2026-04-27T23:59:59.999Z");
   });
 
   it("stops pagination when backend reports unsafe page count", async () => {

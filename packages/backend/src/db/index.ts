@@ -5,4 +5,5 @@ export * from "drizzle-orm";
 export * from "./auth.schema"; // Export individual tables for drizzle-kit
 export * from "./email.schema";
 export * from "./integration.schema";
+export * from "./operational-event.schema";
 export * from "./schema";

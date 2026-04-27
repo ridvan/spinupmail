@@ -9,11 +9,16 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "@better-auth/api-key";
 import { captcha, testUtils } from "better-auth/plugins";
+import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import { schema } from "../../db";
+import {
+  adminAccessControl,
+  platformAdminRoles,
+} from "@/platform/auth/admin-access";
 import { assertAllowedAuthEmailDomain } from "./auth-domain-restriction";
 import { createEmailQualificationPlugin } from "./email-qualification-plugin";
 import {
@@ -152,6 +157,15 @@ function createAuth(
         emailAndPassword: {
           enabled: true,
           requireEmailVerification: true,
+          customSyntheticUser: ({ coreFields, additionalFields, id }) => ({
+            ...coreFields,
+            role: "user",
+            banned: false,
+            banReason: null,
+            banExpires: null,
+            ...additionalFields,
+            id,
+          }),
           sendResetPassword,
           revokeSessionsOnPasswordReset: true,
           password: {
@@ -208,6 +222,7 @@ function createAuth(
             normalizedEmail: {
               type: "string",
               required: false,
+              unique: true,
               input: false,
               returned: false,
             },
@@ -252,6 +267,12 @@ function createAuth(
           }),
           twoFactor({
             issuer: "Spinupmail",
+          }),
+          admin({
+            ac: adminAccessControl,
+            roles: platformAdminRoles,
+            defaultRole: "user",
+            adminRoles: ["admin"],
           }),
         ],
         rateLimit: {

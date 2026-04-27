@@ -1,6 +1,15 @@
+const mocks = vi.hoisted(() => ({
+  getDb: vi.fn(),
+}));
+
+vi.mock("@/platform/db/client", () => ({
+  getDb: mocks.getDb,
+}));
+
 import { Hono } from "hono";
 import type { AppHonoEnv } from "@/app/types";
 import { requireAuth } from "@/app/middleware/require-auth";
+import { requirePlatformAdmin } from "@/app/middleware/require-platform-admin";
 import { requireOrganizationScope } from "@/app/middleware/require-organization-scope";
 
 const buildAuthApp = (getSession: ReturnType<typeof vi.fn>) => {
@@ -48,6 +57,37 @@ const buildOrganizationScopeApp = (
 
   app.get("/scoped", c => {
     return c.json({ organizationId: c.get("organizationId") });
+  });
+
+  return app;
+};
+
+const buildPlatformAdminApp = (
+  getSession: ReturnType<typeof vi.fn>,
+  role: string | null | undefined
+) => {
+  const app = new Hono<AppHonoEnv>();
+  const get = vi.fn().mockResolvedValue(role === undefined ? null : { role });
+  const where = vi.fn(() => ({ get }));
+  const from = vi.fn(() => ({ where }));
+  const select = vi.fn(() => ({ from }));
+
+  mocks.getDb.mockReturnValue({ select });
+
+  app.use("*", async (c, next) => {
+    c.set("auth", {
+      api: {
+        getSession,
+      },
+    } as never);
+    await next();
+  });
+
+  app.use("*", requireAuth);
+  app.use("*", requirePlatformAdmin);
+
+  app.get("/admin", c => {
+    return c.json({ ok: true });
   });
 
   return app;
@@ -219,5 +259,49 @@ describe("organization scope middleware", () => {
     await expect(response.json()).resolves.toEqual({
       organizationId: "org-live",
     });
+  });
+});
+
+describe("platform admin middleware", () => {
+  it("rejects authenticated non-admin users", async () => {
+    const app = buildPlatformAdminApp(
+      vi.fn().mockResolvedValue({
+        session: {
+          id: "session-1",
+          userId: "user-1",
+        },
+        user: {
+          id: "user-1",
+          emailVerified: true,
+        },
+      }),
+      "user"
+    );
+
+    const response = await app.request("/admin");
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "forbidden" });
+  });
+
+  it("allows verified admin users", async () => {
+    const app = buildPlatformAdminApp(
+      vi.fn().mockResolvedValue({
+        session: {
+          id: "session-1",
+          userId: "user-1",
+        },
+        user: {
+          id: "user-1",
+          emailVerified: true,
+        },
+      }),
+      "admin"
+    );
+
+    const response = await app.request("/admin");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
   });
 });

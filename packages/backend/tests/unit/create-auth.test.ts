@@ -194,13 +194,22 @@ describe("createAuth", () => {
           normalizedEmail?: {
             type?: string;
             required?: boolean;
+            unique?: boolean;
             input?: boolean;
             returned?: boolean;
           };
         };
       };
+      emailAndPassword?: {
+        customSyntheticUser?: (input: {
+          coreFields: Record<string, unknown>;
+          additionalFields: Record<string, unknown>;
+          id: string;
+        }) => Record<string, unknown>;
+      };
       plugins?: Array<{
         id?: string;
+        options?: unknown;
         init?: () => {
           options?: {
             databaseHooks?: {
@@ -247,8 +256,30 @@ describe("createAuth", () => {
     expect(auth.user?.additionalFields?.normalizedEmail).toEqual({
       type: "string",
       required: false,
+      unique: true,
       input: false,
       returned: false,
+    });
+    expect(
+      auth.emailAndPassword?.customSyntheticUser?.({
+        coreFields: {
+          email: "jane@example.com",
+          name: "Jane",
+        },
+        additionalFields: {
+          timezone: "UTC",
+        },
+        id: "user-1",
+      })
+    ).toEqual({
+      email: "jane@example.com",
+      name: "Jane",
+      role: "user",
+      banned: false,
+      banReason: null,
+      banExpires: null,
+      timezone: "UTC",
+      id: "user-1",
     });
 
     const createdUser = await qualificationPlugin
@@ -273,6 +304,55 @@ describe("createAuth", () => {
         path: "/sign-in/email",
       })
     ).toBe(true);
+  });
+
+  it("configures the Better Auth admin plugin with safe platform permissions", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+    const { platformAdminRole, platformUserRole } =
+      await import("@/platform/auth/admin-access");
+
+    const auth = createAuth() as {
+      plugins?: Array<{
+        id?: string;
+        options?: {
+          roles?: {
+            admin?: typeof platformAdminRole;
+            user?: typeof platformUserRole;
+          };
+          defaultRole?: string;
+          adminRoles?: string[];
+        };
+      }>;
+    };
+    const adminPlugin = auth.plugins?.find(plugin => plugin.id === "admin");
+
+    expect(adminPlugin?.options).toMatchObject({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+    });
+    expect(adminPlugin?.options?.roles).toEqual({
+      admin: platformAdminRole,
+      user: platformUserRole,
+    });
+    expect(
+      platformAdminRole.authorize({
+        user: ["list", "get", "set-role", "ban"],
+        session: ["list", "revoke"],
+      }).success
+    ).toBe(true);
+    expect(platformAdminRole.authorize({ user: ["delete"] }).success).toBe(
+      false
+    );
+    expect(
+      platformAdminRole.authorize({ user: ["create", "set-password"] }).success
+    ).toBe(false);
+    expect(platformAdminRole.authorize({ user: ["impersonate"] }).success).toBe(
+      false
+    );
+    expect(platformAdminRole.authorize({ session: ["delete"] }).success).toBe(
+      false
+    );
+    expect(platformUserRole.authorize({ user: ["list"] }).success).toBe(false);
   });
 
   it("enables test utils and keeps captcha when E2E helpers are turned on", async () => {

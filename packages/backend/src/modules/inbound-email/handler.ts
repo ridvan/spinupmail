@@ -2,6 +2,7 @@ import type {
   ExecutionContext,
   ForwardableEmailMessage,
 } from "@cloudflare/workers-types";
+import { recordOperationalEventSafely } from "@/modules/admin/operational-events";
 import { dispatchEmailReceivedEvent } from "@/modules/integrations/service";
 import { getDb } from "@/platform/db/client";
 import {
@@ -146,12 +147,23 @@ export const handleIncomingEmail = async (
     rawTruncated,
     ...extra,
   });
+  const trackOperationalEvent = (
+    input: Omit<Parameters<typeof recordOperationalEventSafely>[0], "env">
+  ) => {
+    ctx.waitUntil(recordOperationalEventSafely({ env, ...input }));
+  };
 
   try {
     const recipient = normalizeAddress(message.to);
     const atIndex = recipient.lastIndexOf("@");
 
     if (atIndex === -1) {
+      trackOperationalEvent({
+        severity: "warning",
+        type: "inbound_rejected",
+        message: "Inbound email rejected because the recipient was invalid",
+        metadata: { reason: "invalid_recipient" },
+      });
       message.setReject("Invalid recipient address");
       return;
     }
@@ -160,12 +172,26 @@ export const handleIncomingEmail = async (
     const addressRow = await findAddressByRecipient(db, recipient);
 
     if (!addressRow) {
+      trackOperationalEvent({
+        severity: "info",
+        type: "inbound_rejected",
+        message: "Inbound email rejected because the address is not registered",
+        metadata: { reason: "address_not_registered" },
+      });
       message.setReject("Address not registered");
       return;
     }
 
     const availability = validateAddressAvailability(addressRow);
     if (!availability.allowed) {
+      trackOperationalEvent({
+        severity: "info",
+        type: "inbound_rejected",
+        organizationId: addressRow.organizationId,
+        addressId: addressRow.id,
+        message: "Inbound email rejected because the address is unavailable",
+        metadata: { reason: availability.reason },
+      });
       message.setReject(availability.reason);
       return;
     }
@@ -186,6 +212,14 @@ export const handleIncomingEmail = async (
           "[email] Duplicate inbound delivery skipped",
           logFields()
         );
+        trackOperationalEvent({
+          severity: "info",
+          type: "inbound_duplicate",
+          organizationId,
+          addressId: addressRow.id,
+          message: "Duplicate inbound email delivery skipped",
+          metadata: { messageId },
+        });
         return;
       }
     }
@@ -206,6 +240,18 @@ export const handleIncomingEmail = async (
           allowedFromDomains: senderPolicy.allowedFromDomains,
         })
       );
+      trackOperationalEvent({
+        severity: "info",
+        type: "inbound_rejected",
+        organizationId,
+        addressId: addressRow.id,
+        message: "Inbound email dropped by sender-domain policy",
+        metadata: {
+          reason: "disallowed_sender_domain",
+          senderDomain: senderPolicy.senderDomain ?? "unknown",
+          allowedFromDomains: senderPolicy.allowedFromDomains,
+        },
+      });
       return;
     }
 
@@ -216,6 +262,17 @@ export const handleIncomingEmail = async (
       senderRaw,
     });
     if (!abuseCheck.allowed) {
+      trackOperationalEvent({
+        severity: "warning",
+        type: "inbound_abuse_block",
+        organizationId,
+        addressId: addressRow.id,
+        message: "Inbound email blocked by abuse policy",
+        metadata: {
+          reason: abuseCheck.reason,
+          senderDomain: abuseCheck.senderDomain,
+        },
+      });
       return;
     }
     const addressMeta = parseAddressMeta(addressRow.meta);
@@ -246,6 +303,18 @@ export const handleIncomingEmail = async (
           reason: rawSizeResult.reason,
         })
       );
+      trackOperationalEvent({
+        severity: "error",
+        type: "inbound_rejected",
+        organizationId,
+        addressId: addressRow.id,
+        emailId,
+        message: "Inbound email rejected because rawSize was invalid",
+        metadata: {
+          reason: rawSizeResult.reason,
+          rawSizeType: rawSizeResult.receivedType,
+        },
+      });
       message.setReject("Temporary processing error");
       return;
     }
@@ -292,6 +361,17 @@ export const handleIncomingEmail = async (
         "[email] Failed to parse inbound email",
         logFields({ error })
       );
+      trackOperationalEvent({
+        severity: "error",
+        type: "inbound_parse_failed",
+        organizationId,
+        addressId: addressRow.id,
+        emailId,
+        message: "Inbound email parsing failed",
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       message.setReject("Temporary processing error");
       return;
     }
@@ -350,6 +430,18 @@ export const handleIncomingEmail = async (
               error,
             })
           );
+          trackOperationalEvent({
+            severity: "error",
+            type: "inbound_storage_failed",
+            organizationId,
+            addressId: addressRow.id,
+            emailId,
+            message: "Failed to clean stored files after inbox limit cleanup",
+            metadata: {
+              reason: "limit_cleanup_failed",
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
           message.setReject("Temporary processing error");
           return;
         }
@@ -387,13 +479,49 @@ export const handleIncomingEmail = async (
       );
 
       if (reservationFailureReason === "organization_limit") {
+        trackOperationalEvent({
+          severity: "warning",
+          type: "inbound_limit_reached",
+          organizationId,
+          addressId: addressRow.id,
+          emailId,
+          message:
+            "Inbound email rejected because organization inbox limit was reached",
+          metadata: {
+            reason: reservationFailureReason,
+            organizationHardLimit,
+          },
+        });
         message.setReject("Organization inbox limit reached");
         return;
       }
       if (reservationFailureReason === "address_limit") {
+        trackOperationalEvent({
+          severity: "warning",
+          type: "inbound_limit_reached",
+          organizationId,
+          addressId: addressRow.id,
+          emailId,
+          message:
+            "Inbound email dropped because address inbox limit was reached",
+          metadata: {
+            reason: reservationFailureReason,
+            maxReceivedEmailCount,
+            maxReceivedEmailAction,
+          },
+        });
         return;
       }
 
+      trackOperationalEvent({
+        severity: "error",
+        type: "system_error",
+        organizationId,
+        addressId: addressRow.id,
+        emailId,
+        message: "Inbound email reservation failed unexpectedly",
+        metadata: { reason: reservationFailureReason ?? "conflict" },
+      });
       message.setReject("Temporary processing error");
       return;
     }
@@ -443,6 +571,17 @@ export const handleIncomingEmail = async (
         "[email] Inbound email insert failed",
         logFields({ error })
       );
+      trackOperationalEvent({
+        severity: "error",
+        type: "system_error",
+        organizationId,
+        addressId: addressRow.id,
+        emailId,
+        message: "Inbound email database insert failed",
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
       throw error;
     }
 
@@ -497,7 +636,20 @@ export const handleIncomingEmail = async (
           addressId: addressRow.id,
           userId: addressRow.userId,
         });
-      })()
+      })().catch(error =>
+        recordOperationalEventSafely({
+          env,
+          severity: "error",
+          type: "inbound_storage_failed",
+          organizationId,
+          addressId: addressRow.id,
+          emailId,
+          message: "Inbound email storage persistence failed",
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+      )
     );
 
     ctx.waitUntil(updateAddressLastReceivedAt(db, addressRow.id, receivedAt));
@@ -514,6 +666,18 @@ export const handleIncomingEmail = async (
           ...logFields(),
           organizationId,
           error,
+        });
+        return recordOperationalEventSafely({
+          env,
+          severity: "error",
+          type: "integration_dispatch_failed",
+          organizationId,
+          addressId: addressRow.id,
+          emailId,
+          message: "Integration dispatch failed after inbound email receipt",
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+          },
         });
       })
     );
@@ -547,6 +711,17 @@ export const handleIncomingEmail = async (
       }
     }
     logInboundError("[email] Unhandled processing error", logFields({ error }));
+    trackOperationalEvent({
+      severity: "error",
+      type: "system_error",
+      organizationId: reservedOrganizationId,
+      addressId: reservedAddressId ?? addressId,
+      emailId,
+      message: "Unhandled inbound email processing error",
+      metadata: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
     message.setReject("Temporary processing error");
   }
 };

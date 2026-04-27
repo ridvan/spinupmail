@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   redirectIfAuthenticatedLoader,
   requireActiveOrganizationLoader,
+  requirePlatformAdminLoader,
   requireNoActiveOrganizationLoader,
 } from "../route-loaders";
 
@@ -129,5 +130,56 @@ describe("route loaders", () => {
         loaderArgs("https://app/onboarding/organization")
       )
     ).resolves.toBeNull();
+  });
+
+  it("redirects non-admin users away from the admin route", async () => {
+    mocks.getSession
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          user: { id: "user-1", role: "user" },
+          session: {},
+        },
+      })
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          user: { id: "user-1", role: "user" },
+          session: {},
+        },
+      });
+
+    await expect(
+      requirePlatformAdminLoader(loaderArgs("https://app/admin"))
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("allows admin users through the admin route loader", async () => {
+    mocks.getSession
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          user: { id: "user-1", role: "user" },
+          session: {},
+        },
+      })
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          user: { id: "user-1", role: "admin" },
+          session: {},
+        },
+      });
+
+    await expect(
+      requirePlatformAdminLoader(loaderArgs("https://app/admin"))
+    ).resolves.toBeNull();
+    expect(mocks.getSession).toHaveBeenLastCalledWith({
+      query: {
+        disableCookieCache: true,
+      },
+    });
   });
 });

@@ -1,4 +1,34 @@
 export const queryKeys = {
+  adminOverview: ["app", "admin", "overview"] as const,
+  adminActivity: (timezone: string) =>
+    ["app", "admin", "activity", timezone] as const,
+  adminOrganizations: (page: number, pageSize: number) =>
+    ["app", "admin", "organizations", page, pageSize] as const,
+  adminAnomalies: (
+    page: number,
+    pageSize: number,
+    severity: string,
+    type: string,
+    organizationId: string,
+    from: string,
+    to: string
+  ) =>
+    [
+      "app",
+      "admin",
+      "anomalies",
+      page,
+      pageSize,
+      severity,
+      type,
+      organizationId,
+      from,
+      to,
+    ] as const,
+  adminUsers: (page: number, pageSize: number, search: string) =>
+    ["app", "admin", "users", page, pageSize, search] as const,
+  adminUserSessions: (userId: string | null) =>
+    ["app", "admin", "users", userId, "sessions"] as const,
   organizationStats: ["app", "organization-stats"] as const,
   emailActivity: (organizationId: string | null, timezone: string) =>
     [

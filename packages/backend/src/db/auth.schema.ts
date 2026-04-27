@@ -11,7 +11,6 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  normalizedEmail: text("normalized_email").unique(),
   emailVerified: integer("email_verified", { mode: "boolean" })
     .default(false)
     .notNull(),
@@ -26,6 +25,11 @@ export const users = sqliteTable("users", {
   twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).default(
     false
   ),
+  role: text("role"),
+  banned: integer("banned", { mode: "boolean" }).default(false),
+  banReason: text("ban_reason"),
+  banExpires: integer("ban_expires", { mode: "timestamp_ms" }),
+  normalizedEmail: text("normalized_email").unique(),
   timezone: text("timezone"),
 });
 
@@ -55,6 +59,7 @@ export const sessions = sqliteTable(
     latitude: text("latitude"),
     longitude: text("longitude"),
     activeOrganizationId: text("active_organization_id"),
+    impersonatedBy: text("impersonated_by"),
   },
   table => [index("sessions_userId_idx").on(table.userId)]
 );

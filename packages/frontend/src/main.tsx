@@ -15,11 +15,13 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   requireActiveOrganizationLoader,
   requireNoActiveOrganizationLoader,
+  requirePlatformAdminLoader,
   redirectIfAuthenticatedLoader,
 } from "@/features/auth/hooks/route-loaders";
 import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { TimezoneProvider } from "@/features/timezone/hooks/use-timezone";
 import { AddressManagementPage } from "@/pages/address-management-page";
+import { AdminPage } from "@/pages/admin-page";
 import { HomePage } from "@/pages/home-page";
 import { InboxPage } from "@/pages/inbox-page";
 import { NotFoundPage } from "@/pages/not-found-page";
@@ -128,6 +130,20 @@ const routes: RouteObject[] = [
     element: <OrganizationOnboardingPage />,
     errorElement: <RouteErrorPage />,
     handle: { title: "Organization Onboarding" },
+  },
+  {
+    path: "/admin",
+    loader: requirePlatformAdminLoader,
+    hydrateFallbackElement: hydrationFallbackElement,
+    element: <ProtectedLayoutPage />,
+    errorElement: <RouteErrorPage />,
+    children: [
+      {
+        index: true,
+        element: <AdminPage />,
+        handle: { title: "Admin" },
+      },
+    ],
   },
   {
     path: "/",

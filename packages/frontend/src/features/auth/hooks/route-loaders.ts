@@ -41,6 +41,15 @@ const getActiveOrganizationId = (
   );
 };
 
+const isPlatformAdminRole = (role: unknown) => {
+  if (Array.isArray(role)) return role.includes("admin");
+  if (typeof role !== "string") return false;
+  return role
+    .split(",")
+    .map(part => part.trim())
+    .includes("admin");
+};
+
 const tryRestoreActiveOrganization = async (userId: string) => {
   const organizations = await authClient.organization.list();
   const orgList = organizations.error ? [] : (organizations.data ?? []);
@@ -73,6 +82,24 @@ const tryRestoreActiveOrganization = async (userId: string) => {
 
 export const requireAuthLoader = async ({ request }: LoaderFunctionArgs) => {
   await getSessionOrRedirect(request);
+  return null;
+};
+
+export const requirePlatformAdminLoader = async ({
+  request,
+}: LoaderFunctionArgs) => {
+  const session = await getSessionOrRedirect(request);
+  const freshSession = await authClient.getSession({
+    query: {
+      disableCookieCache: true,
+    },
+  });
+  const user = freshSession.data?.user ?? session.user;
+
+  if (!isPlatformAdminRole((user as { role?: unknown }).role)) {
+    throw redirect("/");
+  }
+
   return null;
 };
 

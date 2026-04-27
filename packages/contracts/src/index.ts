@@ -53,6 +53,112 @@ export const organizationStatsResponseSchema = z.object({
   items: z.array(organizationStatsItemSchema),
 });
 
+export const adminOperationalEventSeveritySchema = z.enum([
+  "info",
+  "warning",
+  "error",
+]);
+
+export const adminOperationalEventTypeSchema = z.enum([
+  "inbound_rejected",
+  "inbound_duplicate",
+  "inbound_limit_reached",
+  "inbound_abuse_block",
+  "inbound_parse_failed",
+  "inbound_storage_failed",
+  "integration_dispatch_failed",
+  "system_error",
+]);
+
+export const adminMetricSchema = z.object({
+  current: z.number().int().nonnegative(),
+  previous: z.number().int().nonnegative(),
+});
+
+export const adminOverviewResponseSchema = z.object({
+  generatedAddresses: adminMetricSchema,
+  receivedEmails: adminMetricSchema,
+  sampleEmails: adminMetricSchema,
+  organizations: z.number().int().nonnegative(),
+  users: z.number().int().nonnegative(),
+  activeUsers24h: z.number().int().nonnegative(),
+  activeUsers7d: z.number().int().nonnegative(),
+  attachments: z.object({
+    count: z.number().int().nonnegative(),
+    sizeTotal: z.number().int().nonnegative(),
+  }),
+  integrations: z.object({
+    active: z.number().int().nonnegative(),
+    retryScheduled: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+  }),
+  anomalies: z.object({
+    last24h: z.number().int().nonnegative(),
+    errorsLast24h: z.number().int().nonnegative(),
+    warningsLast24h: z.number().int().nonnegative(),
+  }),
+  system: z.object({
+    status: z.enum(["healthy", "warning", "critical"]),
+    checkedAt: z.string().datetime(),
+  }),
+});
+
+export const adminActivityDaySchema = z.object({
+  date: z.string().min(1),
+  generatedAddresses: z.number().int().nonnegative(),
+  receivedEmails: z.number().int().nonnegative(),
+});
+
+export const adminActivityResponseSchema = z.object({
+  timezone: z.string().min(1),
+  daily: z.array(adminActivityDaySchema),
+});
+
+export const adminOrganizationItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  createdAt: z.string().nullable(),
+  memberCount: z.number().int().nonnegative(),
+  addressCount: z.number().int().nonnegative(),
+  receivedEmailCount: z.number().int().nonnegative(),
+  sampleEmailCount: z.number().int().nonnegative(),
+  integrationCount: z.number().int().nonnegative(),
+  activeIntegrationCount: z.number().int().nonnegative(),
+  lastReceivedAt: z.string().nullable(),
+});
+
+export const adminOrganizationsResponseSchema = z.object({
+  items: z.array(adminOrganizationItemSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+export const adminOperationalEventSchema = z.object({
+  id: z.string().min(1),
+  severity: adminOperationalEventSeveritySchema,
+  type: adminOperationalEventTypeSchema,
+  organizationId: z.string().nullable(),
+  addressId: z.string().nullable(),
+  emailId: z.string().nullable(),
+  integrationId: z.string().nullable(),
+  dispatchId: z.string().nullable(),
+  organizationName: z.string().nullable(),
+  message: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: z.string().nullable(),
+});
+
+export const adminOperationalEventsResponseSchema = z.object({
+  items: z.array(adminOperationalEventSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
 export const integrationProviderSchema = z.enum(["telegram"]);
 export const integrationStatusSchema = z.enum(["active", "archived"]);
 export const integrationEventTypeSchema = z.enum(["email.received"]);
@@ -506,6 +612,22 @@ export type DomainConfig = z.infer<typeof domainConfigSchema>;
 export type OrganizationStatsItem = z.infer<typeof organizationStatsItemSchema>;
 export type OrganizationStatsResponse = z.infer<
   typeof organizationStatsResponseSchema
+>;
+export type AdminOperationalEventSeverity = z.infer<
+  typeof adminOperationalEventSeveritySchema
+>;
+export type AdminOperationalEventType = z.infer<
+  typeof adminOperationalEventTypeSchema
+>;
+export type AdminOverviewResponse = z.infer<typeof adminOverviewResponseSchema>;
+export type AdminActivityResponse = z.infer<typeof adminActivityResponseSchema>;
+export type AdminOrganizationItem = z.infer<typeof adminOrganizationItemSchema>;
+export type AdminOrganizationsResponse = z.infer<
+  typeof adminOrganizationsResponseSchema
+>;
+export type AdminOperationalEvent = z.infer<typeof adminOperationalEventSchema>;
+export type AdminOperationalEventsResponse = z.infer<
+  typeof adminOperationalEventsResponseSchema
 >;
 export type IntegrationProvider = z.infer<typeof integrationProviderSchema>;
 export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;

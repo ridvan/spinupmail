@@ -78,6 +78,13 @@
       "when": 1776959886106,
       "tag": "0010_colossal_piledriver",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1777318511993,
+      "tag": "0011_wet_sleeper",
+      "breakpoints": true
     }
   ]
 }

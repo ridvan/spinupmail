@@ -1,4 +1,5 @@
 import { apiKeyClient } from "@better-auth/api-key/client";
+import { adminClient } from "better-auth/client/plugins";
 import {
   organizationClient,
   twoFactorClient,
@@ -9,7 +10,12 @@ const baseURL = import.meta.env.VITE_AUTH_BASE_URL;
 
 export const authClient = createAuthClient({
   baseURL,
-  plugins: [apiKeyClient(), organizationClient(), twoFactorClient()],
+  plugins: [
+    apiKeyClient(),
+    organizationClient(),
+    twoFactorClient(),
+    adminClient(),
+  ],
 });
 
 export type AuthSession = typeof authClient.$Infer.Session;

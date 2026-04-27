@@ -1,4 +1,8 @@
 import type {
+  AdminActivityResponse,
+  AdminOperationalEventsResponse,
+  AdminOrganizationsResponse,
+  AdminOverviewResponse,
   AddressIntegration,
   CreateIntegrationRequest,
   DeleteIntegrationResponse,
@@ -128,6 +132,10 @@ const buildQueryString = (query: URLSearchParams) =>
   query.size > 0 ? `?${query.toString()}` : "";
 
 export type {
+  AdminActivityResponse,
+  AdminOperationalEventsResponse,
+  AdminOrganizationsResponse,
+  AdminOverviewResponse,
   AddressIntegration,
   DeleteIntegrationResponse,
   IntegrationDispatch,
@@ -139,6 +147,65 @@ export type {
   OrganizationIntegration,
   OrganizationIntegrationSummary,
   TelegramIntegrationPublicConfig,
+};
+
+export const getAdminOverview = async (options?: { signal?: AbortSignal }) =>
+  apiFetch<AdminOverviewResponse>("/api/admin/overview", {
+    signal: options?.signal,
+  });
+
+export const getAdminActivity = async (options?: {
+  days?: number;
+  timezone?: string;
+  signal?: AbortSignal;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.days) query.set("days", String(options.days));
+  if (options?.timezone) query.set("timezone", options.timezone);
+  return apiFetch<AdminActivityResponse>(
+    `/api/admin/activity${buildQueryString(query)}`,
+    { signal: options?.signal }
+  );
+};
+
+export const listAdminOrganizations = async (options?: {
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  return apiFetch<AdminOrganizationsResponse>(
+    `/api/admin/organizations${buildQueryString(query)}`,
+    { signal: options?.signal }
+  );
+};
+
+export const listAdminAnomalies = async (options?: {
+  page?: number;
+  pageSize?: number;
+  severity?: string;
+  type?: string;
+  organizationId?: string;
+  from?: string;
+  to?: string;
+  signal?: AbortSignal;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.severity) query.set("severity", options.severity);
+  if (options?.type) query.set("type", options.type);
+  if (options?.organizationId) {
+    query.set("organizationId", options.organizationId);
+  }
+  if (options?.from) query.set("from", options.from);
+  if (options?.to) query.set("to", options.to);
+  return apiFetch<AdminOperationalEventsResponse>(
+    `/api/admin/anomalies${buildQueryString(query)}`,
+    { signal: options?.signal }
+  );
 };
 
 export type EmailAddress = {

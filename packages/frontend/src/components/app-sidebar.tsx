@@ -7,6 +7,7 @@ import {
   LogoutIcon,
   UserMultiple02Icon,
   DashboardSquare01Icon,
+  Key01Icon,
 } from "@/lib/hugeicons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AppLogo } from "@/components/app-logo";
@@ -81,6 +82,15 @@ const navItems: NavItem[] = [
   },
 ];
 
+const isPlatformAdminRole = (role: unknown) => {
+  if (Array.isArray(role)) return role.includes("admin");
+  if (typeof role !== "string") return false;
+  return role
+    .split(",")
+    .map(part => part.trim())
+    .includes("admin");
+};
+
 export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
   const { isMobile, state } = useSidebar();
   const location = useLocation();
@@ -93,6 +103,20 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
     [location.pathname, navigate]
   );
   const userAvatarSeed = user?.id ?? user?.email ?? user?.name ?? "guest";
+  const visibleNavItems = React.useMemo(
+    () =>
+      isPlatformAdminRole((user as { role?: unknown } | null)?.role)
+        ? [
+            ...navItems,
+            {
+              title: "Admin",
+              to: "/admin",
+              icon: Key01Icon,
+            },
+          ]
+        : navItems,
+    [user]
+  );
   const [isUserDropdownOpen, setIsUserDropdownOpen] = React.useState(false);
   const userChevronsRef = React.useRef<ChevronsUpDownIconHandle | null>(null);
 
@@ -139,7 +163,7 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
           <OrganizationSwitcher />
           <SidebarGroupContent className="pt-2">
             <SidebarMenu className="gap-1">
-              {navItems.map(item => {
+              {visibleNavItems.map(item => {
                 const isActive = item.end
                   ? location.pathname === item.to
                   : location.pathname.startsWith(item.to);

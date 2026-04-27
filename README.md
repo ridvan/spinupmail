@@ -379,6 +379,19 @@ pnpm -C packages/backend db:migrate:dev
 # for production, run `pnpm -C packages/backend db:migrate:prod`
 ```
 
+### Bootstrap the first platform admin
+
+Spinupmail does not auto-promote the first user and does not use env-based admin
+IDs. After migrations have added the Better Auth admin fields, promote the first
+admin directly in D1:
+
+```bash
+pnpm -C packages/backend exec wrangler d1 execute SUM_DB --local --command "UPDATE users SET role = 'admin' WHERE email = 'you@example.com';"
+```
+
+For production, run the same statement with `--remote` after confirming the
+target user has signed up and verified their email.
+
 ## 5. Deploy the Backend Worker
 
 ```bash
