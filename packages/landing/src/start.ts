@@ -9,9 +9,59 @@ import {
   estimateMarkdownTokens,
 } from "@/lib/agent-discovery";
 
-const acceptsMarkdown = (request: Request) =>
-  request.headers.get("accept")?.toLowerCase().includes("text/markdown") ??
-  false;
+export const acceptsMarkdown = (request: Request) => {
+  const accept = request.headers.get("accept");
+  if (!accept) return false;
+
+  const ranges = accept.split(",").map((range, index) => {
+    const [mediaRange, ...parameters] = range.split(";");
+    const [type, subtype] = mediaRange.trim().toLowerCase().split("/", 2);
+
+    const qParameter = parameters.find(parameter => {
+      const [name] = parameter.trim().split("=", 1);
+      return name.toLowerCase() === "q";
+    });
+
+    const [, rawQuality = "1"] = qParameter?.split("=", 2) ?? [];
+    const quality = Number.parseFloat(rawQuality.trim());
+
+    return {
+      type,
+      subtype,
+      index,
+      quality: Number.isFinite(quality) ? quality : 0,
+    };
+  });
+
+  const qualityFor = (type: string, subtype: string) => {
+    const matches = ranges
+      .map(range => {
+        const typeMatches = range.type === type || range.type === "*";
+        const subtypeMatches =
+          range.subtype === subtype || range.subtype === "*";
+
+        if (!typeMatches || !subtypeMatches) return null;
+
+        const specificity =
+          (range.type === type ? 1 : 0) + (range.subtype === subtype ? 1 : 0);
+
+        return {
+          specificity,
+          quality: range.quality,
+          index: range.index,
+        };
+      })
+      .filter(match => match !== null)
+      .sort((a, b) => b.specificity - a.specificity || a.index - b.index);
+
+    return matches[0]?.quality ?? 0;
+  };
+
+  const markdownQuality = qualityFor("text", "markdown");
+  const htmlQuality = qualityFor("text", "html");
+
+  return markdownQuality > 0 && markdownQuality > htmlQuality;
+};
 
 const AGENT_RESPONSE_CACHE_CONTROL =
   "public, max-age=300, s-maxage=300, stale-while-revalidate=86400";

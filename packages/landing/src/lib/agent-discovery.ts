@@ -1,12 +1,12 @@
 import { landingLinks } from "./links";
 import { siteConfig } from "./site";
 
-const FALLBACK_API_URL = "https://api.spinupmail.com";
+const LOCAL_API_PLACEHOLDER_URL = "http://localhost:8787";
 const CONTENT_SIGNAL = "ai-train=yes, search=yes, ai-input=yes";
 
-const normalizeUrl = (value: string | undefined, fallback: string) => {
+const normalizeUrl = (value: string | undefined) => {
   const trimmed = value?.trim();
-  if (!trimmed) return fallback;
+  if (!trimmed) return undefined;
   return trimmed.replace(/\/+$/, "");
 };
 
@@ -16,12 +16,15 @@ const absoluteUrl = (pathOrUrl: string) => {
 };
 
 export const agentDiscovery = {
-  apiBaseUrl: normalizeUrl(import.meta.env.VITE_API_BASE_URL, FALLBACK_API_URL),
+  apiBaseUrl: normalizeUrl(import.meta.env.VITE_API_BASE_URL),
   apiCatalogPath: "/.well-known/api-catalog",
   openApiPath: "/.well-known/openapi.json",
   docsPath: "/docs/api-overview",
   contentSignal: CONTENT_SIGNAL,
 } as const;
+
+const apiDiscoveryBaseUrl =
+  agentDiscovery.apiBaseUrl ?? LOCAL_API_PLACEHOLDER_URL;
 
 export const agentLinkHeader = [
   `</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"`,
@@ -33,7 +36,7 @@ export function createApiCatalog() {
   return {
     linkset: [
       {
-        anchor: agentDiscovery.apiBaseUrl,
+        anchor: apiDiscoveryBaseUrl,
         "service-desc": [
           {
             href: absoluteUrl(agentDiscovery.openApiPath),
@@ -50,9 +53,11 @@ export function createApiCatalog() {
         ],
         status: [
           {
-            href: `${agentDiscovery.apiBaseUrl}/health`,
+            href: `${apiDiscoveryBaseUrl}/health`,
             type: "application/json",
-            title: "SpinupMail API health check",
+            title: agentDiscovery.apiBaseUrl
+              ? "SpinupMail API health check"
+              : "SpinupMail local API health check placeholder",
           },
         ],
       },
@@ -71,8 +76,10 @@ export function createOpenApiDocument() {
     },
     servers: [
       {
-        url: agentDiscovery.apiBaseUrl,
-        description: "Production API",
+        url: apiDiscoveryBaseUrl,
+        description: agentDiscovery.apiBaseUrl
+          ? "Configured API"
+          : "Local API placeholder. Set VITE_API_BASE_URL to publish deployment-specific discovery metadata.",
       },
     ],
     security: [{ apiKeyAuth: [], organizationId: [] }],
@@ -101,6 +108,7 @@ export function createOpenApiDocument() {
       "/api/organizations": {
         post: {
           summary: "Create an organization",
+          security: [{ apiKeyAuth: [] }],
           responses: {
             "201": {
               description: "Organization created.",
@@ -342,7 +350,7 @@ SpinupMail gives teams temporary inboxes, API access, TTL controls, sender polic
 
 ## API
 
-Use ${agentDiscovery.apiBaseUrl} as the production API origin. Product endpoints are under /api, and the lightweight health probe is ${agentDiscovery.apiBaseUrl}/health.
+${agentDiscovery.apiBaseUrl ? `Use ${agentDiscovery.apiBaseUrl} as the configured API origin. Product endpoints are under /api, and the lightweight health probe is ${agentDiscovery.apiBaseUrl}/health.` : `API origin is not configured in this build. Set VITE_API_BASE_URL to publish deployment-specific API discovery metadata. Local development usually runs the API at ${LOCAL_API_PLACEHOLDER_URL}.`}
 
 ## Content usage
 
