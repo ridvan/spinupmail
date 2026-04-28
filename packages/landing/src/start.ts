@@ -33,7 +33,7 @@ export const acceptsMarkdown = (request: Request) => {
     };
   });
 
-  const qualityFor = (type: string, subtype: string) => {
+  const qualityFor = (type: string, subtype: string, minSpecificity = 0) => {
     const matches = ranges
       .map(range => {
         const typeMatches = range.type === type || range.type === "*";
@@ -54,10 +54,11 @@ export const acceptsMarkdown = (request: Request) => {
       .filter(match => match !== null)
       .sort((a, b) => b.specificity - a.specificity || a.index - b.index);
 
-    return matches[0]?.quality ?? 0;
+    const match = matches.at(0);
+    return match && match.specificity >= minSpecificity ? match.quality : 0;
   };
 
-  const markdownQuality = qualityFor("text", "markdown");
+  const markdownQuality = qualityFor("text", "markdown", 2);
   const htmlQuality = qualityFor("text", "html");
 
   return markdownQuality > 0 && markdownQuality > htmlQuality;
