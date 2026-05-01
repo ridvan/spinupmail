@@ -49,7 +49,7 @@ const HeaderSidebarTrigger = () => {
 export const ProtectedLayoutPage = () => {
   const navigate = useNavigate();
   const matches = useMatches();
-  const { user, isLoading, signOut } = useAuth();
+  const { user, isLoading, refreshSession, signOut } = useAuth();
 
   const [signOutError, setSignOutError] = React.useState<string | null>(null);
 
@@ -74,7 +74,11 @@ export const ProtectedLayoutPage = () => {
 
   return (
     <SidebarProvider>
-      <AppSidebar onSignOut={handleSignOut} user={user} />
+      <AppSidebar
+        onRefreshSession={refreshSession}
+        onSignOut={handleSignOut}
+        user={user}
+      />
       <SidebarInset>
         <header className="sticky top-0 z-20 border-b border-border/65 bg-sidebar px-4 md:px-6 lg:px-8">
           <div className="mx-auto flex h-16 min-w-0 w-full max-w-7xl items-center justify-between gap-4">

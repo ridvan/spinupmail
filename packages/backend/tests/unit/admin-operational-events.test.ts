@@ -7,6 +7,7 @@ vi.mock("@/platform/db/client", () => ({
 }));
 
 import {
+  pruneOperationalEvents,
   recordOperationalEvent,
   recordOperationalEventSafely,
 } from "@/modules/admin/operational-events";
@@ -14,6 +15,10 @@ import {
 describe("admin operational events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("redacts sensitive metadata before writing operational events", async () => {
@@ -39,6 +44,9 @@ describe("admin operational events", () => {
         rawHeaders: {
           subject: "private",
         },
+        context: {
+          id: "ctx-1",
+        },
       },
     });
 
@@ -58,6 +66,9 @@ describe("admin operational events", () => {
             retryCount: 2,
           },
           rawHeaders: "[redacted]",
+          context: {
+            id: "ctx-1",
+          },
         }),
       })
     );
@@ -76,7 +87,7 @@ describe("admin operational events", () => {
       recordOperationalEventSafely({
         env: {} as CloudflareBindings,
         severity: "warning",
-        type: "inbound_rejected",
+        type: "system_error",
         message: "Rejected",
       })
     ).resolves.toBeUndefined();
@@ -84,10 +95,80 @@ describe("admin operational events", () => {
     expect(consoleError).toHaveBeenCalledWith(
       "[admin] Failed to record operational event",
       {
-        type: "inbound_rejected",
+        type: "system_error",
         severity: "warning",
         error,
       }
     );
+  });
+
+  it("caps message and metadata size before writing operational events", async () => {
+    const values = vi.fn().mockResolvedValue(undefined);
+    const insert = vi.fn(() => ({ values }));
+    mocks.getDb.mockReturnValue({ insert });
+
+    await recordOperationalEvent({
+      env: {
+        OPERATIONAL_EVENT_MAX_METADATA_BYTES: "1024",
+      } as CloudflareBindings,
+      severity: "error",
+      type: "system_error",
+      message: "x".repeat(2_000),
+      metadata: {
+        reason: "large_payload",
+        ...Object.fromEntries(
+          Array.from({ length: 60 }, (_, index) => [
+            `detail${index}`,
+            "y".repeat(2_000),
+          ])
+        ),
+      },
+    });
+
+    const written = values.mock.calls[0]?.[0] as {
+      message: string;
+      metadataJson: string;
+    };
+    expect(written.message).toHaveLength(500);
+    expect(written.message).toContain("[truncated]");
+    expect(written.metadataJson.length).toBeLessThanOrEqual(1024);
+    expect(JSON.parse(written.metadataJson)).toMatchObject({
+      truncated: true,
+    });
+  });
+
+  it("suppresses noisy operational events when the event limiter is exhausted", async () => {
+    const values = vi.fn().mockResolvedValue(undefined);
+    const insert = vi.fn(() => ({ values }));
+    const consume = vi.fn().mockResolvedValue({ allowed: false });
+    mocks.getDb.mockReturnValue({ insert });
+
+    await recordOperationalEvent({
+      env: {
+        FIXED_WINDOW_RATE_LIMITERS: {
+          idFromName: vi.fn(value => value),
+          get: vi.fn(() => ({ consume })),
+        },
+      } as unknown as CloudflareBindings,
+      severity: "info",
+      type: "inbound_rejected",
+      message: "Inbound email rejected because the address is not registered",
+      metadata: { reason: "address_not_registered" },
+    });
+
+    expect(consume).toHaveBeenCalledWith(300, 1);
+    expect(insert).not.toHaveBeenCalled();
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("prunes operational events older than the retention window", async () => {
+    const run = vi.fn().mockResolvedValue({ meta: { changes: 1 } });
+    mocks.getDb.mockReturnValue({ run });
+
+    await pruneOperationalEvents({
+      OPERATIONAL_EVENT_RETENTION_DAYS: "7",
+    } as CloudflareBindings);
+
+    expect(run).toHaveBeenCalledOnce();
   });
 });

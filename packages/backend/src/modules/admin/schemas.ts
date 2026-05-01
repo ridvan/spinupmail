@@ -18,6 +18,6 @@ export const adminAnomaliesQuerySchema = adminPaginationQuerySchema.extend({
   severity: adminOperationalEventSeveritySchema.optional(),
   type: adminOperationalEventTypeSchema.optional(),
   organizationId: z.string().min(1).optional(),
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: z.iso.datetime({ local: true }).optional(),
+  to: z.iso.datetime({ local: true }).optional(),
 });

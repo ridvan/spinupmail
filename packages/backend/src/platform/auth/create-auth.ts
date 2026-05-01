@@ -8,7 +8,7 @@ import { betterAuth } from "better-auth";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "@better-auth/api-key";
-import { captcha, testUtils } from "better-auth/plugins";
+import { captcha, openAPI, testUtils } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -272,8 +272,9 @@ function createAuth(
             ac: adminAccessControl,
             roles: platformAdminRoles,
             defaultRole: "user",
-            adminRoles: ["admin"],
+            adminRoles: ["support", "security", "admin", "superadmin"],
           }),
+          openAPI(),
         ],
         rateLimit: {
           // Playwright e2e flows seed auth state directly and can fan out

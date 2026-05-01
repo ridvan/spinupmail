@@ -18,6 +18,7 @@ import { createE2EAuthTestRouter } from "@/modules/e2e-auth/router";
 import { createExtensionRouter } from "@/modules/extension/router";
 import { InboundAbuseCounterDurableObject } from "@/modules/inbound-email/abuse-counter";
 import { FixedWindowRateLimiterDurableObject } from "@/shared/rate-limiter";
+import { pruneOperationalEvents } from "@/modules/admin/operational-events";
 import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 import { handleIntegrationDispatchQueueBatch } from "@/modules/integrations/queue";
 
@@ -94,6 +95,19 @@ export const createWorkerHandler = (options: WorkerHandlerOptions = {}) => {
     email: options.emailHandler ?? handleIncomingEmail,
     queue: (batch: MessageBatch, env: CloudflareBindings) =>
       queueHandler({ batch, env }),
+    scheduled: (
+      _controller: ScheduledController,
+      env: CloudflareBindings,
+      ctx: ExecutionContext
+    ) => {
+      ctx.waitUntil(
+        pruneOperationalEvents(env).catch(error => {
+          console.error("[admin] Failed to prune operational events", {
+            error,
+          });
+        })
+      );
+    },
   };
 };
 

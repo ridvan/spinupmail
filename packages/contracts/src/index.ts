@@ -60,6 +60,9 @@ export const adminOperationalEventSeveritySchema = z.enum([
 ]);
 
 export const adminOperationalEventTypeSchema = z.enum([
+  "admin_user_action",
+  "admin_session_action",
+  "admin_impersonation_started",
   "inbound_rejected",
   "inbound_duplicate",
   "inbound_limit_reached",
@@ -69,6 +72,35 @@ export const adminOperationalEventTypeSchema = z.enum([
   "integration_dispatch_failed",
   "system_error",
 ]);
+
+export const platformRoleSchema = z.enum([
+  "user",
+  "support",
+  "security",
+  "admin",
+  "superadmin",
+]);
+
+const PLATFORM_ADMIN_ROLES = new Set([
+  "support",
+  "security",
+  "admin",
+  "superadmin",
+]);
+
+export const isPlatformAdminRole = (role: unknown) => {
+  if (Array.isArray(role)) {
+    return role.some(value => PLATFORM_ADMIN_ROLES.has(String(value).trim()));
+  }
+  if (typeof role !== "string") return false;
+  return role
+    .split(",")
+    .map(part => part.trim())
+    .some(part => PLATFORM_ADMIN_ROLES.has(part));
+};
+
+const isoDateSchema = z.iso.date();
+const isoDateTimeSchema = z.string().datetime();
 
 export const adminMetricSchema = z.object({
   current: z.number().int().nonnegative(),
@@ -104,7 +136,7 @@ export const adminOverviewResponseSchema = z.object({
 });
 
 export const adminActivityDaySchema = z.object({
-  date: z.string().min(1),
+  date: isoDateSchema,
   generatedAddresses: z.number().int().nonnegative(),
   receivedEmails: z.number().int().nonnegative(),
 });
@@ -118,14 +150,14 @@ export const adminOrganizationItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   slug: z.string().min(1),
-  createdAt: z.string().nullable(),
+  createdAt: isoDateTimeSchema.nullable(),
   memberCount: z.number().int().nonnegative(),
   addressCount: z.number().int().nonnegative(),
   receivedEmailCount: z.number().int().nonnegative(),
   sampleEmailCount: z.number().int().nonnegative(),
   integrationCount: z.number().int().nonnegative(),
   activeIntegrationCount: z.number().int().nonnegative(),
-  lastReceivedAt: z.string().nullable(),
+  lastReceivedAt: isoDateTimeSchema.nullable(),
 });
 
 export const adminOrganizationsResponseSchema = z.object({
@@ -148,7 +180,7 @@ export const adminOperationalEventSchema = z.object({
   organizationName: z.string().nullable(),
   message: z.string().min(1),
   metadata: z.record(z.string(), z.unknown()).nullable(),
-  createdAt: z.string().nullable(),
+  createdAt: isoDateTimeSchema.nullable(),
 });
 
 export const adminOperationalEventsResponseSchema = z.object({
@@ -157,6 +189,153 @@ export const adminOperationalEventsResponseSchema = z.object({
   pageSize: z.number().int().positive(),
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
+});
+
+export const adminUserDetailSchema = z.object({
+  user: z.object({
+    id: z.string().min(1),
+    name: z.string().nullable(),
+    email: z.string().min(1),
+    emailVerified: z.boolean(),
+    role: z.string().nullable(),
+    banned: z.boolean().nullable(),
+    banReason: z.string().nullable(),
+    banExpires: isoDateTimeSchema.nullable(),
+    twoFactorEnabled: z.boolean().nullable(),
+    timezone: z.string().nullable(),
+    createdAt: isoDateTimeSchema.nullable(),
+    updatedAt: isoDateTimeSchema.nullable(),
+  }),
+  accounts: z.array(
+    z.object({
+      providerId: z.string().min(1),
+      createdAt: isoDateTimeSchema.nullable(),
+    })
+  ),
+  memberships: z.array(
+    z.object({
+      organizationId: z.string().min(1),
+      organizationName: z.string().nullable(),
+      organizationSlug: z.string().nullable(),
+      role: z.string().min(1),
+      createdAt: isoDateTimeSchema.nullable(),
+    })
+  ),
+  apiKeys: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().nullable(),
+      start: z.string().nullable(),
+      prefix: z.string().nullable(),
+      enabled: z.boolean().nullable(),
+      requestCount: z.number().int().nonnegative(),
+      remaining: z.number().int().nullable(),
+      rateLimitEnabled: z.boolean().nullable(),
+      rateLimitMax: z.number().int().nullable(),
+      rateLimitTimeWindow: z.number().int().nullable(),
+      lastRequest: isoDateTimeSchema.nullable(),
+      expiresAt: isoDateTimeSchema.nullable(),
+      createdAt: isoDateTimeSchema.nullable(),
+      metadata: z.record(z.string(), z.unknown()).nullable(),
+    })
+  ),
+  recentEvents: z.array(adminOperationalEventSchema),
+});
+
+export const adminUserDetailResponseSchema = adminUserDetailSchema;
+
+export const adminOrganizationDetailSchema = z.object({
+  organization: adminOrganizationItemSchema.extend({
+    metadata: z.record(z.string(), z.unknown()).nullable(),
+  }),
+  members: z.array(
+    z.object({
+      id: z.string().min(1),
+      userId: z.string().min(1),
+      name: z.string().nullable(),
+      email: z.string().nullable(),
+      role: z.string().min(1),
+      createdAt: isoDateTimeSchema.nullable(),
+    })
+  ),
+  invitations: z.array(
+    z.object({
+      id: z.string().min(1),
+      email: z.string().min(1),
+      role: z.string().nullable(),
+      status: z.string().min(1),
+      expiresAt: isoDateTimeSchema.nullable(),
+      createdAt: isoDateTimeSchema.nullable(),
+    })
+  ),
+  integrations: z.array(
+    z.object({
+      id: z.string().min(1),
+      provider: z.string().min(1),
+      name: z.string().min(1),
+      status: z.string().min(1),
+      lastValidatedAt: isoDateTimeSchema.nullable(),
+      createdAt: isoDateTimeSchema.nullable(),
+      updatedAt: isoDateTimeSchema.nullable(),
+    })
+  ),
+  apiKeys: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().nullable(),
+      start: z.string().nullable(),
+      prefix: z.string().nullable(),
+      enabled: z.boolean().nullable(),
+      requestCount: z.number().int().nonnegative(),
+      remaining: z.number().int().nullable(),
+      lastRequest: isoDateTimeSchema.nullable(),
+      expiresAt: isoDateTimeSchema.nullable(),
+      createdAt: isoDateTimeSchema.nullable(),
+      metadata: z.record(z.string(), z.unknown()).nullable(),
+    })
+  ),
+  recentEvents: z.array(adminOperationalEventSchema),
+});
+
+export const adminOrganizationDetailResponseSchema =
+  adminOrganizationDetailSchema;
+
+export const adminApiKeyItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().nullable(),
+  start: z.string().nullable(),
+  prefix: z.string().nullable(),
+  referenceId: z.string().min(1),
+  ownerType: z.enum(["user", "organization", "unknown"]),
+  ownerLabel: z.string().nullable(),
+  enabled: z.boolean().nullable(),
+  requestCount: z.number().int().nonnegative(),
+  remaining: z.number().int().nullable(),
+  rateLimitEnabled: z.boolean().nullable(),
+  rateLimitMax: z.number().int().nullable(),
+  rateLimitTimeWindow: z.number().int().nullable(),
+  lastRequest: isoDateTimeSchema.nullable(),
+  expiresAt: isoDateTimeSchema.nullable(),
+  createdAt: isoDateTimeSchema.nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+});
+
+export const adminApiKeysResponseSchema = z.object({
+  items: z.array(adminApiKeyItemSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+export const adminRecordAuditEventRequestSchema = z.object({
+  action: z.string().min(1).max(128),
+  targetType: z.enum(["user", "session", "organization", "api_key", "system"]),
+  targetId: z.string().min(1).max(256).optional(),
+  organizationId: z.string().min(1).optional(),
+  message: z.string().min(1).max(512),
+  reason: z.string().trim().min(1).max(512).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const integrationProviderSchema = z.enum(["telegram"]);
@@ -619,6 +798,7 @@ export type AdminOperationalEventSeverity = z.infer<
 export type AdminOperationalEventType = z.infer<
   typeof adminOperationalEventTypeSchema
 >;
+export type PlatformRole = z.infer<typeof platformRoleSchema>;
 export type AdminOverviewResponse = z.infer<typeof adminOverviewResponseSchema>;
 export type AdminActivityResponse = z.infer<typeof adminActivityResponseSchema>;
 export type AdminOrganizationItem = z.infer<typeof adminOrganizationItemSchema>;
@@ -628,6 +808,17 @@ export type AdminOrganizationsResponse = z.infer<
 export type AdminOperationalEvent = z.infer<typeof adminOperationalEventSchema>;
 export type AdminOperationalEventsResponse = z.infer<
   typeof adminOperationalEventsResponseSchema
+>;
+export type AdminUserDetailResponse = z.infer<
+  typeof adminUserDetailResponseSchema
+>;
+export type AdminOrganizationDetailResponse = z.infer<
+  typeof adminOrganizationDetailResponseSchema
+>;
+export type AdminApiKeyItem = z.infer<typeof adminApiKeyItemSchema>;
+export type AdminApiKeysResponse = z.infer<typeof adminApiKeysResponseSchema>;
+export type AdminRecordAuditEventRequest = z.infer<
+  typeof adminRecordAuditEventRequestSchema
 >;
 export type IntegrationProvider = z.infer<typeof integrationProviderSchema>;
 export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;

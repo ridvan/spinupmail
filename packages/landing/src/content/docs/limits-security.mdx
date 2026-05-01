@@ -20,12 +20,12 @@ settings you can override in `wrangler.toml`.
 
 These limits are part of the current Spinupmail product behavior.
 
-| Limit | Current value |
-| --- | --- |
-| Organizations per user | `3`, configurable in backend auth setup |
-| Members per organization | `10`, configurable in backend auth setup |
-| Addresses per organization | `100` by default, configurable with `MAX_ADDRESSES_PER_ORGANIZATION` |
-| Stored emails per address | `100` by default, configurable with `MAX_RECEIVED_EMAILS_PER_ADDRESS` |
+| Limit                          | Current value                                                               |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| Organizations per user         | `3`, configurable in backend auth setup                                     |
+| Members per organization       | `10`, configurable in backend auth setup                                    |
+| Addresses per organization     | `100` by default, configurable with `MAX_ADDRESSES_PER_ORGANIZATION`        |
+| Stored emails per address      | `100` by default, configurable with `MAX_RECEIVED_EMAILS_PER_ADDRESS`       |
 | Stored emails per organization | `1000` by default, configurable with `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` |
 
 If an organization reaches its address cap, new address creation is blocked
@@ -43,19 +43,26 @@ currently deployed limits.
 
 These settings control how much inbound mail Spinupmail accepts and stores.
 
-| Variable | Default |
-| --- | --- |
-| `EMAIL_MAX_BYTES` | `524288` bytes for the raw inbound message |
-| `EMAIL_BODY_MAX_BYTES` | `524288` bytes persisted per email body in D1 |
-| `EMAIL_ATTACHMENT_MAX_BYTES` | `10485760` bytes per attachment |
-| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | `104857600` bytes total per organization |
-| `EMAIL_ATTACHMENTS_ENABLED` | `true` |
-| `MAX_RECEIVED_EMAILS_PER_ADDRESS` | `100` stored emails per inbox by default |
-| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` | `1000` stored emails across the organization by default |
+| Variable                                            | Default                                                 |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| `EMAIL_MAX_BYTES`                                   | `524288` bytes for the raw inbound message              |
+| `EMAIL_BODY_MAX_BYTES`                              | `524288` bytes persisted per email body in D1           |
+| `EMAIL_ATTACHMENT_MAX_BYTES`                        | `10485760` bytes per attachment                         |
+| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | `104857600` bytes total per organization                |
+| `EMAIL_ATTACHMENTS_ENABLED`                         | `true`                                                  |
+| `MAX_RECEIVED_EMAILS_PER_ADDRESS`                   | `100` stored emails per inbox by default                |
+| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION`              | `1000` stored emails across the organization by default |
+| `OPERATIONAL_EVENT_RETENTION_DAYS`                  | `30` days of admin operational events                   |
+| `OPERATIONAL_EVENT_MAX_METADATA_BYTES`              | `4096` bytes of serialized metadata per event           |
+| `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX`            | `1` stored noisy event per normalized identity/window   |
+| `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS` | `300` seconds                                           |
 
 Oversized message bodies are dropped before D1 persistence to avoid write
 failures. Oversized attachments are skipped, and new attachments are also
 skipped once an organization would exceed its total attachment quota.
+Operational events are pruned by the scheduled Worker, and repeated noisy
+inbound events such as rejects, duplicates, limit hits, and abuse blocks are
+rate-limited before they write to D1.
 
 For inbox retention, Spinupmail enforces both limits together:
 
@@ -75,11 +82,11 @@ For inbox retention, Spinupmail enforces both limits together:
 
 The default posture is intentionally conservative.
 
-| Variable | Default | Effect |
-| --- | --- | --- |
+| Variable                    | Default | Effect                         |
+| --------------------------- | ------- | ------------------------------ |
 | `EMAIL_STORE_HEADERS_IN_DB` | `false` | Persist full header JSON in D1 |
-| `EMAIL_STORE_RAW_IN_DB` | `false` | Persist raw MIME in D1 |
-| `EMAIL_STORE_RAW_IN_R2` | `false` | Persist raw MIME in private R2 |
+| `EMAIL_STORE_RAW_IN_DB`     | `false` | Persist raw MIME in D1         |
+| `EMAIL_STORE_RAW_IN_R2`     | `false` | Persist raw MIME in private R2 |
 
 <Callout tone="warning" title="Default-safe mode">
   Raw MIME storage is disabled by default to reduce storage overhead and avoid
@@ -91,14 +98,14 @@ The default posture is intentionally conservative.
 
 Spinupmail applies both Better Auth throttling and API key throttling.
 
-| Control | Current default |
-| --- | --- |
-| `API_KEY_RATE_LIMIT_WINDOW` | `60` seconds |
-| `API_KEY_RATE_LIMIT_MAX` | `120` requests |
-| `AUTH_RATE_LIMIT_WINDOW` | `60` seconds |
-| `AUTH_RATE_LIMIT_MAX` | Optional override, otherwise Better Auth default |
-| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` | `3600` seconds |
-| `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | `2` |
+| Control                               | Current default                                  |
+| ------------------------------------- | ------------------------------------------------ |
+| `API_KEY_RATE_LIMIT_WINDOW`           | `60` seconds                                     |
+| `API_KEY_RATE_LIMIT_MAX`              | `120` requests                                   |
+| `AUTH_RATE_LIMIT_WINDOW`              | `60` seconds                                     |
+| `AUTH_RATE_LIMIT_MAX`                 | Optional override, otherwise Better Auth default |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` | `3600` seconds                                   |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX`    | `2`                                              |
 
 API key throttling also covers Better Auth runtime checks on `/get-session` and
 `/organization/get-full-organization`, not just the application endpoints.
@@ -108,14 +115,14 @@ API key throttling also covers Better Auth runtime checks on `/get-session` and
 Integration dispatches are also protected by organization-level caps and queue
 retry controls.
 
-| Control | Current default |
-| --- | --- |
-| `MAX_INTEGRATIONS_PER_ORGANIZATION` | `3` |
-| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` | `100` |
-| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS` | `21600` seconds |
-| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS` | `30` seconds |
-| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS` | `1800` seconds |
-| `INTEGRATION_QUEUE_JITTER_SECONDS` | `10` seconds |
+| Control                                               | Current default |
+| ----------------------------------------------------- | --------------- |
+| `MAX_INTEGRATIONS_PER_ORGANIZATION`                   | `3`             |
+| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` | `100`           |
+| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS`              | `21600` seconds |
+| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS`                | `30` seconds    |
+| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS`                 | `1800` seconds  |
+| `INTEGRATION_QUEUE_JITTER_SECONDS`                    | `10` seconds    |
 
 Dispatches run asynchronously through the integration queue and retry with
 backoff inside the configured retry window.
@@ -124,11 +131,11 @@ backoff inside the configured retry window.
 
 Email verification resend is also guarded by backend constants:
 
-| Control | Current value |
-| --- | --- |
-| Cooldown between resend attempts | `60` seconds |
-| IP window | `300` seconds |
-| Max resend attempts per IP window | `5` |
+| Control                           | Current value |
+| --------------------------------- | ------------- |
+| Cooldown between resend attempts  | `60` seconds  |
+| IP window                         | `300` seconds |
+| Max resend attempts per IP window | `5`           |
 
 ## Retrieval boundaries
 

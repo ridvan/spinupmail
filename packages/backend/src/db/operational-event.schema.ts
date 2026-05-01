@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { desc, relations, sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { emailAddresses, emails } from "./email.schema";
 import {
@@ -36,18 +36,24 @@ export const operationalEvents = sqliteTable(
       .notNull(),
   },
   table => [
-    index("operational_events_created_idx").on(table.createdAt),
+    index("operational_events_created_idx").on(desc(table.createdAt)),
     index("operational_events_severity_created_idx").on(
       table.severity,
-      table.createdAt
+      desc(table.createdAt)
     ),
     index("operational_events_type_created_idx").on(
       table.type,
-      table.createdAt
+      desc(table.createdAt)
     ),
     index("operational_events_org_created_idx").on(
       table.organizationId,
-      table.createdAt
+      desc(table.createdAt)
+    ),
+    index("operational_events_org_severity_type_created_idx").on(
+      table.organizationId,
+      table.severity,
+      table.type,
+      desc(table.createdAt)
     ),
   ]
 );

@@ -1,11 +1,15 @@
 import type {
   AdminActivityResponse,
+  AdminApiKeysResponse,
   AdminOperationalEvent,
   AdminOperationalEventSeverity,
   AdminOperationalEventType,
+  AdminOrganizationDetailResponse,
   AdminOrganizationItem,
   AdminOrganizationsResponse,
   AdminOverviewResponse,
+  AdminRecordAuditEventRequest,
+  AdminUserDetailResponse,
 } from "@spinupmail/contracts";
 import { getDb } from "@/platform/db/client";
 import {
@@ -15,11 +19,15 @@ import {
 } from "@/modules/organizations/service";
 import {
   findAdminActivityRows,
+  findAdminApiKeysPage,
   findAdminOperationalEventsPage,
+  findAdminOrganizationDetail,
   findAdminOrganizationRollups,
   findAdminOrganizationsPage,
   findAdminOverviewStats,
+  findAdminUserDetail,
 } from "./repo";
+import { recordOperationalEvent } from "./operational-events";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ACTIVITY_QUERY_BUFFER_MS = 5 * 60 * 1000;
@@ -88,6 +96,51 @@ const parseMetadata = (
     return null;
   }
 };
+
+const parseRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value) return null;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const mapOperationalEvent = (item: {
+  id: string;
+  severity: string;
+  type: string;
+  organizationId: string | null;
+  addressId: string | null;
+  emailId: string | null;
+  integrationId: string | null;
+  dispatchId: string | null;
+  organizationName: string | null;
+  message: string;
+  metadataJson: string | null;
+  createdAt: unknown;
+}): AdminOperationalEvent => ({
+  id: item.id,
+  severity: item.severity as AdminOperationalEventSeverity,
+  type: item.type as AdminOperationalEventType,
+  organizationId: item.organizationId ?? null,
+  addressId: item.addressId ?? null,
+  emailId: item.emailId ?? null,
+  integrationId: item.integrationId ?? null,
+  dispatchId: item.dispatchId ?? null,
+  organizationName: item.organizationName ?? null,
+  message: item.message,
+  metadata: parseMetadata(item.metadataJson),
+  createdAt: toIsoString(item.createdAt),
+});
 
 export const getAdminOverview = async (
   env: CloudflareBindings
@@ -294,20 +347,7 @@ export const getAdminOperationalEvents = async ({
     from,
     to,
   });
-  const items: AdminOperationalEvent[] = page.items.map(item => ({
-    id: item.id,
-    severity: item.severity as AdminOperationalEventSeverity,
-    type: item.type as AdminOperationalEventType,
-    organizationId: item.organizationId ?? null,
-    addressId: item.addressId ?? null,
-    emailId: item.emailId ?? null,
-    integrationId: item.integrationId ?? null,
-    dispatchId: item.dispatchId ?? null,
-    organizationName: item.organizationName ?? null,
-    message: item.message,
-    metadata: parseMetadata(item.metadataJson),
-    createdAt: toIsoString(item.createdAt),
-  }));
+  const items: AdminOperationalEvent[] = page.items.map(mapOperationalEvent);
 
   return {
     items,
@@ -316,4 +356,238 @@ export const getAdminOperationalEvents = async ({
     totalItems: page.totalItems,
     totalPages: getTotalPages(page.totalItems, pagination.pageSize),
   };
+};
+
+export const getAdminUserDetail = async ({
+  env,
+  userId,
+}: {
+  env: CloudflareBindings;
+  userId: string;
+}): Promise<
+  | { status: 200; body: AdminUserDetailResponse }
+  | { status: 404; body: { error: string } }
+> => {
+  const detail = await findAdminUserDetail(getDb(env), userId);
+  if (!detail.user) return { status: 404, body: { error: "user not found" } };
+
+  return {
+    status: 200,
+    body: {
+      user: {
+        id: detail.user.id,
+        name: detail.user.name ?? null,
+        email: detail.user.email,
+        emailVerified: detail.user.emailVerified === true,
+        role: detail.user.role ?? null,
+        banned: detail.user.banned ?? null,
+        banReason: detail.user.banReason ?? null,
+        banExpires: toIsoString(detail.user.banExpires),
+        twoFactorEnabled: detail.user.twoFactorEnabled ?? null,
+        timezone: detail.user.timezone ?? null,
+        createdAt: toIsoString(detail.user.createdAt),
+        updatedAt: toIsoString(detail.user.updatedAt),
+      },
+      accounts: detail.accounts.map(account => ({
+        providerId: account.providerId,
+        createdAt: toIsoString(account.createdAt),
+      })),
+      memberships: detail.memberships.map(membership => ({
+        organizationId: membership.organizationId,
+        organizationName: membership.organizationName ?? null,
+        organizationSlug: membership.organizationSlug ?? null,
+        role: membership.role,
+        createdAt: toIsoString(membership.createdAt),
+      })),
+      apiKeys: detail.apiKeys.map(key => ({
+        id: key.id,
+        name: key.name ?? null,
+        start: key.start ?? null,
+        prefix: key.prefix ?? null,
+        enabled: key.enabled ?? null,
+        requestCount: Number(key.requestCount ?? 0) || 0,
+        remaining: key.remaining ?? null,
+        rateLimitEnabled: key.rateLimitEnabled ?? null,
+        rateLimitMax: key.rateLimitMax ?? null,
+        rateLimitTimeWindow: key.rateLimitTimeWindow ?? null,
+        lastRequest: toIsoString(key.lastRequest),
+        expiresAt: toIsoString(key.expiresAt),
+        createdAt: toIsoString(key.createdAt),
+        metadata: parseRecord(key.metadata),
+      })),
+      recentEvents: detail.recentEvents.map(mapOperationalEvent),
+    },
+  };
+};
+
+export const getAdminOrganizationDetail = async ({
+  env,
+  organizationId,
+}: {
+  env: CloudflareBindings;
+  organizationId: string;
+}): Promise<
+  | { status: 200; body: AdminOrganizationDetailResponse }
+  | { status: 404; body: { error: string } }
+> => {
+  const detail = await findAdminOrganizationDetail(getDb(env), organizationId);
+  if (!detail.organization) {
+    return { status: 404, body: { error: "organization not found" } };
+  }
+
+  const rollups = await findAdminOrganizationRollups(getDb(env), [
+    organizationId,
+  ]);
+  const addressRollup = rollups.addressRows[0];
+  const emailRollup = rollups.emailRows[0];
+  const integrationRollup = rollups.integrationRows[0];
+  const memberRollup = rollups.memberRows[0];
+
+  return {
+    status: 200,
+    body: {
+      organization: {
+        id: detail.organization.id,
+        name: detail.organization.name,
+        slug: detail.organization.slug,
+        createdAt: toIsoString(detail.organization.createdAt),
+        metadata: parseRecord(detail.organization.metadata),
+        memberCount: Number(memberRollup?.count ?? 0) || 0,
+        addressCount: Number(addressRollup?.count ?? 0) || 0,
+        receivedEmailCount: Number(emailRollup?.receivedCount ?? 0) || 0,
+        sampleEmailCount: Number(emailRollup?.sampleCount ?? 0) || 0,
+        integrationCount: Number(integrationRollup?.count ?? 0) || 0,
+        activeIntegrationCount:
+          Number(integrationRollup?.activeCount ?? 0) || 0,
+        lastReceivedAt: toIsoString(addressRollup?.lastReceivedAt),
+      },
+      members: detail.members.map(member => ({
+        id: member.id,
+        userId: member.userId,
+        name: member.name ?? null,
+        email: member.email ?? null,
+        role: member.role,
+        createdAt: toIsoString(member.createdAt),
+      })),
+      invitations: detail.invitations.map(invitation => ({
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.role ?? null,
+        status: invitation.status,
+        expiresAt: toIsoString(invitation.expiresAt),
+        createdAt: toIsoString(invitation.createdAt),
+      })),
+      integrations: detail.integrations.map(integration => ({
+        id: integration.id,
+        provider: integration.provider,
+        name: integration.name,
+        status: integration.status,
+        lastValidatedAt: toIsoString(integration.lastValidatedAt),
+        createdAt: toIsoString(integration.createdAt),
+        updatedAt: toIsoString(integration.updatedAt),
+      })),
+      apiKeys: detail.apiKeys.map(key => ({
+        id: key.id,
+        name: key.name ?? null,
+        start: key.start ?? null,
+        prefix: key.prefix ?? null,
+        enabled: key.enabled ?? null,
+        requestCount: Number(key.requestCount ?? 0) || 0,
+        remaining: key.remaining ?? null,
+        lastRequest: toIsoString(key.lastRequest),
+        expiresAt: toIsoString(key.expiresAt),
+        createdAt: toIsoString(key.createdAt),
+        metadata: parseRecord(key.metadata),
+      })),
+      recentEvents: detail.recentEvents.map(mapOperationalEvent),
+    },
+  };
+};
+
+export const getAdminApiKeys = async ({
+  env,
+  pageRaw,
+  pageSizeRaw,
+}: {
+  env: CloudflareBindings;
+  pageRaw?: number;
+  pageSizeRaw?: number;
+}): Promise<AdminApiKeysResponse> => {
+  const pagination = clampPagination({ pageRaw, pageSizeRaw });
+  const page = await findAdminApiKeysPage(getDb(env), pagination);
+
+  return {
+    items: page.items.map(item => {
+      const ownerType = item.userEmail
+        ? "user"
+        : item.organizationName
+          ? "organization"
+          : "unknown";
+      const ownerLabel =
+        item.userEmail ??
+        item.organizationName ??
+        item.organizationSlug ??
+        null;
+
+      return {
+        id: item.id,
+        name: item.name ?? null,
+        start: item.start ?? null,
+        prefix: item.prefix ?? null,
+        referenceId: item.referenceId,
+        ownerType,
+        ownerLabel,
+        enabled: item.enabled ?? null,
+        requestCount: Number(item.requestCount ?? 0) || 0,
+        remaining: item.remaining ?? null,
+        rateLimitEnabled: item.rateLimitEnabled ?? null,
+        rateLimitMax: item.rateLimitMax ?? null,
+        rateLimitTimeWindow: item.rateLimitTimeWindow ?? null,
+        lastRequest: toIsoString(item.lastRequest),
+        expiresAt: toIsoString(item.expiresAt),
+        createdAt: toIsoString(item.createdAt),
+        metadata: parseRecord(item.metadata),
+      };
+    }),
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    totalItems: page.totalItems,
+    totalPages: getTotalPages(page.totalItems, pagination.pageSize),
+  };
+};
+
+export const recordAdminAuditEvent = async ({
+  env,
+  actorUserId,
+  actorEmail,
+  input,
+}: {
+  env: CloudflareBindings;
+  actorUserId: string;
+  actorEmail?: string | null;
+  input: AdminRecordAuditEventRequest;
+}) => {
+  await recordOperationalEvent({
+    env,
+    severity: "info",
+    type:
+      input.targetType === "session"
+        ? "admin_session_action"
+        : input.action === "impersonate-user"
+          ? "admin_impersonation_started"
+          : "admin_user_action",
+    organizationId: input.organizationId ?? null,
+    message: input.message,
+    metadata: {
+      actorUserId,
+      actorEmail: actorEmail ?? null,
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId ?? null,
+      reason: input.reason ?? null,
+      ...(input.metadata ?? {}),
+    },
+  });
+
+  return { ok: true };
 };

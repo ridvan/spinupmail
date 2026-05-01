@@ -1,4 +1,5 @@
 import { redirect, type LoaderFunctionArgs } from "react-router";
+import { isPlatformAdminRole } from "@spinupmail/contracts";
 import {
   getLastActiveOrganizationId,
   setLastActiveOrganizationId,
@@ -39,15 +40,6 @@ const getActiveOrganizationId = (
     (data.session as { activeOrganizationId?: string | null })
       .activeOrganizationId ?? null
   );
-};
-
-const isPlatformAdminRole = (role: unknown) => {
-  if (Array.isArray(role)) return role.includes("admin");
-  if (typeof role !== "string") return false;
-  return role
-    .split(",")
-    .map(part => part.trim())
-    .includes("admin");
 };
 
 const tryRestoreActiveOrganization = async (userId: string) => {

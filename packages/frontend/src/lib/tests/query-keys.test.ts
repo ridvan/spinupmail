@@ -49,15 +49,15 @@ describe("queryKeys", () => {
       "email-1",
     ]);
     expect(
-      queryKeys.adminAnomalies(
-        2,
-        10,
-        "error",
-        "system_error",
-        "org-1",
-        "2026-04-01",
-        "2026-04-27"
-      )
+      queryKeys.adminAnomalies({
+        page: 2,
+        pageSize: 10,
+        severity: "error",
+        type: "system_error",
+        organizationId: "org-1",
+        from: "2026-04-01",
+        to: "2026-04-27",
+      })
     ).toEqual([
       "app",
       "admin",

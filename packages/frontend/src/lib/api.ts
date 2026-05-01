@@ -1,8 +1,14 @@
 import type {
   AdminActivityResponse,
+  AdminApiKeysResponse,
+  AdminOperationalEventSeverity,
+  AdminOperationalEventType,
   AdminOperationalEventsResponse,
+  AdminOrganizationDetailResponse,
   AdminOrganizationsResponse,
   AdminOverviewResponse,
+  AdminRecordAuditEventRequest,
+  AdminUserDetailResponse,
   AddressIntegration,
   CreateIntegrationRequest,
   DeleteIntegrationResponse,
@@ -133,9 +139,15 @@ const buildQueryString = (query: URLSearchParams) =>
 
 export type {
   AdminActivityResponse,
+  AdminApiKeysResponse,
+  AdminOperationalEventSeverity,
+  AdminOperationalEventType,
   AdminOperationalEventsResponse,
+  AdminOrganizationDetailResponse,
   AdminOrganizationsResponse,
   AdminOverviewResponse,
+  AdminRecordAuditEventRequest,
+  AdminUserDetailResponse,
   AddressIntegration,
   DeleteIntegrationResponse,
   IntegrationDispatch,
@@ -182,11 +194,43 @@ export const listAdminOrganizations = async (options?: {
   );
 };
 
+export const getAdminUserDetail = async (
+  userId: string,
+  options?: { signal?: AbortSignal }
+) =>
+  apiFetch<AdminUserDetailResponse>(
+    `/api/admin/users/${encodeURIComponent(userId)}`,
+    { signal: options?.signal }
+  );
+
+export const getAdminOrganizationDetail = async (
+  organizationId: string,
+  options?: { signal?: AbortSignal }
+) =>
+  apiFetch<AdminOrganizationDetailResponse>(
+    `/api/admin/organizations/${encodeURIComponent(organizationId)}`,
+    { signal: options?.signal }
+  );
+
+export const listAdminApiKeys = async (options?: {
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}) => {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  return apiFetch<AdminApiKeysResponse>(
+    `/api/admin/api-keys${buildQueryString(query)}`,
+    { signal: options?.signal }
+  );
+};
+
 export const listAdminAnomalies = async (options?: {
   page?: number;
   pageSize?: number;
-  severity?: string;
-  type?: string;
+  severity?: AdminOperationalEventSeverity;
+  type?: AdminOperationalEventType;
   organizationId?: string;
   from?: string;
   to?: string;
@@ -207,6 +251,14 @@ export const listAdminAnomalies = async (options?: {
     { signal: options?.signal }
   );
 };
+
+export const recordAdminAuditEvent = async (
+  body: AdminRecordAuditEventRequest
+) =>
+  apiFetch<{ ok: true }>("/api/admin/audit-events", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 export type EmailAddress = {
   id: string;

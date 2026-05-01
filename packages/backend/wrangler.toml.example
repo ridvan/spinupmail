@@ -13,13 +13,24 @@ enabled = true
 [placement]
 mode = "smart"
 
+[triggers]
+crons = ["17 * * * *"]
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["InboundAbuseCounterDurableObject"]
 
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["FixedWindowRateLimiterDurableObject"]
+
 [[durable_objects.bindings]]
 name = "ABUSE_COUNTERS"
 class_name = "InboundAbuseCounterDurableObject"
+
+[[durable_objects.bindings]]
+name = "FIXED_WINDOW_RATE_LIMITERS"
+class_name = "FixedWindowRateLimiterDurableObject"
 
 [[d1_databases]]
 binding = "SUM_DB"
@@ -62,6 +73,10 @@ MAX_INTEGRATIONS_PER_ORGANIZATION = "3"
 MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY = "100"
 MAX_RECEIVED_EMAILS_PER_ORGANIZATION = "1000"
 MAX_RECEIVED_EMAILS_PER_ADDRESS = "100"
+OPERATIONAL_EVENT_RETENTION_DAYS = "30"
+OPERATIONAL_EVENT_MAX_METADATA_BYTES = "4096"
+OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS = "300"
+OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX = "1"
 API_KEY_RATE_LIMIT_WINDOW = "60"
 API_KEY_RATE_LIMIT_MAX = "120"
 AUTH_RATE_LIMIT_WINDOW = "60"

@@ -1,29 +1,42 @@
+import type {
+  AdminOperationalEventSeverity,
+  AdminOperationalEventType,
+} from "@spinupmail/contracts";
+
+export type AdminAnomaliesQueryKeyOptions = {
+  page: number;
+  pageSize: number;
+  severity: AdminOperationalEventSeverity | "all";
+  type: AdminOperationalEventType | "all";
+  organizationId: string;
+  from: string;
+  to: string;
+};
+
 export const queryKeys = {
   adminOverview: ["app", "admin", "overview"] as const,
   adminActivity: (timezone: string) =>
     ["app", "admin", "activity", timezone] as const,
   adminOrganizations: (page: number, pageSize: number) =>
     ["app", "admin", "organizations", page, pageSize] as const,
-  adminAnomalies: (
-    page: number,
-    pageSize: number,
-    severity: string,
-    type: string,
-    organizationId: string,
-    from: string,
-    to: string
-  ) =>
+  adminUserDetail: (userId: string | null) =>
+    ["app", "admin", "users", "detail", userId] as const,
+  adminOrganizationDetail: (organizationId: string | null) =>
+    ["app", "admin", "organizations", "detail", organizationId] as const,
+  adminApiKeys: (page: number, pageSize: number) =>
+    ["app", "admin", "api-keys", page, pageSize] as const,
+  adminAnomalies: (options: AdminAnomaliesQueryKeyOptions) =>
     [
       "app",
       "admin",
       "anomalies",
-      page,
-      pageSize,
-      severity,
-      type,
-      organizationId,
-      from,
-      to,
+      options.page,
+      options.pageSize,
+      options.severity,
+      options.type,
+      options.organizationId,
+      options.from,
+      options.to,
     ] as const,
   adminUsers: (page: number, pageSize: number, search: string) =>
     ["app", "admin", "users", page, pageSize, search] as const,

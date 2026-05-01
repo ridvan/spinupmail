@@ -40,10 +40,12 @@ import {
 } from "@/components/ui/chevrons-up-down";
 import { MemberAvatar } from "@/features/organization/components/members/member-avatar";
 import type { AuthUser } from "@/lib/auth";
+import { isPlatformAdminRole } from "@spinupmail/contracts";
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   user: AuthUser | null;
   onSignOut: () => Promise<void> | void;
+  onRefreshSession?: () => Promise<void>;
 };
 
 type NavItem = {
@@ -82,19 +84,17 @@ const navItems: NavItem[] = [
   },
 ];
 
-const isPlatformAdminRole = (role: unknown) => {
-  if (Array.isArray(role)) return role.includes("admin");
-  if (typeof role !== "string") return false;
-  return role
-    .split(",")
-    .map(part => part.trim())
-    .includes("admin");
-};
-
-export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
+export const AppSidebar = ({
+  user,
+  onSignOut,
+  onRefreshSession,
+  ...props
+}: AppSidebarProps) => {
   const { isMobile, state } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
+  const [hasRefreshedSession, setHasRefreshedSession] =
+    React.useState(!onRefreshSession);
   const navigateIfNeeded = React.useCallback(
     (to: string) => {
       if (location.pathname === to) return;
@@ -103,8 +103,23 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
     [location.pathname, navigate]
   );
   const userAvatarSeed = user?.id ?? user?.email ?? user?.name ?? "guest";
+
+  React.useEffect(() => {
+    if (!onRefreshSession) return;
+    let isMounted = true;
+
+    void onRefreshSession().finally(() => {
+      if (isMounted) setHasRefreshedSession(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [onRefreshSession]);
+
   const visibleNavItems = React.useMemo(
     () =>
+      hasRefreshedSession &&
       isPlatformAdminRole((user as { role?: unknown } | null)?.role)
         ? [
             ...navItems,
@@ -115,7 +130,7 @@ export const AppSidebar = ({ user, onSignOut, ...props }: AppSidebarProps) => {
             },
           ]
         : navItems,
-    [user]
+    [hasRefreshedSession, user]
   );
   const [isUserDropdownOpen, setIsUserDropdownOpen] = React.useState(false);
   const userChevronsRef = React.useRef<ChevronsUpDownIconHandle | null>(null);

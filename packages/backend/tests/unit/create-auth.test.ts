@@ -308,15 +308,23 @@ describe("createAuth", () => {
 
   it("configures the Better Auth admin plugin with safe platform permissions", async () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
-    const { platformAdminRole, platformUserRole } =
-      await import("@/platform/auth/admin-access");
+    const {
+      platformAdminRole,
+      platformSecurityRole,
+      platformSuperAdminRole,
+      platformSupportRole,
+      platformUserRole,
+    } = await import("@/platform/auth/admin-access");
 
     const auth = createAuth() as {
       plugins?: Array<{
         id?: string;
         options?: {
           roles?: {
+            support?: typeof platformSupportRole;
+            security?: typeof platformSecurityRole;
             admin?: typeof platformAdminRole;
+            superadmin?: typeof platformSuperAdminRole;
             user?: typeof platformUserRole;
           };
           defaultRole?: string;
@@ -328,10 +336,13 @@ describe("createAuth", () => {
 
     expect(adminPlugin?.options).toMatchObject({
       defaultRole: "user",
-      adminRoles: ["admin"],
+      adminRoles: ["support", "security", "admin", "superadmin"],
     });
     expect(adminPlugin?.options?.roles).toEqual({
+      support: platformSupportRole,
+      security: platformSecurityRole,
       admin: platformAdminRole,
+      superadmin: platformSuperAdminRole,
       user: platformUserRole,
     });
     expect(
@@ -352,6 +363,18 @@ describe("createAuth", () => {
     expect(platformAdminRole.authorize({ session: ["delete"] }).success).toBe(
       false
     );
+    expect(
+      platformSupportRole.authorize({ user: ["list", "get"] }).success
+    ).toBe(true);
+    expect(platformSecurityRole.authorize({ user: ["ban"] }).success).toBe(
+      true
+    );
+    expect(
+      platformSuperAdminRole.authorize({
+        user: ["impersonate", "delete", "set-password"],
+        session: ["delete"],
+      }).success
+    ).toBe(true);
     expect(platformUserRole.authorize({ user: ["list"] }).success).toBe(false);
   });
 

@@ -85,6 +85,13 @@
       "when": 1777318511993,
       "tag": "0011_wet_sleeper",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1777623785767,
+      "tag": "0012_flaky_hercules",
+      "breakpoints": true
     }
   ]
 }

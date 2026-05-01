@@ -4,6 +4,9 @@ import {
   emailAttachments,
   emails,
   integrationDispatches,
+  accounts,
+  apikeys,
+  invitations,
   members,
   operationalEvents,
   organizationIntegrations,
@@ -20,6 +23,259 @@ import type {
 type DateRange = {
   from: Date;
   to: Date;
+};
+
+export const findAdminUserDetail = async (db: AppDb, userId: string) => {
+  const [user, accountRows, membershipRows, apiKeyRows, recentEventRows] =
+    await Promise.all([
+      db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          emailVerified: users.emailVerified,
+          role: users.role,
+          banned: users.banned,
+          banReason: users.banReason,
+          banExpires: users.banExpires,
+          twoFactorEnabled: users.twoFactorEnabled,
+          timezone: users.timezone,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .get(),
+      db
+        .select({
+          providerId: accounts.providerId,
+          createdAt: accounts.createdAt,
+        })
+        .from(accounts)
+        .where(eq(accounts.userId, userId))
+        .orderBy(desc(accounts.createdAt)),
+      db
+        .select({
+          organizationId: members.organizationId,
+          organizationName: organizations.name,
+          organizationSlug: organizations.slug,
+          role: members.role,
+          createdAt: members.createdAt,
+        })
+        .from(members)
+        .leftJoin(organizations, eq(organizations.id, members.organizationId))
+        .where(eq(members.userId, userId))
+        .orderBy(desc(members.createdAt)),
+      db
+        .select({
+          id: apikeys.id,
+          name: apikeys.name,
+          start: apikeys.start,
+          prefix: apikeys.prefix,
+          enabled: apikeys.enabled,
+          requestCount: apikeys.requestCount,
+          remaining: apikeys.remaining,
+          rateLimitEnabled: apikeys.rateLimitEnabled,
+          rateLimitMax: apikeys.rateLimitMax,
+          rateLimitTimeWindow: apikeys.rateLimitTimeWindow,
+          lastRequest: apikeys.lastRequest,
+          expiresAt: apikeys.expiresAt,
+          createdAt: apikeys.createdAt,
+          metadata: apikeys.metadata,
+        })
+        .from(apikeys)
+        .where(eq(apikeys.referenceId, userId))
+        .orderBy(desc(apikeys.createdAt)),
+      db
+        .select({
+          id: operationalEvents.id,
+          severity: operationalEvents.severity,
+          type: operationalEvents.type,
+          organizationId: operationalEvents.organizationId,
+          addressId: operationalEvents.addressId,
+          emailId: operationalEvents.emailId,
+          integrationId: operationalEvents.integrationId,
+          dispatchId: operationalEvents.dispatchId,
+          organizationName: organizations.name,
+          message: operationalEvents.message,
+          metadataJson: operationalEvents.metadataJson,
+          createdAt: operationalEvents.createdAt,
+        })
+        .from(operationalEvents)
+        .leftJoin(
+          organizations,
+          eq(organizations.id, operationalEvents.organizationId)
+        )
+        .where(
+          sql`json_extract(${operationalEvents.metadataJson}, '$.targetId') = ${userId}`
+        )
+        .orderBy(desc(operationalEvents.createdAt))
+        .limit(10),
+    ]);
+
+  return {
+    user,
+    accounts: accountRows,
+    memberships: membershipRows,
+    apiKeys: apiKeyRows,
+    recentEvents: recentEventRows,
+  };
+};
+
+export const findAdminOrganizationDetail = async (
+  db: AppDb,
+  organizationId: string
+) => {
+  const [
+    organization,
+    memberRows,
+    invitationRows,
+    integrationRows,
+    apiKeyRows,
+    recentEventRows,
+  ] = await Promise.all([
+    db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        slug: organizations.slug,
+        createdAt: organizations.createdAt,
+        metadata: organizations.metadata,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .get(),
+    db
+      .select({
+        id: members.id,
+        userId: members.userId,
+        name: users.name,
+        email: users.email,
+        role: members.role,
+        createdAt: members.createdAt,
+      })
+      .from(members)
+      .leftJoin(users, eq(users.id, members.userId))
+      .where(eq(members.organizationId, organizationId))
+      .orderBy(desc(members.createdAt)),
+    db
+      .select({
+        id: invitations.id,
+        email: invitations.email,
+        role: invitations.role,
+        status: invitations.status,
+        expiresAt: invitations.expiresAt,
+        createdAt: invitations.createdAt,
+      })
+      .from(invitations)
+      .where(eq(invitations.organizationId, organizationId))
+      .orderBy(desc(invitations.createdAt)),
+    db
+      .select({
+        id: organizationIntegrations.id,
+        provider: organizationIntegrations.provider,
+        name: organizationIntegrations.name,
+        status: organizationIntegrations.status,
+        lastValidatedAt: organizationIntegrations.lastValidatedAt,
+        createdAt: organizationIntegrations.createdAt,
+        updatedAt: organizationIntegrations.updatedAt,
+      })
+      .from(organizationIntegrations)
+      .where(eq(organizationIntegrations.organizationId, organizationId))
+      .orderBy(desc(organizationIntegrations.createdAt)),
+    db
+      .select({
+        id: apikeys.id,
+        name: apikeys.name,
+        start: apikeys.start,
+        prefix: apikeys.prefix,
+        enabled: apikeys.enabled,
+        requestCount: apikeys.requestCount,
+        remaining: apikeys.remaining,
+        lastRequest: apikeys.lastRequest,
+        expiresAt: apikeys.expiresAt,
+        createdAt: apikeys.createdAt,
+        metadata: apikeys.metadata,
+      })
+      .from(apikeys)
+      .where(eq(apikeys.referenceId, organizationId))
+      .orderBy(desc(apikeys.createdAt)),
+    db
+      .select({
+        id: operationalEvents.id,
+        severity: operationalEvents.severity,
+        type: operationalEvents.type,
+        organizationId: operationalEvents.organizationId,
+        addressId: operationalEvents.addressId,
+        emailId: operationalEvents.emailId,
+        integrationId: operationalEvents.integrationId,
+        dispatchId: operationalEvents.dispatchId,
+        organizationName: organizations.name,
+        message: operationalEvents.message,
+        metadataJson: operationalEvents.metadataJson,
+        createdAt: operationalEvents.createdAt,
+      })
+      .from(operationalEvents)
+      .leftJoin(
+        organizations,
+        eq(organizations.id, operationalEvents.organizationId)
+      )
+      .where(eq(operationalEvents.organizationId, organizationId))
+      .orderBy(desc(operationalEvents.createdAt))
+      .limit(10),
+  ]);
+
+  return {
+    organization,
+    members: memberRows,
+    invitations: invitationRows,
+    integrations: integrationRows,
+    apiKeys: apiKeyRows,
+    recentEvents: recentEventRows,
+  };
+};
+
+export const findAdminApiKeysPage = async (
+  db: AppDb,
+  { page, pageSize }: Pagination
+) => {
+  const offset = (page - 1) * pageSize;
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: apikeys.id,
+        name: apikeys.name,
+        start: apikeys.start,
+        prefix: apikeys.prefix,
+        referenceId: apikeys.referenceId,
+        enabled: apikeys.enabled,
+        requestCount: apikeys.requestCount,
+        remaining: apikeys.remaining,
+        rateLimitEnabled: apikeys.rateLimitEnabled,
+        rateLimitMax: apikeys.rateLimitMax,
+        rateLimitTimeWindow: apikeys.rateLimitTimeWindow,
+        lastRequest: apikeys.lastRequest,
+        expiresAt: apikeys.expiresAt,
+        createdAt: apikeys.createdAt,
+        metadata: apikeys.metadata,
+        userName: users.name,
+        userEmail: users.email,
+        organizationName: organizations.name,
+        organizationSlug: organizations.slug,
+      })
+      .from(apikeys)
+      .leftJoin(users, eq(users.id, apikeys.referenceId))
+      .leftJoin(organizations, eq(organizations.id, apikeys.referenceId))
+      .orderBy(desc(apikeys.createdAt))
+      .limit(pageSize)
+      .offset(offset),
+    db.select({ count: count() }).from(apikeys),
+  ]);
+
+  return {
+    items,
+    totalItems: getFirstCount(totalRows),
+  };
 };
 
 type Pagination = {

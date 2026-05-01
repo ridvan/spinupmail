@@ -161,6 +161,9 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
   - `[vars].MAX_RECEIVED_EMAILS_PER_ADDRESS` (default: `100`)
   - `[vars].MAX_INTEGRATIONS_PER_ORGANIZATION` (default: `3`)
   - `[vars].MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` (default: `100`)
+  - `[vars].OPERATIONAL_EVENT_RETENTION_DAYS` (default: `30`)
+  - `[vars].OPERATIONAL_EVENT_MAX_METADATA_BYTES` (default: `4096`)
+  - `[vars].OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS` and `[vars].OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX` (default: `300` seconds and `1` stored event per noisy event identity)
   - `[vars].API_KEY_RATE_LIMIT_WINDOW` and `[vars].API_KEY_RATE_LIMIT_MAX` (default: `60` seconds and `120` requests for `x-api-key` app traffic, including Better Auth runtime checks on `/get-session` and `/organization/get-full-organization`; these apply in addition to `AUTH_RATE_LIMIT_*` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_*`)
   - `[vars].AUTH_RATE_LIMIT_WINDOW` (default: `60`)
   - `[vars].AUTH_RATE_LIMIT_MAX` (optional Better Auth global max override)
@@ -633,6 +636,9 @@ Limits:
 - `EMAIL_ATTACHMENTS_ENABLED`: when `false`, inbound attachments are ignored and attachment UI/API surfaces are disabled (`true` by default).
 - `MAX_RECEIVED_EMAILS_PER_ORGANIZATION`: hard cap across all stored emails in one organization (default `1000`).
 - `MAX_RECEIVED_EMAILS_PER_ADDRESS`: hard cap across stored emails in one address (default `100`).
+- `OPERATIONAL_EVENT_RETENTION_DAYS`: operational event rows older than this are pruned by the scheduled Worker (default `30`).
+- `OPERATIONAL_EVENT_MAX_METADATA_BYTES`: serialized metadata cap per operational event row (default `4096`).
+- `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS` / `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX`: cap repeated low-value inbound operational events such as rejects, duplicates, limit hits, and abuse blocks (default `1` stored event per `300` seconds per normalized event identity).
 - `EMAIL_STORE_HEADERS_IN_DB`: persist full header JSON in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_DB`: persist full raw MIME in D1 (`false` by default).
 - `EMAIL_STORE_RAW_IN_R2`: persist full raw MIME in private R2 (`false` by default).

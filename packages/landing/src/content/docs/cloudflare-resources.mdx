@@ -34,18 +34,18 @@ pnpm wrangler queues create spinupmail-integration-dispatches
 Record the values each command returns. You will need them when you edit
 `wrangler.toml`.
 
-| Resource | Create command | Save these values |
-| --- | --- | --- |
-| D1 database | `pnpm exec wrangler d1 create SUM_DB` | `binding`, `database_name`, `database_id` |
-| KV namespace | `pnpm exec wrangler kv namespace create SUM_KV` | `binding`, `id` |
-| R2 bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments` | `bucket_name` |
-| R2 preview bucket | `pnpm exec wrangler r2 bucket create spinupmail-attachments-preview` | `bucket_name` |
-| Integration dispatch queue | `pnpm wrangler queues create spinupmail-integration-dispatches` | `queue_name` |
+| Resource                   | Create command                                                       | Save these values                         |
+| -------------------------- | -------------------------------------------------------------------- | ----------------------------------------- |
+| D1 database                | `pnpm exec wrangler d1 create SUM_DB`                                | `binding`, `database_name`, `database_id` |
+| KV namespace               | `pnpm exec wrangler kv namespace create SUM_KV`                      | `binding`, `id`                           |
+| R2 bucket                  | `pnpm exec wrangler r2 bucket create spinupmail-attachments`         | `bucket_name`                             |
+| R2 preview bucket          | `pnpm exec wrangler r2 bucket create spinupmail-attachments-preview` | `bucket_name`                             |
+| Integration dispatch queue | `pnpm wrangler queues create spinupmail-integration-dispatches`      | `queue_name`                              |
 
 <Callout tone="info" title="Durable Objects do not need a separate create step">
-  The Durable Object binding and migration already exist in the example
-  Wrangler config. Cloudflare creates the namespace when you deploy the Worker,
-  and individual instances are created on first use.
+  The Durable Object binding and migration already exist in the example Wrangler
+  config. Cloudflare creates the namespace when you deploy the Worker, and
+  individual instances are created on first use.
 </Callout>
 
 ## Copy the backend Wrangler config
@@ -93,38 +93,41 @@ control routing, email limits, and optional product behavior.
 
 ### Required variables
 
-| Variable | Purpose |
-| --- | --- |
-| `EMAIL_DOMAINS` | Comma-separated inbound domains handled by Email Routing, such as `spinupmail.com` or `spinupmail.com,spinupmail.dev` |
-| `RESEND_FROM_EMAIL` | Verified sender used for Better Auth verification and password-reset email |
+| Variable            | Purpose                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_DOMAINS`     | Comma-separated inbound domains handled by Email Routing, such as `spinupmail.com` or `spinupmail.com,spinupmail.dev` |
+| `RESEND_FROM_EMAIL` | Verified sender used for Better Auth verification and password-reset email                                            |
 
 ### Common optional variables
 
-| Variable | Default or usage |
-| --- | --- |
-| `AUTH_ALLOWED_EMAIL_DOMAIN` | Restricts sign-up and sign-in to one email domain for internal deployments |
-| `FORCED_MAIL_PREFIX` | Forces every created or renamed inbox local part to start with this prefix plus `-`; unset disables the feature |
-| `EMAIL_MAX_BYTES` | Max raw email bytes parsed by the Worker |
-| `EMAIL_BODY_MAX_BYTES` | Max HTML and text body bytes persisted in D1 |
-| `EMAIL_FORWARD_TO` | Optional forward target |
-| `EMAIL_ATTACHMENT_MAX_BYTES` | Max size per attachment uploaded to R2 |
-| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION` | Total attachment quota per organization, default `104857600` |
-| `EMAIL_ATTACHMENTS_ENABLED` | Toggle attachment processing, default `true` |
-| `MAX_ADDRESSES_PER_ORGANIZATION` | Address cap per org, default `10` |
-| `MAX_RECEIVED_EMAILS_PER_ADDRESS` | Default and hard cap for stored emails per inbox, default `100` |
-| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION` | Total stored-email cap across one org, default `1000` |
-| `MAX_INTEGRATIONS_PER_ORGANIZATION` | Integration cap per org, default `3` |
-| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY` | Daily integration dispatch cap per org, default `100` |
-| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS` | Retry window for integration dispatch failures, default `21600` |
-| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS` | Initial retry delay for integration dispatches, default `30` |
-| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS` | Maximum retry delay for integration dispatches, default `1800` |
-| `INTEGRATION_QUEUE_JITTER_SECONDS` | Retry jitter to spread retries, default `10` |
-| `API_KEY_RATE_LIMIT_WINDOW` and `API_KEY_RATE_LIMIT_MAX` | Rate limit window and max for `x-api-key` traffic |
-| `AUTH_RATE_LIMIT_WINDOW` and `AUTH_RATE_LIMIT_MAX` | Better Auth global rate limiting |
-| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX` | Change-email rate limiting |
-| `EMAIL_STORE_HEADERS_IN_DB` | Persist full headers in D1 |
-| `EMAIL_STORE_RAW_IN_DB` | Persist raw MIME in D1 |
-| `EMAIL_STORE_RAW_IN_R2` | Persist raw MIME in private R2 for debugging |
+| Variable                                                                                         | Default or usage                                                                                                |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `AUTH_ALLOWED_EMAIL_DOMAIN`                                                                      | Restricts sign-up and sign-in to one email domain for internal deployments                                      |
+| `FORCED_MAIL_PREFIX`                                                                             | Forces every created or renamed inbox local part to start with this prefix plus `-`; unset disables the feature |
+| `EMAIL_MAX_BYTES`                                                                                | Max raw email bytes parsed by the Worker                                                                        |
+| `EMAIL_BODY_MAX_BYTES`                                                                           | Max HTML and text body bytes persisted in D1                                                                    |
+| `EMAIL_FORWARD_TO`                                                                               | Optional forward target                                                                                         |
+| `EMAIL_ATTACHMENT_MAX_BYTES`                                                                     | Max size per attachment uploaded to R2                                                                          |
+| `EMAIL_ATTACHMENT_MAX_TOTAL_BYTES_PER_ORGANIZATION`                                              | Total attachment quota per organization, default `104857600`                                                    |
+| `EMAIL_ATTACHMENTS_ENABLED`                                                                      | Toggle attachment processing, default `true`                                                                    |
+| `MAX_ADDRESSES_PER_ORGANIZATION`                                                                 | Address cap per org, default `10`                                                                               |
+| `MAX_RECEIVED_EMAILS_PER_ADDRESS`                                                                | Default and hard cap for stored emails per inbox, default `100`                                                 |
+| `MAX_RECEIVED_EMAILS_PER_ORGANIZATION`                                                           | Total stored-email cap across one org, default `1000`                                                           |
+| `OPERATIONAL_EVENT_RETENTION_DAYS`                                                               | Operational-event retention window, default `30`                                                                |
+| `OPERATIONAL_EVENT_MAX_METADATA_BYTES`                                                           | Serialized metadata cap per operational event, default `4096`                                                   |
+| `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS` and `OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX` | Stored noisy-event cap, default `1` per `300` seconds                                                           |
+| `MAX_INTEGRATIONS_PER_ORGANIZATION`                                                              | Integration cap per org, default `3`                                                                            |
+| `MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY`                                            | Daily integration dispatch cap per org, default `100`                                                           |
+| `INTEGRATION_QUEUE_RETRY_WINDOW_SECONDS`                                                         | Retry window for integration dispatch failures, default `21600`                                                 |
+| `INTEGRATION_QUEUE_BASE_DELAY_SECONDS`                                                           | Initial retry delay for integration dispatches, default `30`                                                    |
+| `INTEGRATION_QUEUE_MAX_DELAY_SECONDS`                                                            | Maximum retry delay for integration dispatches, default `1800`                                                  |
+| `INTEGRATION_QUEUE_JITTER_SECONDS`                                                               | Retry jitter to spread retries, default `10`                                                                    |
+| `API_KEY_RATE_LIMIT_WINDOW` and `API_KEY_RATE_LIMIT_MAX`                                         | Rate limit window and max for `x-api-key` traffic                                                               |
+| `AUTH_RATE_LIMIT_WINDOW` and `AUTH_RATE_LIMIT_MAX`                                               | Better Auth global rate limiting                                                                                |
+| `AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW` and `AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX`                     | Change-email rate limiting                                                                                      |
+| `EMAIL_STORE_HEADERS_IN_DB`                                                                      | Persist full headers in D1                                                                                      |
+| `EMAIL_STORE_RAW_IN_DB`                                                                          | Persist raw MIME in D1                                                                                          |
+| `EMAIL_STORE_RAW_IN_R2`                                                                          | Persist raw MIME in private R2 for debugging                                                                    |
 
 ## Domain strategy and routing prep
 

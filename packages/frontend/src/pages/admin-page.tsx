@@ -1,16 +1,23 @@
 import * as React from "react";
 import NumberFlow from "@number-flow/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  isPlatformAdminRole,
+  type AdminOperationalEventType,
+} from "@spinupmail/contracts";
 import { Bar, BarChart, XAxis } from "recharts";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Ban,
+  CheckCircle2,
   Database,
+  Eye,
   KeyRound,
   Mail,
   Mailbox,
+  PlugZap,
   RefreshCcw,
-  Shield,
   Users,
 } from "lucide-react";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -19,6 +26,8 @@ import {
   ChartAnalysisIcon,
   DashboardSquare01Icon,
   FolderIcon,
+  Key01Icon,
+  LeftToRightListDashIcon,
   UserMultiple02Icon,
 } from "@/lib/hugeicons";
 import { HashTabsPage } from "@/components/layout/hash-tabs-page";
@@ -51,6 +60,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -61,23 +77,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useTimezone } from "@/features/timezone/hooks/use-timezone";
 import { formatDashboardDayLabel } from "@/features/timezone/lib/date-format";
 import { authClient } from "@/lib/auth";
 import {
+  getAdminOrganizationDetail,
+  getAdminUserDetail,
   getAdminActivity,
   getAdminOverview,
+  listAdminApiKeys,
   listAdminAnomalies,
   listAdminOrganizations,
+  recordAdminAuditEvent,
+  type AdminApiKeysResponse,
   type AdminOperationalEventsResponse,
+  type AdminOrganizationDetailResponse,
   type AdminOrganizationsResponse,
+  type AdminUserDetailResponse,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 const PAGE_SIZE = 10;
+const PLATFORM_ROLE_OPTIONS = [
+  "user",
+  "support",
+  "security",
+  "admin",
+  "superadmin",
+] as const;
 const ANOMALY_SEVERITIES = ["all", "info", "warning", "error"] as const;
 const ANOMALY_TYPES = [
   "all",
+  "admin_user_action",
+  "admin_session_action",
+  "admin_impersonation_started",
   "inbound_rejected",
   "inbound_duplicate",
   "inbound_limit_reached",
@@ -86,7 +120,7 @@ const ANOMALY_TYPES = [
   "inbound_storage_failed",
   "integration_dispatch_failed",
   "system_error",
-];
+] as const satisfies readonly (AdminOperationalEventType | "all")[];
 
 const chartConfig = {
   generatedAddresses: {
@@ -128,9 +162,14 @@ type AdminUsersResponse = {
 };
 
 type PendingUserAction =
-  | { type: "set-role"; user: AdminUser; role: "admin" | "user" }
+  | {
+      type: "set-role";
+      user: AdminUser;
+      role: (typeof PLATFORM_ROLE_OPTIONS)[number];
+    }
   | { type: "ban"; user: AdminUser }
   | { type: "unban"; user: AdminUser }
+  | { type: "impersonate"; user: AdminUser }
   | { type: "revoke-sessions"; user: AdminUser }
   | null;
 
@@ -203,28 +242,48 @@ const formatDate = (value: string | Date | null | undefined) => {
   }).format(date);
 };
 
-const formatBytes = (bytes: number) => {
-  if (bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`;
-};
-
 const getRoleLabel = (role: AdminUser["role"]) =>
   Array.isArray(role) ? role.join(", ") : (role ?? "user");
 
-const isAdminUser = (user: AdminUser) =>
-  getRoleLabel(user.role)
-    .split(",")
-    .map(role => role.trim())
-    .includes("admin");
+const isAdminUser = (user: AdminUser) => isPlatformAdminRole(user.role);
 
-const MetricCard = ({
+const parseRoleParts = (role: unknown) =>
+  Array.isArray(role)
+    ? role.map(value => String(value).trim())
+    : typeof role === "string"
+      ? role.split(",").map(value => value.trim())
+      : [];
+
+const hasPlatformRole = (role: unknown, expectedRole: string) =>
+  parseRoleParts(role).includes(expectedRole);
+
+const getPrimaryPlatformRole = (
+  role: AdminUser["role"]
+): (typeof PLATFORM_ROLE_OPTIONS)[number] => {
+  const parts = parseRoleParts(role);
+  return PLATFORM_ROLE_OPTIONS.find(option => parts.includes(option)) ?? "user";
+};
+
+const formatPercent = (value: number) =>
+  new Intl.NumberFormat(undefined, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatSignedNumber = (value: number) =>
+  `${value > 0 ? "+" : ""}${formatNumber(value)}`;
+
+const getTrendDetail = (current: number, previous: number) => {
+  const delta = current - previous;
+  if (previous === 0) {
+    return delta > 0
+      ? `${formatSignedNumber(delta)} vs previous 30d`
+      : "No change";
+  }
+  return `${formatPercent(delta / previous)} vs previous 30d`;
+};
+
+const CompactMetric = ({
   icon: Icon,
   label,
   value,
@@ -237,29 +296,52 @@ const MetricCard = ({
   detail?: React.ReactNode;
   loading?: boolean;
 }) => (
-  <Card className="border-border/70 bg-card/60">
-    <CardHeader className="pb-2">
-      <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-        <Icon className="size-4" />
-        {label}
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="flex min-h-16 flex-col justify-end gap-1">
+  <div className="flex min-w-0 items-start gap-3">
+    <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+    <div className="min-w-0">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       {loading ? (
-        <>
-          <Skeleton className="h-7 w-24" />
-          <Skeleton className="h-3 w-32" />
-        </>
+        <div className="mt-1 flex flex-col gap-1.5">
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-3 w-28" />
+        </div>
       ) : (
-        <>
-          <div className="text-2xl font-semibold tabular-nums">{value}</div>
+        <div className="mt-1">
+          <div className="text-xl font-semibold tabular-nums">{value}</div>
           {detail ? (
-            <div className="text-xs text-muted-foreground">{detail}</div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+              {detail}
+            </div>
           ) : null}
-        </>
+        </div>
       )}
-    </CardContent>
-  </Card>
+    </div>
+  </div>
+);
+
+const InsightRow = ({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+}) => (
+  <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
+    <div className="flex min-w-0 items-center gap-2">
+      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <div className="truncate font-medium">{label}</div>
+        {detail ? (
+          <div className="truncate text-xs text-muted-foreground">{detail}</div>
+        ) : null}
+      </div>
+    </div>
+    <div className="shrink-0 font-semibold tabular-nums">{value}</div>
+  </div>
 );
 
 const AdminOverviewPanel = () => {
@@ -278,61 +360,124 @@ const AdminOverviewPanel = () => {
   const overview = overviewQuery.data;
   const daily = activityQuery.data?.daily ?? [];
   const isLoading = overviewQuery.isLoading;
+  const generatedDelta =
+    (overview?.generatedAddresses.current ?? 0) -
+    (overview?.generatedAddresses.previous ?? 0);
+  const integrationQueueCount =
+    (overview?.integrations.retryScheduled ?? 0) +
+    (overview?.integrations.failed ?? 0);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          icon={Mailbox}
-          label="Generated addresses"
-          loading={isLoading}
-          value={
-            <NumberFlow value={overview?.generatedAddresses.current ?? 0} />
-          }
-          detail={`Previous 30d: ${formatNumber(overview?.generatedAddresses.previous ?? 0)}`}
-        />
-        <MetricCard
-          icon={Mail}
-          label="Received emails"
-          loading={isLoading}
-          value={<NumberFlow value={overview?.receivedEmails.current ?? 0} />}
-          detail={`Samples: ${formatNumber(overview?.sampleEmails.current ?? 0)}`}
-        />
-        <MetricCard
-          icon={Users}
-          label="Users"
-          loading={isLoading}
-          value={<NumberFlow value={overview?.users ?? 0} />}
-          detail={`${formatNumber(overview?.activeUsers24h ?? 0)} active in 24h`}
-        />
-        <MetricCard
-          icon={Shield}
-          label="System status"
-          loading={isLoading}
-          value={
-            <span className="capitalize">
-              {overview?.system.status ?? "healthy"}
-            </span>
-          }
-          detail={`${formatNumber(overview?.anomalies.last24h ?? 0)} anomalies in 24h`}
-        />
-      </div>
+      <section className="w-full rounded-lg border border-border/70 p-4">
+        <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
+          <div className="flex flex-col gap-3">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-10 w-36" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex min-w-0 items-center gap-2">
+                  {overview?.system.status === "healthy" ? (
+                    <CheckCircle2 className="size-4 text-muted-foreground" />
+                  ) : (
+                    <AlertTriangle className="size-4 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      Platform status
+                    </div>
+                    <div className="text-lg font-semibold capitalize">
+                      {overview?.system.status ?? "healthy"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <InsightRow
+                    icon={AlertTriangle}
+                    label="Anomalies"
+                    value={formatNumber(overview?.anomalies.last24h ?? 0)}
+                  />
+                  <InsightRow
+                    icon={RefreshCcw}
+                    label="Queue"
+                    value={formatNumber(integrationQueueCount)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <HugeiconsIcon
-                icon={ChartAnalysisIcon}
-                strokeWidth={2}
-                className="size-4"
-              />
-              Activity
-            </CardTitle>
+          <div
+            className="grid gap-x-5 gap-y-4 border-t border-border/70 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 sm:grid-cols-2 xl:grid-cols-5"
+            aria-label="Admin overview metrics"
+          >
+            <CompactMetric
+              icon={Mailbox}
+              label="Addresses"
+              loading={isLoading}
+              value={
+                <NumberFlow value={overview?.generatedAddresses.current ?? 0} />
+              }
+              detail={`${formatSignedNumber(generatedDelta)} in 30d`}
+            />
+            <CompactMetric
+              icon={Mail}
+              label="Emails"
+              loading={isLoading}
+              value={
+                <NumberFlow value={overview?.receivedEmails.current ?? 0} />
+              }
+              detail={getTrendDetail(
+                overview?.receivedEmails.current ?? 0,
+                overview?.receivedEmails.previous ?? 0
+              )}
+            />
+            <CompactMetric
+              icon={Users}
+              label="Users"
+              loading={isLoading}
+              value={<NumberFlow value={overview?.users ?? 0} />}
+              detail={`${formatNumber(overview?.activeUsers24h ?? 0)} active in 24h`}
+            />
+            <CompactMetric
+              icon={PlugZap}
+              label="Active integrations"
+              loading={isLoading}
+              value={<NumberFlow value={overview?.integrations.active ?? 0} />}
+            />
+            <CompactMetric
+              icon={Database}
+              label="Organizations"
+              loading={isLoading}
+              value={<NumberFlow value={overview?.organizations ?? 0} />}
+            />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <Card className="min-w-0 rounded-none bg-transparent py-0 ring-0">
+          <CardHeader className="flex-row items-start justify-between px-0 pb-2 pt-0">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <HugeiconsIcon
+                  icon={ChartAnalysisIcon}
+                  strokeWidth={2}
+                  className="size-4"
+                />
+                Activity
+              </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-0 pb-0">
             {activityQuery.isLoading ? (
-              <div className="flex h-[220px] items-end gap-2 px-2">
+              <div className="flex h-[120px] items-end gap-2 px-2">
                 {Array.from({ length: 14 }).map((_, index) => (
                   <Skeleton
                     key={index}
@@ -342,11 +487,8 @@ const AdminOverviewPanel = () => {
                 ))}
               </div>
             ) : (
-              <ChartContainer config={chartConfig} className="h-[240px] w-full">
-                <BarChart
-                  data={daily}
-                  margin={{ top: 12, right: 12, left: 12 }}
-                >
+              <ChartContainer config={chartConfig} className="h-[135px] w-full">
+                <BarChart data={daily} margin={{ top: 8, right: 12, left: 12 }}>
                   <XAxis
                     dataKey="date"
                     tickLine={false}
@@ -376,70 +518,24 @@ const AdminOverviewPanel = () => {
             )}
           </CardContent>
         </Card>
-
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Database className="size-4" />
-              Operations
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            <StatRow
-              label="Organizations"
-              value={overview?.organizations ?? 0}
-            />
-            <StatRow
-              label="Attachment storage"
-              value={formatBytes(overview?.attachments.sizeTotal ?? 0)}
-            />
-            <StatRow
-              label="Attachments"
-              value={overview?.attachments.count ?? 0}
-            />
-            <Separator />
-            <StatRow
-              label="Active integrations"
-              value={overview?.integrations.active ?? 0}
-            />
-            <StatRow
-              label="Retry scheduled"
-              value={overview?.integrations.retryScheduled ?? 0}
-            />
-            <StatRow
-              label="Failed dispatches"
-              value={overview?.integrations.failed ?? 0}
-            />
-          </CardContent>
-        </Card>
       </section>
     </div>
   );
 };
 
-const StatRow = ({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) => (
-  <div className="flex items-center justify-between gap-4">
-    <span className="text-muted-foreground">{label}</span>
-    <span className="font-medium tabular-nums">
-      {typeof value === "number" ? formatNumber(value) : value}
-    </span>
-  </div>
-);
-
 const AdminUsersPanel = () => {
   const queryClient = useQueryClient();
+  const { user: currentUser, refreshSession } = useAuth();
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
+  const [selectedUserId, setSelectedUserId] = React.useState<string | null>(
+    null
+  );
   const [selectedSessionUser, setSelectedSessionUser] =
     React.useState<AdminUser | null>(null);
   const [pendingAction, setPendingAction] =
     React.useState<PendingUserAction>(null);
+  const [actionReason, setActionReason] = React.useState("");
   const usersQuery = useQuery({
     queryKey: queryKeys.adminUsers(page, PAGE_SIZE, search),
     queryFn: () => listAdminUsers({ page, pageSize: PAGE_SIZE, search }),
@@ -454,7 +550,13 @@ const AdminUsersPanel = () => {
   const actionMutation = useMutation({
     mutationFn: async (action: NonNullable<PendingUserAction>) => {
       if (action.type === "set-role") {
-        const result = await authClient.admin.setRole({
+        const adminApi = authClient.admin as typeof authClient.admin & {
+          setRole: (args: {
+            userId: string;
+            role: string;
+          }) => ReturnType<typeof authClient.admin.setRole>;
+        };
+        const result = await adminApi.setRole({
           userId: action.user.id,
           role: action.role,
         });
@@ -479,6 +581,16 @@ const AdminUsersPanel = () => {
           throw new Error(readAuthError(result.error, "Unable to unban user"));
         return;
       }
+      if (action.type === "impersonate") {
+        const result = await authClient.admin.impersonateUser({
+          userId: action.user.id,
+        });
+        if (result.error)
+          throw new Error(
+            readAuthError(result.error, "Unable to impersonate user")
+          );
+        return;
+      }
       const result = await authClient.admin.revokeUserSessions({
         userId: action.user.id,
       });
@@ -487,16 +599,32 @@ const AdminUsersPanel = () => {
           readAuthError(result.error, "Unable to revoke sessions")
         );
     },
-    onSuccess: async () => {
-      setPendingAction(null);
+    onSuccess: async (_data, action) => {
+      const actedUserId = action.user.id;
+      const reason = actionReason.trim() || undefined;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["app", "admin", "users"] }),
         queryClient.invalidateQueries({
-          queryKey: queryKeys.adminUserSessions(
-            selectedSessionUser?.id ?? null
-          ),
+          queryKey: queryKeys.adminUserSessions(actedUserId),
         }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.adminUserDetail(actedUserId),
+        }),
+        recordAdminAuditEvent({
+          action: action.type,
+          targetType: action.type === "revoke-sessions" ? "session" : "user",
+          targetId: actedUserId,
+          message: getActionAuditMessage(action),
+          reason,
+          metadata:
+            action.type === "set-role" ? { role: action.role } : undefined,
+        }).catch(() => undefined),
       ]);
+      setPendingAction(null);
+      setActionReason("");
+      if (action.type === "impersonate") {
+        await refreshSession();
+      }
     },
   });
   const revokeSessionMutation = useMutation({
@@ -509,14 +637,27 @@ const AdminUsersPanel = () => {
       }
     },
     onSuccess: async () => {
+      const userId = selectedSessionUser?.id ?? null;
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.adminUserSessions(selectedSessionUser?.id ?? null),
+        queryKey: queryKeys.adminUserSessions(userId),
       });
+      if (userId) {
+        await recordAdminAuditEvent({
+          action: "revoke-session",
+          targetType: "session",
+          targetId: userId,
+          message: `Revoked one session for ${selectedSessionUser?.email ?? "user"}.`,
+        }).catch(() => undefined);
+      }
     },
   });
   const users = usersQuery.data?.users ?? [];
   const total = usersQuery.data?.total ?? 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
+  const canImpersonate = hasPlatformRole(
+    (currentUser as { role?: unknown } | null)?.role,
+    "superadmin"
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -575,20 +716,33 @@ const AdminUsersPanel = () => {
             <TableCell>{formatDate(user.createdAt)}</TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
+                <Select
+                  value={getPrimaryPlatformRole(user.role)}
+                  onValueChange={role =>
                     setPendingAction({
                       type: "set-role",
                       user,
-                      role: isAdminUser(user) ? "user" : "admin",
+                      role: role as (typeof PLATFORM_ROLE_OPTIONS)[number],
                     })
                   }
                 >
-                  <KeyRound data-icon="inline-start" />
-                  Role
-                </Button>
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={`Role for ${user.email}`}
+                  >
+                    <KeyRound data-icon="inline-start" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {PLATFORM_ROLE_OPTIONS.map(role => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline"
                   size="sm"
@@ -609,6 +763,28 @@ const AdminUsersPanel = () => {
                 >
                   Sessions
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedUserId(user.id)}
+                >
+                  <Eye data-icon="inline-start" />
+                  Details
+                </Button>
+                {canImpersonate ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPendingAction({
+                        type: "impersonate",
+                        user,
+                      })
+                    }
+                  >
+                    Impersonate
+                  </Button>
+                ) : null}
               </div>
             </TableCell>
           </TableRow>
@@ -625,7 +801,10 @@ const AdminUsersPanel = () => {
       <AlertDialog
         open={Boolean(pendingAction)}
         onOpenChange={open => {
-          if (!open && !actionMutation.isPending) setPendingAction(null);
+          if (!open && !actionMutation.isPending) {
+            setPendingAction(null);
+            setActionReason("");
+          }
         }}
       >
         <AlertDialogContent>
@@ -640,12 +819,31 @@ const AdminUsersPanel = () => {
               {(actionMutation.error as Error).message}
             </p>
           ) : null}
+          {pendingAction ? (
+            <Input
+              aria-label="Admin action reason"
+              placeholder={
+                pendingAction.type === "ban" ||
+                pendingAction.type === "impersonate"
+                  ? "Reason"
+                  : "Reason (optional)"
+              }
+              value={actionReason}
+              onChange={event => setActionReason(event.target.value)}
+            />
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionMutation.isPending}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={!pendingAction || actionMutation.isPending}
+              disabled={
+                !pendingAction ||
+                actionMutation.isPending ||
+                ((pendingAction.type === "ban" ||
+                  pendingAction.type === "impersonate") &&
+                  !actionReason.trim())
+              }
               onClick={event => {
                 event.preventDefault();
                 if (pendingAction) actionMutation.mutate(pendingAction);
@@ -739,6 +937,13 @@ const AdminUsersPanel = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserDetailSheet
+        userId={selectedUserId}
+        onOpenChange={open => {
+          if (!open) setSelectedUserId(null);
+        }}
+      />
     </div>
   );
 };
@@ -748,6 +953,7 @@ const getActionTitle = (action: PendingUserAction) => {
   if (action.type === "set-role") return `Set role to ${action.role}`;
   if (action.type === "ban") return "Ban user";
   if (action.type === "unban") return "Unban user";
+  if (action.type === "impersonate") return "Impersonate user";
   return "Revoke sessions";
 };
 
@@ -762,11 +968,29 @@ const getActionDescription = (action: PendingUserAction) => {
   if (action.type === "unban") {
     return `${action.user.email} will be allowed to sign in again.`;
   }
+  if (action.type === "impersonate") {
+    return `You will start a temporary session as ${action.user.email}. This is audited.`;
+  }
   return `All active sessions for ${action.user.email} will be revoked.`;
+};
+
+const getActionAuditMessage = (action: NonNullable<PendingUserAction>) => {
+  if (action.type === "set-role") {
+    return `Set ${action.user.email} role to ${action.role}.`;
+  }
+  if (action.type === "ban") return `Banned ${action.user.email}.`;
+  if (action.type === "unban") return `Unbanned ${action.user.email}.`;
+  if (action.type === "impersonate") {
+    return `Started impersonating ${action.user.email}.`;
+  }
+  return `Revoked all sessions for ${action.user.email}.`;
 };
 
 const AdminOrganizationsPanel = () => {
   const [page, setPage] = React.useState(1);
+  const [selectedOrganizationId, setSelectedOrganizationId] = React.useState<
+    string | null
+  >(null);
   const organizationsQuery = useQuery<AdminOrganizationsResponse>({
     queryKey: queryKeys.adminOrganizations(page, PAGE_SIZE),
     queryFn: ({ signal }) =>
@@ -786,6 +1010,7 @@ const AdminOrganizationsPanel = () => {
           "Received",
           "Integrations",
           "Last mail",
+          "Actions",
         ]}
       >
         {organizations.map(org => (
@@ -800,19 +1025,22 @@ const AdminOrganizationsPanel = () => {
             </TableCell>
             <TableCell>{formatNumber(org.memberCount)}</TableCell>
             <TableCell>{formatNumber(org.addressCount)}</TableCell>
-            <TableCell>
-              <div className="flex flex-col">
-                <span>{formatNumber(org.receivedEmailCount)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatNumber(org.sampleEmailCount)} samples
-                </span>
-              </div>
-            </TableCell>
+            <TableCell>{formatNumber(org.receivedEmailCount)}</TableCell>
             <TableCell>
               {formatNumber(org.activeIntegrationCount)} /{" "}
               {formatNumber(org.integrationCount)}
             </TableCell>
             <TableCell>{formatDate(org.lastReceivedAt)}</TableCell>
+            <TableCell>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedOrganizationId(org.id)}
+              >
+                <Eye data-icon="inline-start" />
+                Details
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </AdminTableShell>
@@ -822,12 +1050,21 @@ const AdminOrganizationsPanel = () => {
         onPrevious={() => setPage(value => Math.max(1, value - 1))}
         onNext={() => setPage(value => value + 1)}
       />
+      <OrganizationDetailSheet
+        organizationId={selectedOrganizationId}
+        onOpenChange={open => {
+          if (!open) setSelectedOrganizationId(null);
+        }}
+      />
     </div>
   );
 };
 
 const AdminAnomaliesPanel = () => {
   const [page, setPage] = React.useState(1);
+  const [selectedEvent, setSelectedEvent] = React.useState<
+    AdminOperationalEventsResponse["items"][number] | null
+  >(null);
   const [severity, setSeverity] =
     React.useState<(typeof ANOMALY_SEVERITIES)[number]>("all");
   const [type, setType] = React.useState<(typeof ANOMALY_TYPES)[number]>("all");
@@ -835,15 +1072,15 @@ const AdminAnomaliesPanel = () => {
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
   const anomaliesQuery = useQuery<AdminOperationalEventsResponse>({
-    queryKey: queryKeys.adminAnomalies(
+    queryKey: queryKeys.adminAnomalies({
       page,
-      PAGE_SIZE,
+      pageSize: PAGE_SIZE,
       severity,
       type,
       organizationId,
-      fromDate,
-      toDate
-    ),
+      from: fromDate,
+      to: toDate,
+    }),
     queryFn: ({ signal }) =>
       listAdminAnomalies({
         page,
@@ -851,12 +1088,8 @@ const AdminAnomaliesPanel = () => {
         severity: severity === "all" ? undefined : severity,
         type: type === "all" ? undefined : type,
         organizationId: organizationId.trim() || undefined,
-        from: fromDate
-          ? new Date(`${fromDate}T00:00:00.000Z`).toISOString()
-          : undefined,
-        to: toDate
-          ? new Date(`${toDate}T23:59:59.999Z`).toISOString()
-          : undefined,
+        from: fromDate ? `${fromDate}T00:00:00` : undefined,
+        to: toDate ? `${toDate}T23:59:59.999` : undefined,
         signal,
       }),
     staleTime: 30_000,
@@ -940,7 +1173,7 @@ const AdminAnomaliesPanel = () => {
 
       <AdminTableShell
         loading={anomaliesQuery.isLoading}
-        columns={["Event", "Severity", "Organization", "Created"]}
+        columns={["Event", "Severity", "Organization", "Created", "Actions"]}
       >
         {anomalies.map(event => (
           <TableRow key={event.id}>
@@ -959,6 +1192,16 @@ const AdminAnomaliesPanel = () => {
               {event.organizationName ?? event.organizationId ?? "System"}
             </TableCell>
             <TableCell>{formatDate(event.createdAt)}</TableCell>
+            <TableCell>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedEvent(event)}
+              >
+                <Eye data-icon="inline-start" />
+                Details
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </AdminTableShell>
@@ -968,6 +1211,12 @@ const AdminAnomaliesPanel = () => {
         onPrevious={() => setPage(value => Math.max(1, value - 1))}
         onNext={() => setPage(value => value + 1)}
       />
+      <OperationalEventSheet
+        event={selectedEvent}
+        onOpenChange={open => {
+          if (!open) setSelectedEvent(null);
+        }}
+      />
     </div>
   );
 };
@@ -976,6 +1225,457 @@ const SeverityBadge = ({ severity }: { severity: string }) => {
   if (severity === "error") return <Badge variant="destructive">Error</Badge>;
   if (severity === "warning") return <Badge variant="secondary">Warning</Badge>;
   return <Badge variant="outline">Info</Badge>;
+};
+
+const DetailRow = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) => (
+  <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
+    <span className="text-muted-foreground">{label}</span>
+    <span className="max-w-2xs text-right font-medium wrap-break-word">
+      {value}
+    </span>
+  </div>
+);
+
+const JsonBlock = ({ value }: { value: unknown }) => (
+  <pre className="max-h-64 overflow-auto rounded-md bg-muted/60 p-3 text-xs">
+    {JSON.stringify(value ?? {}, null, 2)}
+  </pre>
+);
+
+const UserDetailSheet = ({
+  userId,
+  onOpenChange,
+}: {
+  userId: string | null;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const detailQuery = useQuery<AdminUserDetailResponse>({
+    queryKey: queryKeys.adminUserDetail(userId),
+    queryFn: ({ signal }) => getAdminUserDetail(userId ?? "", { signal }),
+    enabled: Boolean(userId),
+    staleTime: 15_000,
+  });
+  const detail = detailQuery.data;
+
+  return (
+    <Sheet open={Boolean(userId)} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle>{detail?.user.email ?? "User detail"}</SheetTitle>
+          <SheetDescription>
+            Account, sessions, organizations, API keys, and recent audit events.
+          </SheetDescription>
+        </SheetHeader>
+        {detailQuery.isLoading ? (
+          <div className="flex flex-col gap-3 px-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : detail ? (
+          <div className="flex flex-col gap-5 px-4 pb-6">
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Account
+              </p>
+              <DetailRow label="Name" value={detail.user.name ?? "Unnamed"} />
+              <DetailRow label="Role" value={detail.user.role ?? "user"} />
+              <DetailRow
+                label="Email verified"
+                value={detail.user.emailVerified ? "Yes" : "No"}
+              />
+              <DetailRow
+                label="Two-factor"
+                value={detail.user.twoFactorEnabled ? "Enabled" : "Disabled"}
+              />
+              <DetailRow
+                label="Status"
+                value={detail.user.banned ? "Banned" : "Active"}
+              />
+              <DetailRow
+                label="Created"
+                value={formatDate(detail.user.createdAt)}
+              />
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Organizations
+              </p>
+              {detail.memberships.length > 0 ? (
+                detail.memberships.map(membership => (
+                  <DetailRow
+                    key={membership.organizationId}
+                    label={membership.organizationName ?? "Organization"}
+                    value={membership.role}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No memberships.</p>
+              )}
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                API Keys
+              </p>
+              {detail.apiKeys.length > 0 ? (
+                detail.apiKeys.map(key => (
+                  <DetailRow
+                    key={key.id}
+                    label={key.name ?? key.start ?? key.id}
+                    value={key.enabled === false ? "Disabled" : "Enabled"}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No API keys.</p>
+              )}
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Recent Audit
+              </p>
+              {detail.recentEvents.length > 0 ? (
+                detail.recentEvents.map(event => (
+                  <DetailRow
+                    key={event.id}
+                    label={formatDate(event.createdAt)}
+                    value={event.message}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No recent audit events.
+                </p>
+              )}
+            </section>
+          </div>
+        ) : (
+          <p className="px-4 text-sm text-muted-foreground">User not found.</p>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+const OrganizationDetailSheet = ({
+  organizationId,
+  onOpenChange,
+}: {
+  organizationId: string | null;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const detailQuery = useQuery<AdminOrganizationDetailResponse>({
+    queryKey: queryKeys.adminOrganizationDetail(organizationId),
+    queryFn: ({ signal }) =>
+      getAdminOrganizationDetail(organizationId ?? "", { signal }),
+    enabled: Boolean(organizationId),
+    staleTime: 15_000,
+  });
+  const detail = detailQuery.data;
+
+  return (
+    <Sheet open={Boolean(organizationId)} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader>
+          <SheetTitle>
+            {detail?.organization.name ?? "Organization detail"}
+          </SheetTitle>
+          <SheetDescription>
+            Members, invitations, integrations, API keys, and recent events.
+          </SheetDescription>
+        </SheetHeader>
+        {detailQuery.isLoading ? (
+          <div className="flex flex-col gap-3 px-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : detail ? (
+          <div className="flex flex-col gap-5 px-4 pb-6">
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Usage
+              </p>
+              <DetailRow label="Slug" value={detail.organization.slug} />
+              <DetailRow
+                label="Members"
+                value={formatNumber(detail.organization.memberCount)}
+              />
+              <DetailRow
+                label="Addresses"
+                value={formatNumber(detail.organization.addressCount)}
+              />
+              <DetailRow
+                label="Received"
+                value={formatNumber(detail.organization.receivedEmailCount)}
+              />
+              <DetailRow
+                label="Last mail"
+                value={formatDate(detail.organization.lastReceivedAt)}
+              />
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Members
+              </p>
+              {detail.members.map(member => (
+                <DetailRow
+                  key={member.id}
+                  label={member.email ?? member.userId}
+                  value={member.role}
+                />
+              ))}
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Invitations
+              </p>
+              {detail.invitations.length > 0 ? (
+                detail.invitations.map(invitation => (
+                  <DetailRow
+                    key={invitation.id}
+                    label={invitation.email}
+                    value={invitation.status}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No invitations.</p>
+              )}
+            </section>
+
+            <section>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Integrations
+              </p>
+              {detail.integrations.length > 0 ? (
+                detail.integrations.map(integration => (
+                  <DetailRow
+                    key={integration.id}
+                    label={integration.name}
+                    value={`${integration.provider} / ${integration.status}`}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No integrations.
+                </p>
+              )}
+            </section>
+          </div>
+        ) : (
+          <p className="px-4 text-sm text-muted-foreground">
+            Organization not found.
+          </p>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+const OperationalEventSheet = ({
+  event,
+  onOpenChange,
+}: {
+  event: AdminOperationalEventsResponse["items"][number] | null;
+  onOpenChange: (open: boolean) => void;
+}) => (
+  <Sheet open={Boolean(event)} onOpenChange={onOpenChange}>
+    <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetHeader>
+        <SheetTitle>{event?.message ?? "Event detail"}</SheetTitle>
+        <SheetDescription>{event?.type.replaceAll("_", " ")}</SheetDescription>
+      </SheetHeader>
+      {event ? (
+        <div className="flex flex-col gap-4 px-4 pb-6">
+          <DetailRow
+            label="Severity"
+            value={<SeverityBadge severity={event.severity} />}
+          />
+          <DetailRow label="Created" value={formatDate(event.createdAt)} />
+          <DetailRow
+            label="Organization"
+            value={event.organizationName ?? event.organizationId ?? "System"}
+          />
+          <DetailRow label="Address ID" value={event.addressId ?? "None"} />
+          <DetailRow label="Email ID" value={event.emailId ?? "None"} />
+          <DetailRow
+            label="Integration ID"
+            value={event.integrationId ?? "None"}
+          />
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Metadata
+            </p>
+            <JsonBlock value={event.metadata} />
+          </div>
+        </div>
+      ) : null}
+    </SheetContent>
+  </Sheet>
+);
+
+const AdminApiKeysPanel = () => {
+  const [page, setPage] = React.useState(1);
+  const apiKeysQuery = useQuery<AdminApiKeysResponse>({
+    queryKey: queryKeys.adminApiKeys(page, PAGE_SIZE),
+    queryFn: ({ signal }) =>
+      listAdminApiKeys({ page, pageSize: PAGE_SIZE, signal }),
+    staleTime: 30_000,
+  });
+  const apiKeys = apiKeysQuery.data?.items ?? [];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <AdminTableShell
+        loading={apiKeysQuery.isLoading}
+        columns={["Key", "Owner", "Status", "Requests", "Last used", "Expires"]}
+      >
+        {apiKeys.map(key => (
+          <TableRow key={key.id}>
+            <TableCell>
+              <div className="flex min-w-48 flex-col">
+                <span className="font-medium">{key.name ?? "Unnamed key"}</span>
+                <span className="text-xs text-muted-foreground">
+                  {key.prefix ?? ""}
+                  {key.start ?? key.id}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex flex-col">
+                <span>{key.ownerLabel ?? key.referenceId}</span>
+                <span className="text-xs text-muted-foreground">
+                  {key.ownerType}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell>
+              <Badge variant={key.enabled === false ? "secondary" : "default"}>
+                {key.enabled === false ? "Disabled" : "Enabled"}
+              </Badge>
+            </TableCell>
+            <TableCell>{formatNumber(key.requestCount)}</TableCell>
+            <TableCell>{formatDate(key.lastRequest)}</TableCell>
+            <TableCell>{formatDate(key.expiresAt)}</TableCell>
+          </TableRow>
+        ))}
+      </AdminTableShell>
+      <PaginationFooter
+        page={page}
+        totalPages={apiKeysQuery.data?.totalPages ?? 0}
+        onPrevious={() => setPage(value => Math.max(1, value - 1))}
+        onNext={() => setPage(value => value + 1)}
+      />
+    </div>
+  );
+};
+
+const AdminAuditPanel = () => {
+  const [page, setPage] = React.useState(1);
+  const [type, setType] = React.useState<
+    "admin_user_action" | "admin_session_action" | "admin_impersonation_started"
+  >("admin_user_action");
+  const [selectedEvent, setSelectedEvent] = React.useState<
+    AdminOperationalEventsResponse["items"][number] | null
+  >(null);
+  const auditQuery = useQuery<AdminOperationalEventsResponse>({
+    queryKey: queryKeys.adminAnomalies({
+      page,
+      pageSize: PAGE_SIZE,
+      severity: "info",
+      type,
+      organizationId: "",
+      from: "",
+      to: "",
+    }),
+    queryFn: ({ signal }) =>
+      listAdminAnomalies({
+        page,
+        pageSize: PAGE_SIZE,
+        type,
+        signal,
+      }),
+    staleTime: 15_000,
+  });
+  const events = auditQuery.data?.items ?? [];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Select
+        value={type}
+        onValueChange={value => {
+          setPage(1);
+          setType(value as typeof type);
+        }}
+      >
+        <SelectTrigger size="sm" className="w-64" aria-label="Audit type">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value="admin_user_action">User actions</SelectItem>
+            <SelectItem value="admin_session_action">
+              Session actions
+            </SelectItem>
+            <SelectItem value="admin_impersonation_started">
+              Impersonation
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <AdminTableShell
+        loading={auditQuery.isLoading}
+        columns={["Event", "Actor", "Target", "Created", "Actions"]}
+      >
+        {events.map(event => (
+          <TableRow key={event.id}>
+            <TableCell>{event.message}</TableCell>
+            <TableCell>
+              {typeof event.metadata?.actorEmail === "string"
+                ? event.metadata.actorEmail
+                : "Unknown"}
+            </TableCell>
+            <TableCell>
+              {typeof event.metadata?.targetId === "string"
+                ? event.metadata.targetId
+                : "None"}
+            </TableCell>
+            <TableCell>{formatDate(event.createdAt)}</TableCell>
+            <TableCell>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedEvent(event)}
+              >
+                <Eye data-icon="inline-start" />
+                Details
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </AdminTableShell>
+      <PaginationFooter
+        page={page}
+        totalPages={auditQuery.data?.totalPages ?? 0}
+        onPrevious={() => setPage(value => Math.max(1, value - 1))}
+        onNext={() => setPage(value => value + 1)}
+      />
+      <OperationalEventSheet
+        event={selectedEvent}
+        onOpenChange={open => {
+          if (!open) setSelectedEvent(null);
+        }}
+      />
+    </div>
+  );
 };
 
 const AdminTableShell = ({
@@ -1076,6 +1776,18 @@ const adminSections = [
     label: "Anomalies",
     icon: Alert02Icon,
     content: <AdminAnomaliesPanel />,
+  },
+  {
+    id: "api-keys",
+    label: "API Keys",
+    icon: Key01Icon,
+    content: <AdminApiKeysPanel />,
+  },
+  {
+    id: "audit",
+    label: "Audit",
+    icon: LeftToRightListDashIcon,
+    content: <AdminAuditPanel />,
   },
 ];
 
