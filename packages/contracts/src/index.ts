@@ -73,20 +73,9 @@ export const adminOperationalEventTypeSchema = z.enum([
   "system_error",
 ]);
 
-export const platformRoleSchema = z.enum([
-  "user",
-  "support",
-  "security",
-  "admin",
-  "superadmin",
-]);
+export const platformRoleSchema = z.enum(["user", "admin"]);
 
-const PLATFORM_ADMIN_ROLES = new Set([
-  "support",
-  "security",
-  "admin",
-  "superadmin",
-]);
+const PLATFORM_ADMIN_ROLES = new Set(["admin"]);
 
 export const isPlatformAdminRole = (role: unknown) => {
   if (Array.isArray(role)) {

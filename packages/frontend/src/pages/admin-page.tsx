@@ -99,13 +99,7 @@ import {
 import { queryKeys } from "@/lib/query-keys";
 
 const PAGE_SIZE = 10;
-const PLATFORM_ROLE_OPTIONS = [
-  "user",
-  "support",
-  "security",
-  "admin",
-  "superadmin",
-] as const;
+const PLATFORM_ROLE_OPTIONS = ["user", "admin"] as const;
 const ANOMALY_SEVERITIES = ["all", "info", "warning", "error"] as const;
 const ANOMALY_TYPES = [
   "all",
@@ -689,7 +683,7 @@ const AdminUsersPanel = () => {
   const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
   const canImpersonate = hasPlatformRole(
     (currentUser as { role?: unknown } | null)?.role,
-    "superadmin"
+    "admin"
   );
 
   return (
@@ -1611,6 +1605,7 @@ const AdminAuditPanel = () => {
   const [type, setType] = React.useState<
     "admin_user_action" | "admin_session_action" | "admin_impersonation_started"
   >("admin_user_action");
+  const severity = "info" as const;
   const [selectedEvent, setSelectedEvent] = React.useState<
     AdminOperationalEventsResponse["items"][number] | null
   >(null);
@@ -1618,7 +1613,7 @@ const AdminAuditPanel = () => {
     queryKey: queryKeys.adminAnomalies({
       page,
       pageSize: PAGE_SIZE,
-      severity: "info",
+      severity,
       type,
       organizationId: "",
       from: "",
@@ -1628,6 +1623,7 @@ const AdminAuditPanel = () => {
       listAdminAnomalies({
         page,
         pageSize: PAGE_SIZE,
+        severity,
         type,
         signal,
       }),

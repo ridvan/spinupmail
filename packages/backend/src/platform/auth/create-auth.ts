@@ -272,7 +272,7 @@ function createAuth(
             ac: adminAccessControl,
             roles: platformAdminRoles,
             defaultRole: "user",
-            adminRoles: ["support", "security", "admin", "superadmin"],
+            adminRoles: ["admin"],
           }),
           openAPI(),
         ],

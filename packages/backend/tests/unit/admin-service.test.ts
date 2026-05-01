@@ -24,7 +24,40 @@ import {
   getAdminOperationalEvents,
   getAdminOrganizations,
   getAdminOverview,
+  performAdminUserAction,
 } from "@/modules/admin/service";
+
+const createAdminActionDb = () => {
+  const targetUser = {
+    id: "target-user",
+    email: "target@example.com",
+  };
+  const get = vi.fn().mockResolvedValue(targetUser);
+  const select = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({ get })),
+    })),
+  }));
+  const updateWhere = vi.fn();
+  const set = vi.fn(() => ({ where: updateWhere }));
+  const update = vi.fn(() => ({ set }));
+  const deleteWhere = vi.fn();
+  const deleteFrom = vi.fn(() => ({ where: deleteWhere }));
+  const values = vi.fn();
+  const insert = vi.fn(() => ({ values }));
+
+  return {
+    db: {
+      select,
+      update,
+      delete: deleteFrom,
+      insert,
+    },
+    set,
+    updateWhere,
+    insertValues: values,
+  };
+};
 
 describe("admin service", () => {
   beforeEach(() => {
@@ -247,5 +280,52 @@ describe("admin service", () => {
         createdAt: "2026-04-27T11:00:00.000Z",
       },
     ]);
+  });
+
+  it("allows admins to set user roles and records the audit event", async () => {
+    const db = createAdminActionDb();
+    mocks.getDb.mockReturnValue(db.db);
+
+    await expect(
+      performAdminUserAction({
+        env: {} as CloudflareBindings,
+        actorUserId: "actor-user",
+        actorEmail: "actor@example.com",
+        actorRole: "admin",
+        input: {
+          action: "set-role",
+          userId: "target-user",
+          role: "admin",
+        },
+      })
+    ).resolves.toEqual({ ok: true });
+
+    expect(db.set).toHaveBeenCalledWith({
+      role: "admin",
+      updatedAt: new Date("2026-04-27T12:00:00.000Z"),
+    });
+    expect(db.insertValues).toHaveBeenCalled();
+  });
+
+  it("rejects admin actions from non-admin users", async () => {
+    const db = createAdminActionDb();
+    mocks.getDb.mockReturnValue(db.db);
+
+    await expect(
+      performAdminUserAction({
+        env: {} as CloudflareBindings,
+        actorUserId: "actor-user",
+        actorEmail: "actor@example.com",
+        actorRole: "user",
+        input: {
+          action: "ban",
+          userId: "target-user",
+          reason: "Policy violation",
+        },
+      })
+    ).rejects.toThrow("forbidden");
+
+    expect(db.updateWhere).not.toHaveBeenCalled();
+    expect(db.insertValues).not.toHaveBeenCalled();
   });
 });

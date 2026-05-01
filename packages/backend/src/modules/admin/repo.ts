@@ -404,7 +404,12 @@ export const findAdminOverviewStats = async ({
     db
       .select({ count: sql<number>`count(*)` })
       .from(operationalEvents)
-      .where(gte(operationalEvents.createdAt, anomalySince)),
+      .where(
+        and(
+          gte(operationalEvents.createdAt, anomalySince),
+          inArray(operationalEvents.severity, ["warning", "error"])
+        )
+      ),
     db
       .select({ count: sql<number>`count(*)` })
       .from(operationalEvents)

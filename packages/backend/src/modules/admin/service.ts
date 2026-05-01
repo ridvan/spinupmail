@@ -599,17 +599,6 @@ export const recordAdminAuditEvent = async ({
   return { ok: true };
 };
 
-const ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES = [
-  "user",
-  "support",
-  "security",
-  "admin",
-] as const satisfies readonly PlatformRole[];
-const SUPER_ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES = [
-  ...ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES,
-  "superadmin",
-] as const satisfies readonly PlatformRole[];
-
 const roleIncludes = (role: unknown, expected: PlatformRole) => {
   if (Array.isArray(role)) {
     return role.some(value => String(value).trim() === expected);
@@ -620,26 +609,10 @@ const roleIncludes = (role: unknown, expected: PlatformRole) => {
 
 const requireAdminActionPermission = ({
   actorRole,
-  action,
 }: {
   actorRole: unknown;
-  action: AdminUserActionRequest["action"];
 }) => {
-  const isSecurity = roleIncludes(actorRole, "security");
-  const isAdmin = roleIncludes(actorRole, "admin");
-  const isSuperAdmin = roleIncludes(actorRole, "superadmin");
-
-  if (action === "set-role" && (isAdmin || isSuperAdmin)) return;
-  if (
-    (action === "ban" ||
-      action === "unban" ||
-      action === "revoke-session" ||
-      action === "revoke-sessions") &&
-    (isSecurity || isAdmin || isSuperAdmin)
-  ) {
-    return;
-  }
-  if (action === "impersonate" && isSuperAdmin) return;
+  if (roleIncludes(actorRole, "admin")) return;
 
   throw new AdminActionError(403, "forbidden");
 };
@@ -705,7 +678,7 @@ export const performAdminUserAction = async ({
   actorRole: unknown;
   input: AdminUserActionRequest;
 }) => {
-  requireAdminActionPermission({ actorRole, action: input.action });
+  requireAdminActionPermission({ actorRole });
 
   const db = getDb(env);
   const targetUser = await db
@@ -719,15 +692,6 @@ export const performAdminUserAction = async ({
   let actionResponse: Response | null = null;
 
   if (input.action === "set-role") {
-    const allowedRoles: readonly PlatformRole[] = roleIncludes(
-      actorRole,
-      "superadmin"
-    )
-      ? SUPER_ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES
-      : ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES;
-    if (!allowedRoles.includes(input.role)) {
-      throw new AdminActionError(403, "target role is not allowed");
-    }
     await db
       .update(users)
       .set({ role: input.role, updatedAt: new Date() })
