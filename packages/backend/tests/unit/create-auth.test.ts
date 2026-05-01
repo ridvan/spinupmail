@@ -347,10 +347,13 @@ describe("createAuth", () => {
     });
     expect(
       platformAdminRole.authorize({
-        user: ["list", "get", "set-role", "ban"],
+        user: ["list", "get", "ban"],
         session: ["list", "revoke"],
       }).success
     ).toBe(true);
+    expect(platformAdminRole.authorize({ user: ["set-role"] }).success).toBe(
+      false
+    );
     expect(platformAdminRole.authorize({ user: ["delete"] }).success).toBe(
       false
     );

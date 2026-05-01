@@ -75,7 +75,7 @@ export const ProtectedLayoutPage = () => {
   return (
     <SidebarProvider>
       <AppSidebar
-        onRefreshSession={refreshSession}
+        onRefreshSession={user ? refreshSession : undefined}
         onSignOut={handleSignOut}
         user={user}
       />

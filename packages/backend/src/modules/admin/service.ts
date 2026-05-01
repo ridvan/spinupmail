@@ -9,8 +9,12 @@ import type {
   AdminOrganizationsResponse,
   AdminOverviewResponse,
   AdminRecordAuditEventRequest,
+  AdminUserActionRequest,
   AdminUserDetailResponse,
+  PlatformRole,
 } from "@spinupmail/contracts";
+import { eq } from "drizzle-orm";
+import { sessions, users } from "@/db";
 import { getDb } from "@/platform/db/client";
 import {
   buildTimeZonedDailyCounts,
@@ -52,9 +56,12 @@ const clampPagination = ({
 });
 
 const toIsoString = (value: unknown): string | null => {
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
   if (typeof value === "number" && Number.isFinite(value)) {
-    return new Date(value).toISOString();
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
   if (typeof value === "string" && value.trim()) {
     const parsed = new Date(value);
@@ -579,15 +586,226 @@ export const recordAdminAuditEvent = async ({
     organizationId: input.organizationId ?? null,
     message: input.message,
     metadata: {
+      ...(input.metadata ?? {}),
       actorUserId,
       actorEmail: actorEmail ?? null,
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId ?? null,
       reason: input.reason ?? null,
-      ...(input.metadata ?? {}),
     },
   });
 
   return { ok: true };
+};
+
+const ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES = [
+  "user",
+  "support",
+  "security",
+  "admin",
+] as const satisfies readonly PlatformRole[];
+const SUPER_ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES = [
+  ...ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES,
+  "superadmin",
+] as const satisfies readonly PlatformRole[];
+
+const roleIncludes = (role: unknown, expected: PlatformRole) => {
+  if (Array.isArray(role)) {
+    return role.some(value => String(value).trim() === expected);
+  }
+  if (typeof role !== "string") return false;
+  return role.split(",").some(part => part.trim() === expected);
+};
+
+const requireAdminActionPermission = ({
+  actorRole,
+  action,
+}: {
+  actorRole: unknown;
+  action: AdminUserActionRequest["action"];
+}) => {
+  const isSecurity = roleIncludes(actorRole, "security");
+  const isAdmin = roleIncludes(actorRole, "admin");
+  const isSuperAdmin = roleIncludes(actorRole, "superadmin");
+
+  if (action === "set-role" && (isAdmin || isSuperAdmin)) return;
+  if (
+    (action === "ban" ||
+      action === "unban" ||
+      action === "revoke-session" ||
+      action === "revoke-sessions") &&
+    (isSecurity || isAdmin || isSuperAdmin)
+  ) {
+    return;
+  }
+  if (action === "impersonate" && isSuperAdmin) return;
+
+  throw new AdminActionError(403, "forbidden");
+};
+
+class AdminActionError extends Error {
+  constructor(
+    readonly status: 400 | 403 | 404 | 500,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+class AdminActionResponse extends Error {
+  constructor(readonly response: Response) {
+    super("admin action response");
+  }
+}
+
+const getAdminActionMessage = (
+  input: AdminUserActionRequest,
+  targetEmail: string | null
+) => {
+  const label = targetEmail ?? "user";
+  if (input.action === "set-role") return `Set ${label} role to ${input.role}.`;
+  if (input.action === "ban") return `Banned ${label}.`;
+  if (input.action === "unban") return `Unbanned ${label}.`;
+  if (input.action === "impersonate")
+    return `Started impersonation for ${label}.`;
+  if (input.action === "revoke-session")
+    return `Revoked one session for ${label}.`;
+  return `Revoked sessions for ${label}.`;
+};
+
+const getAdminActionAuditType = (
+  input: AdminUserActionRequest
+): AdminRecordAuditEventRequest["targetType"] =>
+  input.action === "revoke-session" || input.action === "revoke-sessions"
+    ? "session"
+    : "user";
+
+const getAdminActionEventType = (
+  input: AdminUserActionRequest
+): AdminOperationalEventType =>
+  input.action === "impersonate"
+    ? "admin_impersonation_started"
+    : input.action === "revoke-session" || input.action === "revoke-sessions"
+      ? "admin_session_action"
+      : "admin_user_action";
+
+export const performAdminUserAction = async ({
+  env,
+  runImpersonation,
+  actorUserId,
+  actorEmail,
+  actorRole,
+  input,
+}: {
+  env: CloudflareBindings;
+  runImpersonation?: () => Promise<Response>;
+  actorUserId: string;
+  actorEmail?: string | null;
+  actorRole: unknown;
+  input: AdminUserActionRequest;
+}) => {
+  requireAdminActionPermission({ actorRole, action: input.action });
+
+  const db = getDb(env);
+  const targetUser = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .get();
+
+  if (!targetUser) throw new AdminActionError(404, "user not found");
+
+  let actionResponse: Response | null = null;
+
+  if (input.action === "set-role") {
+    const allowedRoles: readonly PlatformRole[] = roleIncludes(
+      actorRole,
+      "superadmin"
+    )
+      ? SUPER_ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES
+      : ADMIN_SET_ROLE_ALLOWED_TARGET_ROLES;
+    if (!allowedRoles.includes(input.role)) {
+      throw new AdminActionError(403, "target role is not allowed");
+    }
+    await db
+      .update(users)
+      .set({ role: input.role, updatedAt: new Date() })
+      .where(eq(users.id, input.userId));
+  } else if (input.action === "ban") {
+    if (input.userId === actorUserId) {
+      throw new AdminActionError(400, "cannot ban yourself");
+    }
+    await db
+      .update(users)
+      .set({
+        banned: true,
+        banReason: input.reason?.trim() || "Administrative action",
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, input.userId));
+    await db.delete(sessions).where(eq(sessions.userId, input.userId));
+  } else if (input.action === "unban") {
+    await db
+      .update(users)
+      .set({
+        banned: false,
+        banReason: null,
+        banExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, input.userId));
+  } else if (input.action === "revoke-sessions") {
+    await db.delete(sessions).where(eq(sessions.userId, input.userId));
+  } else if (input.action === "revoke-session") {
+    const session = await db
+      .select({ userId: sessions.userId })
+      .from(sessions)
+      .where(eq(sessions.token, input.sessionToken))
+      .get();
+    if (session?.userId && session.userId !== input.userId) {
+      throw new AdminActionError(400, "session does not belong to user");
+    }
+    await db.delete(sessions).where(eq(sessions.token, input.sessionToken));
+  } else {
+    const impersonationResponse = await runImpersonation?.();
+    if (!impersonationResponse) {
+      throw new AdminActionError(500, "unable to impersonate user");
+    }
+    if (!impersonationResponse.ok) {
+      throw new AdminActionResponse(impersonationResponse);
+    }
+    actionResponse = impersonationResponse;
+  }
+
+  await recordOperationalEvent({
+    env,
+    severity: "info",
+    type: getAdminActionEventType(input),
+    message: getAdminActionMessage(input, targetUser.email),
+    metadata: {
+      ...(input.action === "set-role" ? { role: input.role } : {}),
+      actorUserId,
+      actorEmail: actorEmail ?? null,
+      action: input.action,
+      targetType: getAdminActionAuditType(input),
+      targetId: input.userId,
+      reason: input.reason?.trim() || null,
+    },
+  });
+
+  return actionResponse ?? { ok: true };
+};
+
+export const getAdminActionErrorResponse = (error: unknown) => {
+  if (error instanceof AdminActionResponse) {
+    return { response: error.response };
+  }
+  if (error instanceof AdminActionError) {
+    return {
+      status: error.status,
+      body: { error: error.message },
+    };
+  }
+  return null;
 };

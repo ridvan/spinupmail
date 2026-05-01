@@ -89,7 +89,7 @@ import {
   listAdminApiKeys,
   listAdminAnomalies,
   listAdminOrganizations,
-  recordAdminAuditEvent,
+  performAdminUserAction,
   type AdminApiKeysResponse,
   type AdminOperationalEventsResponse,
   type AdminOrganizationDetailResponse,
@@ -360,12 +360,14 @@ const AdminOverviewPanel = () => {
   const overview = overviewQuery.data;
   const daily = activityQuery.data?.daily ?? [];
   const isLoading = overviewQuery.isLoading;
-  const generatedDelta =
-    (overview?.generatedAddresses.current ?? 0) -
-    (overview?.generatedAddresses.previous ?? 0);
-  const integrationQueueCount =
-    (overview?.integrations.retryScheduled ?? 0) +
-    (overview?.integrations.failed ?? 0);
+  const overviewUnavailable =
+    overviewQuery.isError || (!isLoading && !overview);
+  const generatedDelta = overview
+    ? overview.generatedAddresses.current - overview.generatedAddresses.previous
+    : null;
+  const integrationQueueCount = overview
+    ? overview.integrations.retryScheduled + overview.integrations.failed
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -380,10 +382,30 @@ const AdminOverviewPanel = () => {
                   <Skeleton className="h-8 w-full" />
                 </div>
               </>
+            ) : overviewUnavailable ? (
+              <>
+                <div className="flex min-w-0 items-center gap-2">
+                  <AlertTriangle className="size-4 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      Platform status
+                    </div>
+                    <div className="text-lg font-semibold">Unknown</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <InsightRow
+                    icon={AlertTriangle}
+                    label="Anomalies"
+                    value="Unknown"
+                  />
+                  <InsightRow icon={RefreshCcw} label="Queue" value="Unknown" />
+                </div>
+              </>
             ) : (
               <>
                 <div className="flex min-w-0 items-center gap-2">
-                  {overview?.system.status === "healthy" ? (
+                  {overview!.system.status === "healthy" ? (
                     <CheckCircle2 className="size-4 text-muted-foreground" />
                   ) : (
                     <AlertTriangle className="size-4 text-muted-foreground" />
@@ -393,7 +415,7 @@ const AdminOverviewPanel = () => {
                       Platform status
                     </div>
                     <div className="text-lg font-semibold capitalize">
-                      {overview?.system.status ?? "healthy"}
+                      {overview!.system.status}
                     </div>
                   </div>
                 </div>
@@ -401,12 +423,12 @@ const AdminOverviewPanel = () => {
                   <InsightRow
                     icon={AlertTriangle}
                     label="Anomalies"
-                    value={formatNumber(overview?.anomalies.last24h ?? 0)}
+                    value={formatNumber(overview!.anomalies.last24h)}
                   />
                   <InsightRow
                     icon={RefreshCcw}
                     label="Queue"
-                    value={formatNumber(integrationQueueCount)}
+                    value={formatNumber(integrationQueueCount ?? 0)}
                   />
                 </div>
               </>
@@ -422,40 +444,74 @@ const AdminOverviewPanel = () => {
               label="Addresses"
               loading={isLoading}
               value={
-                <NumberFlow value={overview?.generatedAddresses.current ?? 0} />
+                overview ? (
+                  <NumberFlow value={overview.generatedAddresses.current} />
+                ) : (
+                  "Unknown"
+                )
               }
-              detail={`${formatSignedNumber(generatedDelta)} in 30d`}
+              detail={
+                generatedDelta === null
+                  ? "Unavailable"
+                  : `${formatSignedNumber(generatedDelta)} in 30d`
+              }
             />
             <CompactMetric
               icon={Mail}
               label="Emails"
               loading={isLoading}
               value={
-                <NumberFlow value={overview?.receivedEmails.current ?? 0} />
+                overview ? (
+                  <NumberFlow value={overview.receivedEmails.current} />
+                ) : (
+                  "Unknown"
+                )
               }
-              detail={getTrendDetail(
-                overview?.receivedEmails.current ?? 0,
-                overview?.receivedEmails.previous ?? 0
-              )}
+              detail={
+                overview
+                  ? getTrendDetail(
+                      overview.receivedEmails.current,
+                      overview.receivedEmails.previous
+                    )
+                  : "Unavailable"
+              }
             />
             <CompactMetric
               icon={Users}
               label="Users"
               loading={isLoading}
-              value={<NumberFlow value={overview?.users ?? 0} />}
-              detail={`${formatNumber(overview?.activeUsers24h ?? 0)} active in 24h`}
+              value={
+                overview ? <NumberFlow value={overview.users} /> : "Unknown"
+              }
+              detail={
+                overview
+                  ? `${formatNumber(overview.activeUsers24h)} active in 24h`
+                  : "Unavailable"
+              }
             />
             <CompactMetric
               icon={PlugZap}
               label="Active integrations"
               loading={isLoading}
-              value={<NumberFlow value={overview?.integrations.active ?? 0} />}
+              value={
+                overview ? (
+                  <NumberFlow value={overview.integrations.active} />
+                ) : (
+                  "Unknown"
+                )
+              }
             />
             <CompactMetric
               icon={Database}
               label="Organizations"
               loading={isLoading}
-              value={<NumberFlow value={overview?.organizations ?? 0} />}
+              value={
+                overview ? (
+                  <NumberFlow value={overview.organizations} />
+                ) : (
+                  "Unknown"
+                )
+              }
             />
           </div>
         </div>
@@ -549,59 +605,48 @@ const AdminUsersPanel = () => {
   });
   const actionMutation = useMutation({
     mutationFn: async (action: NonNullable<PendingUserAction>) => {
+      const reason = actionReason.trim() || undefined;
       if (action.type === "set-role") {
-        const adminApi = authClient.admin as typeof authClient.admin & {
-          setRole: (args: {
-            userId: string;
-            role: string;
-          }) => ReturnType<typeof authClient.admin.setRole>;
-        };
-        const result = await adminApi.setRole({
+        await performAdminUserAction({
+          action: "set-role",
           userId: action.user.id,
           role: action.role,
+          ...(reason ? { reason } : {}),
         });
-        if (result.error)
-          throw new Error(readAuthError(result.error, "Unable to set role"));
         return;
       }
       if (action.type === "ban") {
-        const result = await authClient.admin.banUser({
+        await performAdminUserAction({
+          action: "ban",
           userId: action.user.id,
-          banReason: "Administrative action",
+          reason: reason || "Administrative action",
         });
-        if (result.error)
-          throw new Error(readAuthError(result.error, "Unable to ban user"));
         return;
       }
       if (action.type === "unban") {
-        const result = await authClient.admin.unbanUser({
+        await performAdminUserAction({
+          action: "unban",
           userId: action.user.id,
+          ...(reason ? { reason } : {}),
         });
-        if (result.error)
-          throw new Error(readAuthError(result.error, "Unable to unban user"));
         return;
       }
       if (action.type === "impersonate") {
-        const result = await authClient.admin.impersonateUser({
+        await performAdminUserAction({
+          action: "impersonate",
           userId: action.user.id,
+          ...(reason ? { reason } : {}),
         });
-        if (result.error)
-          throw new Error(
-            readAuthError(result.error, "Unable to impersonate user")
-          );
         return;
       }
-      const result = await authClient.admin.revokeUserSessions({
+      await performAdminUserAction({
+        action: "revoke-sessions",
         userId: action.user.id,
+        ...(reason ? { reason } : {}),
       });
-      if (result.error)
-        throw new Error(
-          readAuthError(result.error, "Unable to revoke sessions")
-        );
     },
     onSuccess: async (_data, action) => {
       const actedUserId = action.user.id;
-      const reason = actionReason.trim() || undefined;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["app", "admin", "users"] }),
         queryClient.invalidateQueries({
@@ -610,15 +655,6 @@ const AdminUsersPanel = () => {
         queryClient.invalidateQueries({
           queryKey: queryKeys.adminUserDetail(actedUserId),
         }),
-        recordAdminAuditEvent({
-          action: action.type,
-          targetType: action.type === "revoke-sessions" ? "session" : "user",
-          targetId: actedUserId,
-          message: getActionAuditMessage(action),
-          reason,
-          metadata:
-            action.type === "set-role" ? { role: action.role } : undefined,
-        }).catch(() => undefined),
       ]);
       setPendingAction(null);
       setActionReason("");
@@ -628,27 +664,24 @@ const AdminUsersPanel = () => {
     },
   });
   const revokeSessionMutation = useMutation({
-    mutationFn: async (sessionToken: string) => {
-      const result = await authClient.admin.revokeUserSession({ sessionToken });
-      if (result.error) {
-        throw new Error(
-          readAuthError(result.error, "Unable to revoke session")
-        );
-      }
+    mutationFn: async ({
+      sessionToken,
+      userId,
+    }: {
+      sessionToken: string;
+      userId: string;
+    }) => {
+      await performAdminUserAction({
+        action: "revoke-session",
+        userId,
+        sessionToken,
+      });
     },
-    onSuccess: async () => {
-      const userId = selectedSessionUser?.id ?? null;
+    onSuccess: async (_data, action) => {
+      const userId = action.userId;
       await queryClient.invalidateQueries({
         queryKey: queryKeys.adminUserSessions(userId),
       });
-      if (userId) {
-        await recordAdminAuditEvent({
-          action: "revoke-session",
-          targetType: "session",
-          targetId: userId,
-          message: `Revoked one session for ${selectedSessionUser?.email ?? "user"}.`,
-        }).catch(() => undefined);
-      }
     },
   });
   const users = usersQuery.data?.users ?? [];
@@ -894,11 +927,18 @@ const AdminUsersPanel = () => {
                           size="sm"
                           disabled={revokeSessionMutation.isPending}
                           onClick={() => {
+                            const userId = selectedSessionUser?.id ?? null;
+                            const actedOnEmail =
+                              selectedSessionUser?.email ?? "user";
+                            if (!userId) return;
                             toast.promise(
-                              revokeSessionMutation.mutateAsync(session.token),
+                              revokeSessionMutation.mutateAsync({
+                                sessionToken: session.token,
+                                userId,
+                              }),
                               {
                                 loading: "Revoking session...",
-                                success: "Session revoked.",
+                                success: `Revoked one session for ${actedOnEmail}.`,
                                 error: error =>
                                   error instanceof Error
                                     ? error.message
@@ -972,18 +1012,6 @@ const getActionDescription = (action: PendingUserAction) => {
     return `You will start a temporary session as ${action.user.email}. This is audited.`;
   }
   return `All active sessions for ${action.user.email} will be revoked.`;
-};
-
-const getActionAuditMessage = (action: NonNullable<PendingUserAction>) => {
-  if (action.type === "set-role") {
-    return `Set ${action.user.email} role to ${action.role}.`;
-  }
-  if (action.type === "ban") return `Banned ${action.user.email}.`;
-  if (action.type === "unban") return `Unbanned ${action.user.email}.`;
-  if (action.type === "impersonate") {
-    return `Started impersonating ${action.user.email}.`;
-  }
-  return `Revoked all sessions for ${action.user.email}.`;
 };
 
 const AdminOrganizationsPanel = () => {

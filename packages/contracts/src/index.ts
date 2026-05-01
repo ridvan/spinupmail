@@ -338,6 +338,34 @@ export const adminRecordAuditEventRequestSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+const adminUserActionBaseSchema = z.object({
+  userId: z.string().min(1).max(256),
+  reason: z.string().trim().min(1).max(512).optional(),
+});
+
+export const adminUserActionRequestSchema = z.discriminatedUnion("action", [
+  adminUserActionBaseSchema.extend({
+    action: z.literal("set-role"),
+    role: platformRoleSchema,
+  }),
+  adminUserActionBaseSchema.extend({
+    action: z.literal("ban"),
+  }),
+  adminUserActionBaseSchema.extend({
+    action: z.literal("unban"),
+  }),
+  adminUserActionBaseSchema.extend({
+    action: z.literal("impersonate"),
+  }),
+  adminUserActionBaseSchema.extend({
+    action: z.literal("revoke-sessions"),
+  }),
+  adminUserActionBaseSchema.extend({
+    action: z.literal("revoke-session"),
+    sessionToken: z.string().min(1).max(512),
+  }),
+]);
+
 export const integrationProviderSchema = z.enum(["telegram"]);
 export const integrationStatusSchema = z.enum(["active", "archived"]);
 export const integrationEventTypeSchema = z.enum(["email.received"]);
@@ -819,6 +847,9 @@ export type AdminApiKeyItem = z.infer<typeof adminApiKeyItemSchema>;
 export type AdminApiKeysResponse = z.infer<typeof adminApiKeysResponseSchema>;
 export type AdminRecordAuditEventRequest = z.infer<
   typeof adminRecordAuditEventRequestSchema
+>;
+export type AdminUserActionRequest = z.infer<
+  typeof adminUserActionRequestSchema
 >;
 export type IntegrationProvider = z.infer<typeof integrationProviderSchema>;
 export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;

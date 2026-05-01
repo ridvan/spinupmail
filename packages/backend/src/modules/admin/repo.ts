@@ -25,6 +25,12 @@ type DateRange = {
   to: Date;
 };
 
+const ADMIN_AUDIT_EVENT_TYPES = [
+  "admin_user_action",
+  "admin_session_action",
+  "admin_impersonation_started",
+] as const satisfies readonly AdminOperationalEventType[];
+
 export const findAdminUserDetail = async (db: AppDb, userId: string) => {
   const [user, accountRows, membershipRows, apiKeyRows, recentEventRows] =
     await Promise.all([
@@ -107,7 +113,10 @@ export const findAdminUserDetail = async (db: AppDb, userId: string) => {
           eq(organizations.id, operationalEvents.organizationId)
         )
         .where(
-          sql`json_extract(${operationalEvents.metadataJson}, '$.targetId') = ${userId}`
+          and(
+            inArray(operationalEvents.type, ADMIN_AUDIT_EVENT_TYPES),
+            sql`json_extract(${operationalEvents.metadataJson}, '$.targetId') = ${userId}`
+          )
         )
         .orderBy(desc(operationalEvents.createdAt))
         .limit(10),

@@ -15,7 +15,7 @@ export const platformSecurityRole = adminAccessControl.newRole({
 });
 
 export const platformAdminRole = adminAccessControl.newRole({
-  user: ["list", "get", "set-role", "ban"],
+  user: ["list", "get", "ban"],
   session: ["list", "revoke"],
 });
 

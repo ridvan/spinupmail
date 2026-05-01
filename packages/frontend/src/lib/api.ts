@@ -8,6 +8,7 @@ import type {
   AdminOrganizationsResponse,
   AdminOverviewResponse,
   AdminRecordAuditEventRequest,
+  AdminUserActionRequest,
   AdminUserDetailResponse,
   AddressIntegration,
   CreateIntegrationRequest,
@@ -256,6 +257,12 @@ export const recordAdminAuditEvent = async (
   body: AdminRecordAuditEventRequest
 ) =>
   apiFetch<{ ok: true }>("/api/admin/audit-events", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const performAdminUserAction = async (body: AdminUserActionRequest) =>
+  apiFetch<{ ok: true }>("/api/admin/user-actions", {
     method: "POST",
     body: JSON.stringify(body),
   });

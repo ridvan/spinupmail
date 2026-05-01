@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { adminRecordAuditEventRequestSchema } from "@spinupmail/contracts";
+import {
+  adminRecordAuditEventRequestSchema,
+  adminUserActionRequestSchema,
+} from "@spinupmail/contracts";
 import type { AppHonoEnv } from "@/app/types";
 import {
   adminActivityQuerySchema,
@@ -11,11 +14,13 @@ import {
 import {
   getAdminActivity,
   getAdminApiKeys,
+  getAdminActionErrorResponse,
   getAdminOrganizationDetail,
   getAdminOperationalEvents,
   getAdminOrganizations,
   getAdminOverview,
   getAdminUserDetail,
+  performAdminUserAction,
   recordAdminAuditEvent,
 } from "./service";
 
@@ -166,6 +171,57 @@ export const createAdminRouter = () => {
         input,
       });
       return c.json(result, 201);
+    }
+  );
+
+  router.post(
+    "/admin/user-actions",
+    zValidator("json", adminUserActionRequestSchema, (result, c) => {
+      if (!result.success)
+        return c.json({ error: "invalid admin user action" }, 400);
+      return undefined;
+    }),
+    async c => {
+      const auth = c.get("auth");
+      const session = c.get("session");
+      const input = c.req.valid("json");
+
+      try {
+        const result = await performAdminUserAction({
+          env: c.env,
+          runImpersonation:
+            input.action === "impersonate"
+              ? () => {
+                  const url = new URL(c.req.url);
+                  url.pathname = "/api/auth/admin/impersonate-user";
+                  url.search = "";
+                  const headers = new Headers(c.req.raw.headers);
+                  headers.set("Content-Type", "application/json");
+                  return auth.handler(
+                    new Request(url, {
+                      method: "POST",
+                      headers,
+                      body: JSON.stringify({ userId: input.userId }),
+                    })
+                  );
+                }
+              : undefined,
+          actorUserId: session.user.id,
+          actorEmail:
+            typeof session.user.email === "string" ? session.user.email : null,
+          actorRole: session.user.role,
+          input,
+        });
+        if (result instanceof Response) return result;
+        return c.json(result, 200);
+      } catch (error) {
+        const response = getAdminActionErrorResponse(error);
+        if (response) {
+          if ("response" in response) return response.response;
+          return c.json(response.body, response.status);
+        }
+        throw error;
+      }
     }
   );
 
