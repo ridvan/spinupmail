@@ -24,7 +24,7 @@
     "@better-auth/api-key": "1.6.5",
     "@cloudflare/workers-types": "4.20260418.1",
     "@hono/zod-validator": "^0.7.6",
-    "better-auth": "1.6.5",
+    "better-auth": "1.6.11",
     "better-auth-cloudflare": "^0.3.0",
     "css-tree": "^3.2.1",
     "dom-serializer": "^3.0.0",
