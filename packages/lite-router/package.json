@@ -37,15 +37,15 @@
     "test:package": "node ./scripts/smoke-package.mjs"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "4.20260605.1",
+    "@cloudflare/workers-types": "4.20260621.1",
     "postal-mime": "^2.7.4"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
-    "@typescript/native-preview": "7.0.0-dev.20260605.1",
-    "tsdown": "^0.22.2",
+    "@types/node": "^26.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20260621.1",
+    "tsdown": "^0.22.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8",
-    "wrangler": "^4.98.0"
+    "vitest": "^4.1.9",
+    "wrangler": "^4.103.0"
   }
 }

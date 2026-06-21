@@ -38,9 +38,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
-    "@typescript/native-preview": "7.0.0-dev.20260605.1",
-    "tsdown": "^0.22.2",
+    "@types/node": "^26.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20260621.1",
+    "tsdown": "^0.22.3",
     "typescript": "^6.0.3"
   }
 }

@@ -1,9 +1,9 @@
 import type {
   D1Database,
-  ExecutionContext,
   IncomingRequestCfProperties,
   KVNamespace,
 } from "@cloudflare/workers-types";
+import type { WorkerExecutionContext } from "@/shared/worker-context";
 import { betterAuth } from "better-auth";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { withCloudflare } from "better-auth-cloudflare";
@@ -92,7 +92,7 @@ const verifyPasswordWithNodeCrypto = async ({
 function createAuth(
   env?: CloudflareBindings,
   cf?: IncomingRequestCfProperties,
-  executionContext?: ExecutionContext
+  executionContext?: WorkerExecutionContext
 ) {
   const enableE2ETestUtils = isE2ETestUtilsEnabled(env);
   const db = env ? drizzle(env.SUM_DB, { schema }) : undefined;

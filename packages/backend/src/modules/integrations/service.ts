@@ -10,7 +10,7 @@ import {
   type ValidateIntegrationConnectionRequest,
   validateIntegrationConnectionRequestSchema,
 } from "@spinupmail/contracts";
-import type { ExecutionContext } from "@cloudflare/workers-types";
+import type { WorkerExecutionContext } from "@/shared/worker-context";
 import { getDb } from "@/platform/db/client";
 import type { AppDb } from "@/platform/db/client";
 import {
@@ -589,7 +589,7 @@ export const createIntegration = async ({
   organizationId: string;
   session: AppHonoEnv["Variables"]["session"];
   payload: unknown;
-  executionContext?: ExecutionContext;
+  executionContext?: WorkerExecutionContext;
 }) => {
   const adminCheck = await requireOrganizationAdmin({
     env,

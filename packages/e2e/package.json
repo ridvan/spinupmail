@@ -7,7 +7,7 @@
     "test:smoke": "playwright test --config ./playwright.config.ts --project=chromium"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^25.9.1"
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0"
   }
 }
