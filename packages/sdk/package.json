@@ -30,7 +30,7 @@
   },
   "scripts": {
     "build": "tsdown --config tsdown.config.ts",
-    "typecheck": "tsgo --noEmit -p tsconfig.test.json && tsgo --noEmit -p tests/tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tests/tsconfig.json",
     "test": "vitest run --config vitest.config.ts",
     "test:package": "node ./scripts/smoke-package.mjs"
   },
@@ -38,9 +38,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "@typescript/native-preview": "7.0.0-dev.20260621.1",
-    "tsdown": "^0.22.3",
-    "typescript": "^6.0.3"
+    "@types/node": "^26.1.1",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "tsdown": "^0.22.14",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

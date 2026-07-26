@@ -32,20 +32,20 @@
   "scripts": {
     "build": "tsdown --config tsdown.config.ts",
     "deploy": "pnpm exec wrangler deploy --minify",
-    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts",
     "test:package": "node ./scripts/smoke-package.mjs"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "4.20260621.1",
-    "postal-mime": "^2.7.4"
+    "@cloudflare/workers-types": "5.20260726.1",
+    "postal-mime": "^2.7.5"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "@typescript/native-preview": "7.0.0-dev.20260621.1",
-    "tsdown": "^0.22.3",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9",
-    "wrangler": "^4.103.0"
+    "@types/node": "^26.1.1",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "tsdown": "^0.22.14",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.114.0"
   }
 }
