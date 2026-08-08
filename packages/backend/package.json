@@ -21,26 +21,26 @@
     "test:integration:workers": "pnpm exec vitest run --config vitest.workers.config.ts"
   },
   "dependencies": {
-    "@better-auth/api-key": "1.6.25",
-    "@cloudflare/workers-types": "5.20260726.1",
+    "@better-auth/api-key": "1.6.26",
+    "@cloudflare/workers-types": "5.20260808.1",
     "@hono/zod-validator": "^0.9.0",
-    "better-auth": "1.6.25",
+    "better-auth": "1.6.26",
     "better-auth-cloudflare": "^0.3.1",
     "css-tree": "^3.2.1",
     "dom-serializer": "^3.1.1",
     "drizzle-orm": "^0.45.2",
-    "hono": "4.12.32",
+    "hono": "4.13.1",
     "htmlparser2": "^12.0.0",
-    "postal-mime": "^2.7.5",
-    "resend": "^6.18.0",
+    "postal-mime": "^2.7.6",
+    "resend": "^6.18.1",
     "sanitize-html": "^2.17.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/vitest-pool-workers": "^0.20.3",
     "@spinupmail/contracts": "workspace:*",
-    "@types/css-tree": "^2.3.11",
-    "@types/node": "^26.1.1",
+    "@types/css-tree": "^3.2.0",
+    "@types/node": "^26.2.0",
     "@types/sanitize-html": "^2.16.1",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "4.1.10",
@@ -48,6 +48,6 @@
     "fast-check": "^4.9.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vitest": "^4.1.10",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.120.0"
   }
 }
