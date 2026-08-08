@@ -290,9 +290,17 @@ export default defineBackground(() => {
 
   browser.notifications.onClicked.addListener(notificationId => {
     const parts = notificationId.split(":");
-    if (parts.length !== 4) return;
+    const [prefix, organizationId, addressId, emailId] = parts;
+    if (
+      parts.length !== 4 ||
+      prefix !== "spinupmail" ||
+      !organizationId ||
+      !addressId ||
+      !emailId
+    ) {
+      return;
+    }
 
-    const [, organizationId, addressId, emailId] = parts;
     void openPopupForIntent({
       addressId,
       emailId,

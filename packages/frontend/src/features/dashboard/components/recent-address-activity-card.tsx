@@ -11,9 +11,9 @@ import { NuqsAdapter } from "nuqs/adapters/react-router/v7";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   type ColumnDef,
+  coreFeatures,
   flexRender,
-  getCoreRowModel,
-  useReactTable,
+  useTable,
 } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -489,6 +489,8 @@ const RecentAddressActivityCardContent = ({
   const addressSearchValue = addressFilterValue.trim();
 
   React.useEffect(() => {
+    // Synchronize the debounced draft when URL navigation changes the filter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchInputValue(addressFilterValue);
   }, [addressFilterValue]);
 
@@ -510,6 +512,8 @@ const RecentAddressActivityCardContent = ({
   }, [addressFilterValue, searchInputValue, setAddressFilterValue]);
 
   React.useEffect(() => {
+    // A new query scope always starts from the first cursor page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCursor(null);
     setCursorHistory([]);
   }, [
@@ -589,7 +593,7 @@ const RecentAddressActivityCardContent = ({
     [sortColumn, sortDirection]
   );
 
-  const columns = React.useMemo<ColumnDef<ActivityRow>[]>(
+  const columns = React.useMemo<ColumnDef<typeof coreFeatures, ActivityRow>[]>(
     () => [
       {
         accessorKey: "address",
@@ -686,11 +690,10 @@ const RecentAddressActivityCardContent = ({
     [addressFilterValue, effectiveTimeZone, getSortDirection, toggleSorting]
   );
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const table = useTable({
     data: recentRows,
     columns,
-    getCoreRowModel: getCoreRowModel(),
+    features: coreFeatures,
   });
   const isTableLoading = isLoading;
   const isPageTransitioning = isFetching && isPlaceholderData;
@@ -891,7 +894,7 @@ const RecentAddressActivityCardContent = ({
                       key={row.id}
                       className="group/row transition-colors hover:bg-muted/30"
                     >
-                      {row.getVisibleCells().map(cell => (
+                      {row.getAllCells().map(cell => (
                         <TableCell key={cell.id}>
                           {flexRender(
                             cell.column.columnDef.cell,
