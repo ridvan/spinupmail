@@ -48,7 +48,7 @@
     "jsdom": "^30.0.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "wxt": "^0.21.3"
   }
 }
