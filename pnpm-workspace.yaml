@@ -8,7 +8,9 @@ peerDependencyRules:
   allowedVersions:
     eslint: ^10.0.0
 allowBuilds:
+  "@prisma/engines": false
   esbuild: true
   msw: false
   prisma: false
+  unrs-resolver: true
   workerd: true
