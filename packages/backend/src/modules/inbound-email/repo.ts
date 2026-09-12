@@ -2,6 +2,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { emailAddresses, emailAttachments, emails } from "@/db";
 import type { AppDb } from "@/platform/db/client";
 import {
+  buildAgentInboundStatements,
+  type AgentInboundContext,
+} from "@/modules/agent-api/ingest";
+import {
   buildDeleteEmailSearchEntriesByAddressIdStatement,
   buildInsertEmailSearchEntryStatement,
 } from "@/modules/emails/repo";
@@ -38,7 +42,7 @@ export const getInboxReservationCounts = async (
   db: AppDb,
   values: {
     addressId: string;
-    organizationId: string;
+    organizationId?: string;
   }
 ) => {
   const row = await db.$client
@@ -89,7 +93,7 @@ export const insertEmailAttachmentIfOrganizationQuotaAllows = async (
   values: {
     id: string;
     emailId: string;
-    organizationId: string;
+    organizationId?: string;
     addressId: string;
     userId: string;
     filename: string;
@@ -131,7 +135,7 @@ export const insertEmailAttachmentIfOrganizationQuotaAllows = async (
     .bind(
       values.id,
       values.emailId,
-      values.organizationId,
+      values.organizationId ?? null,
       values.addressId,
       values.userId,
       values.filename,
@@ -166,7 +170,11 @@ export const insertInboundEmail = async (
   values: {
     id: string;
     addressId: string;
+    organizationId?: string;
     messageId?: string;
+    inReplyTo?: string;
+    references?: string[];
+    agentContext?: AgentInboundContext | null;
     sender?: string;
     from: string;
     to: string;
@@ -188,7 +196,13 @@ export const insertInboundEmail = async (
         INSERT OR IGNORE INTO emails (
           id,
           address_id,
+          organization_id,
           message_id,
+          in_reply_to,
+          references_json,
+          thread_id,
+          direction,
+          delivery_state,
           sender,
           "from",
           "to",
@@ -202,13 +216,17 @@ export const insertInboundEmail = async (
           is_sample,
           received_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'inbound', 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
     .bind(
       values.id,
       values.addressId,
+      values.organizationId ?? null,
       values.messageId ?? null,
+      values.inReplyTo ?? null,
+      JSON.stringify(values.references ?? []),
+      values.agentContext?.threadId ?? null,
       values.sender ?? null,
       values.from,
       values.to,
@@ -223,7 +241,12 @@ export const insertInboundEmail = async (
       values.receivedAt.getTime()
     );
 
-  const insertResults = await db.$client.batch([insertEmailStatement]);
+  const insertResults = await db.$client.batch([
+    insertEmailStatement,
+    ...(values.agentContext
+      ? buildAgentInboundStatements(db.$client, values.id, values.agentContext)
+      : []),
+  ]);
   const inserted = Number(insertResults[0]?.meta?.changes ?? 0) > 0;
 
   if (!inserted) {

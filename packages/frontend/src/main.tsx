@@ -21,6 +21,7 @@ import {
 import { AuthProvider } from "@/features/auth/hooks/use-auth";
 import { TimezoneProvider } from "@/features/timezone/hooks/use-timezone";
 import { AddressManagementPage } from "@/pages/address-management-page";
+import { AgentMailPage } from "@/pages/agent-mail-page";
 import { AdminPage } from "@/pages/admin-page";
 import { HomePage } from "@/pages/home-page";
 import { InboxPage } from "@/pages/inbox-page";
@@ -183,6 +184,11 @@ const routes: RouteObject[] = [
             handle: { title: "Address Management" },
           },
         ],
+      },
+      {
+        path: "agent-mail",
+        element: <AgentMailPage />,
+        handle: { title: "Agent Mail" },
       },
       {
         path: "settings",

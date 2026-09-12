@@ -8,6 +8,7 @@ import {
   UserMultiple02Icon,
   DashboardSquare01Icon,
   Key01Icon,
+  SparklesIcon,
 } from "@/lib/hugeicons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AppLogo } from "@/components/app-logo";
@@ -71,6 +72,11 @@ const navItems: NavItem[] = [
     title: "Addresses",
     to: "/addresses",
     icon: AddressBookIcon,
+  },
+  {
+    title: "Agent Mail",
+    to: "/agent-mail",
+    icon: SparklesIcon,
   },
   {
     title: "Settings",

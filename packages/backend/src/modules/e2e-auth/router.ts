@@ -312,6 +312,7 @@ export const createE2EAuthTestRouter = () => {
     await insertInboundEmail(db, {
       id: emailId,
       addressId: address.id,
+      organizationId: payload.organizationId,
       messageId: `<${emailId}@spinupmail-e2e.test>`,
       sender,
       from,

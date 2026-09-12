@@ -99,3 +99,47 @@ const dispatches = await spinupmail.integrations.listDispatches(
   { page: 1, pageSize: 20 }
 );
 ```
+
+## Agent inbox client
+
+The v1 agent client uses an opaque bearer credential and the shared operation
+contract:
+
+```ts
+import { SpinupMailAgentClient } from "spinupmail/agent";
+
+const agent = new SpinupMailAgentClient();
+const inboxes = await agent.listInboxes();
+const messages = await agent.listMessages({
+  inboxId: inboxes.items[0].id,
+  search: "verification",
+});
+```
+
+It reads these defaults:
+
+- `SPINUPMAIL_AGENT_CREDENTIAL`
+- `SPINUPMAIL_BASE_URL` or `https://api.spinupmail.com`
+- `SPINUPMAIL_ORGANIZATION_ID` or `SPINUPMAIL_ORG_ID`
+
+The SDK generates enrollment credential secrets locally, supports abort signals
+and deadlines, and prevents credential forwarding through unsafe redirects.
+Store the one-time `credentialToken` result immediately; the service stores only
+its hash and cannot recover it.
+
+The package also installs:
+
+- `spinupmail-agent`: one JSON operation envelope from stdin and one JSON result
+  on stdout
+- `spinupmail-mcp`: a local line-delimited stdio MCP server containing only the
+  operation-registry tools marked safe for agents
+
+Supply credentials and enrollment tokens through environment configuration,
+never command arguments. Outbound delivery remains disabled by default and
+requires server, fleet, workspace, domain, entitlement, recipient, suppression,
+and quota gates.
+
+See the repository's
+[agent inbox guide](https://github.com/ridvan/spinupmail/blob/main/docs/agent-inboxes.md)
+and
+[operation examples](https://github.com/ridvan/spinupmail/blob/main/docs/agent-operations.md).

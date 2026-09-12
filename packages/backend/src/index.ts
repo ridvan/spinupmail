@@ -16,11 +16,22 @@ import { createEmailsRouter } from "@/modules/emails/router";
 import { createIntegrationsRouter } from "@/modules/integrations/router";
 import { createE2EAuthTestRouter } from "@/modules/e2e-auth/router";
 import { createExtensionRouter } from "@/modules/extension/router";
+import { createAgentApiRouter } from "@/modules/agent-api/router";
 import { InboundAbuseCounterDurableObject } from "@/modules/inbound-email/abuse-counter";
 import { FixedWindowRateLimiterDurableObject } from "@/shared/rate-limiter";
 import { pruneOperationalEvents } from "@/modules/admin/operational-events";
 import { handleIncomingEmail } from "@/modules/inbound-email/handler";
 import { handleIntegrationDispatchQueueBatch } from "@/modules/integrations/queue";
+import {
+  handleAgentEventQueueBatch,
+  isAgentEventQueueBatch,
+} from "@/modules/agent-api/events";
+import { recoverAgentInboxEvents } from "@/modules/agent-api/recovery";
+import {
+  handleAgentOutboundQueueBatch,
+  isAgentOutboundQueueBatch,
+  recoverAgentSubmissions,
+} from "@/modules/agent-api/sending";
 
 type AppFactoryOptions = {
   createAuthFactory?: typeof createAuth;
@@ -42,6 +53,7 @@ export const createApp = (options: AppFactoryOptions = {}) => {
     app.route("/api", createE2EAuthTestRouter());
   }
   app.route("/api", createAuthHttpRouter());
+  app.route("/api/v1", createAgentApiRouter());
 
   app.use("/api/domains", requireAuth);
   app.use("/api/admin/*", requireAuth);
@@ -94,7 +106,11 @@ export const createWorkerHandler = (options: WorkerHandlerOptions = {}) => {
     fetch: app.fetch,
     email: options.emailHandler ?? handleIncomingEmail,
     queue: (batch: MessageBatch, env: CloudflareBindings) =>
-      queueHandler({ batch, env }),
+      isAgentOutboundQueueBatch(batch)
+        ? handleAgentOutboundQueueBatch({ batch, env })
+        : isAgentEventQueueBatch(batch)
+          ? handleAgentEventQueueBatch({ batch, env })
+          : queueHandler({ batch, env }),
     scheduled: (
       _controller: ScheduledController,
       env: CloudflareBindings,
@@ -105,6 +121,16 @@ export const createWorkerHandler = (options: WorkerHandlerOptions = {}) => {
           console.error("[admin] Failed to prune operational events", {
             error,
           });
+        })
+      );
+      ctx.waitUntil(
+        recoverAgentInboxEvents(env).catch(error => {
+          console.error("[agent-events] Recovery failed", { error });
+        })
+      );
+      ctx.waitUntil(
+        recoverAgentSubmissions(env).catch(error => {
+          console.error("[agent-outbound] Recovery failed", { error });
         })
       );
     },

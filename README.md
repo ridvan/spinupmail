@@ -39,6 +39,14 @@ attachments), and manage everything through a secure Better Auth + Hono API and 
 - Store inbound mail attachments in Cloudflare R2 and download them in UI/API
 - Generate API keys for automation (e.g., test suites)
 - Route inbound email events to integrations for real-time notifications (Telegram provider available)
+- Enroll least-privilege agent principals into persistent, organization-scoped inboxes
+- Search agent messages and RFC-reference threads, create reviewed drafts, and poll durable events through `/api/v1`
+- Use the schema-driven TypeScript agent client, JSON CLI, and local stdio MCP server
+
+Agent inboxes are a controlled-pilot feature. Outbound delivery is disabled by
+default and is not ready for production enablement without the provider,
+security, abuse/legal, billing, pricing, and deployment gates in the
+[pilot runbook](docs/runbooks/agent-pilot.md).
 
 ## Screenshots
 
@@ -63,6 +71,8 @@ attachments), and manage everything through a secure Better Auth + Hono API and 
 - `packages/e2e` — Playwright end-to-end tests
 - `packages/lite-router` — A minimal Cloudflare Email Routing Worker that
   forwards inbound email to signed JSON webhooks for external runtimes.
+- `docs/agent-inboxes.md` — agent trust model, inbox behavior, and sending gates
+- `docs/agent-operations.md` — v1 SDK, CLI, MCP, and authorization reference
 
 ### Backend Source Structure
 
@@ -133,6 +143,23 @@ Create the queue used for integration dispatch jobs:
 pnpm wrangler queues create spinupmail-integration-dispatches
 ```
 
+### Create Optional Agent Queues
+
+Durable D1 polling works without an event queue. To publish agent events and run
+the isolated outbound pilot worker, create separate queues and dead-letter
+queues, then copy the commented bindings from the Wrangler examples:
+
+```bash
+pnpm wrangler queues create spinupmail-agent-events
+pnpm wrangler queues create spinupmail-agent-events-dlq
+pnpm wrangler queues create spinupmail-agent-outbound
+pnpm wrangler queues create spinupmail-agent-outbound-dlq
+```
+
+Keep `AGENT_OUTBOUND_ENABLED="false"`. See
+[`packages/backend/wrangler.outbound.toml.example`](packages/backend/wrangler.outbound.toml.example)
+and the [controlled pilot runbook](docs/runbooks/agent-pilot.md).
+
 ### Durable Objects
 
 This backend already includes the Durable Object binding and migration in
@@ -184,6 +211,10 @@ Edit `packages/backend/wrangler.toml` with the created resource values:
   - `[vars].EMAIL_STORE_HEADERS_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_DB`
   - `[vars].EMAIL_STORE_RAW_IN_R2`
+  - `[vars].AGENT_OUTBOUND_ENABLED` (default and required launch posture: `false`)
+
+The optional `AGENT_PROVIDER_EVENT_SECRET` must be configured with
+`wrangler secret put`, never committed in a Wrangler file.
 
 For local development, create `.dev.vars` file in `packages/backend`. Here is a sample file:
 
@@ -217,6 +248,8 @@ pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
 pnpm exec wrangler secret put GOOGLE_CLIENT_ID
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 # See detailed Google OAuth setup instructions below
+pnpm exec wrangler secret put AGENT_PROVIDER_EVENT_SECRET
+# Only needed for an authorized outbound pilot; use an independent random secret.
 ```
 
 Run each of these commands in the `packages/backend` folder and provide the corresponding value when prompted.

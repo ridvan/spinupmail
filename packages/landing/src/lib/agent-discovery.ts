@@ -25,11 +25,18 @@ export const agentDiscovery = {
 
 const apiDiscoveryBaseUrl =
   agentDiscovery.apiBaseUrl ?? LOCAL_API_PLACEHOLDER_URL;
+const agentApiLinks = {
+  discovery: `${apiDiscoveryBaseUrl}/api/v1/discovery`,
+  openapi: `${apiDiscoveryBaseUrl}/api/v1/openapi.json`,
+  llms: `${apiDiscoveryBaseUrl}/api/v1/llms.txt`,
+} as const;
 
 export const agentLinkHeader = [
   `</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"`,
   `</.well-known/openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json"`,
   `</docs/api-overview>; rel="service-doc"; type="text/html"`,
+  `<${agentApiLinks.openapi}>; rel="service-desc"; type="application/vnd.oai.openapi+json"`,
+  `<${agentApiLinks.llms}>; rel="service-doc"; type="text/plain"`,
 ].join(", ");
 
 export function createApiCatalog() {
@@ -43,12 +50,22 @@ export function createApiCatalog() {
             type: "application/vnd.oai.openapi+json",
             title: "SpinupMail OpenAPI description",
           },
+          {
+            href: agentApiLinks.openapi,
+            type: "application/vnd.oai.openapi+json",
+            title: "SpinupMail Agent Inbox API",
+          },
         ],
         "service-doc": [
           {
             href: absoluteUrl(agentDiscovery.docsPath),
             type: "text/html",
             title: "SpinupMail API documentation",
+          },
+          {
+            href: agentApiLinks.llms,
+            type: "text/plain",
+            title: "SpinupMail agent integration guide",
           },
         ],
         status: [
@@ -325,6 +342,7 @@ export function createOpenApiDocument() {
       description: "SpinupMail API documentation",
       url: absoluteUrl(landingLinks.apiDocs),
     },
+    "x-spinupmail-agent-api": agentApiLinks,
   };
 }
 
@@ -345,6 +363,9 @@ SpinupMail gives teams temporary inboxes, API access, TTL controls, sender polic
 - API catalog: ${absoluteUrl(agentDiscovery.apiCatalogPath)}
 - OpenAPI description: ${absoluteUrl(agentDiscovery.openApiPath)}
 - API documentation: ${absoluteUrl(agentDiscovery.docsPath)}
+- Agent API discovery: ${agentApiLinks.discovery}
+- Agent API OpenAPI: ${agentApiLinks.openapi}
+- Agent integration guide: ${agentApiLinks.llms}
 - GitHub repository: ${landingLinks.github}
 - App: ${landingLinks.app}
 

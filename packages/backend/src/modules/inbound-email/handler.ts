@@ -4,6 +4,10 @@ import type {
 } from "@cloudflare/workers-types";
 import { recordOperationalEventSafely } from "@/modules/admin/operational-events";
 import { dispatchEmailReceivedEvent } from "@/modules/integrations/service";
+import {
+  parseRfcReferences,
+  prepareAgentInboundContext,
+} from "@/modules/agent-api/ingest";
 import { getDb } from "@/platform/db/client";
 import {
   EMAIL_BODY_MAX_BYTES_DEFAULT,
@@ -388,6 +392,23 @@ export const handleIncomingEmail = async (
     const senderValue = parseSenderIdentity(senderHeaderValue)?.formatted;
     const fromValue = message.from ?? "unknown";
     const toValue = message.to || recipient;
+    const subject = message.headers.get("subject") ?? null;
+    const inReplyTo =
+      parseRfcReferences(message.headers.get("in-reply-to")).at(-1) ?? null;
+    const references = parseRfcReferences(message.headers.get("references"));
+    const agentContext = env.SUM_DB
+      ? await prepareAgentInboundContext({
+          db: env.SUM_DB,
+          organizationId,
+          inboxId: addressRow.id,
+          emailId,
+          messageId,
+          inReplyTo,
+          references,
+          subject,
+          receivedAt: receivedAt.getTime(),
+        })
+      : null;
 
     let inboxSlotReserved = false;
     let reservationDecision = "reserved";
@@ -552,11 +573,15 @@ export const handleIncomingEmail = async (
       insertResult = await insertInboundEmail(db, {
         id: emailId,
         addressId: addressRow.id,
+        organizationId,
         messageId: messageId ?? undefined,
+        inReplyTo: inReplyTo ?? undefined,
+        references,
+        agentContext,
         sender: senderValue,
         from: fromValue,
         to: toValue,
-        subject: message.headers.get("subject") ?? undefined,
+        subject: subject ?? undefined,
         headers: headersJson,
         bodyHtml,
         bodyText,

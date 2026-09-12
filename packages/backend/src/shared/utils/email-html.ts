@@ -643,6 +643,15 @@ export const sanitizeEmailHtml = async (html: string) => {
   });
 };
 
+export const sanitizeEmailHtmlForAgent = async (html: string) => {
+  const sanitized = await sanitizeEmailHtml(html);
+  return transformHtmlDocument(sanitized, {
+    allowRemoteUrls: false,
+    rewriteUrl: value =>
+      isRemoteUrl(value.trim().toLowerCase()) ? null : value,
+  });
+};
+
 export const rewriteEmailHtmlForRendering = (
   html: string,
   attachments: InlineAttachment[]

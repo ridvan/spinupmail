@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export * from "./agent-operations";
+export * from "./agent-openapi";
+export * from "./agent-resources";
+
 export const apiErrorSchema = z.object({
   error: z.string().min(1),
   details: z.string().min(1).optional(),
