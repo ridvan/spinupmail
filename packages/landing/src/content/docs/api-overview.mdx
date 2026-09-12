@@ -29,6 +29,11 @@ Product endpoints accept either of these auth modes:
 - A Better Auth session cookie for browser-based requests
 - An API key sent in `X-API-Key` for automation and test tooling
 
+The versioned agent inbox surface under `/api/v1` uses opaque bearer credentials
+with an embedded organization scope. Human oversight routes continue to use a
+verified Better Auth session. See [Agent inboxes](/docs/agent-inboxes) for the
+enrollment, capability, SDK, CLI, MCP, and outbound-safety model.
+
 <Callout tone="info" title="Email verification still matters">
   Protected product endpoints reject authenticated users whose email is not
   verified.
@@ -58,6 +63,16 @@ Key reference pages:
 - [Email addresses](/docs/api-email-addresses)
 - [Emails](/docs/api-emails)
 - [Integrations](/docs/integrations)
+- [Agent inboxes](/docs/agent-inboxes)
+
+Versioned agent clients can discover the live contract from the backend itself:
+
+- `GET /api/v1/discovery`
+- `GET /api/v1/openapi.json`
+- `GET /api/v1/llms.txt`
+
+These three documents are public; every agent resource operation remains
+authenticated.
 
 ## Health check
 

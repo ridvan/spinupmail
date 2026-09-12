@@ -94,6 +94,37 @@ Please keep testing controlled and proportional:
 If you accidentally access sensitive data, stop immediately and include that in
 your report.
 
+## Agent Inbox Security
+
+The `/api/v1` agent surface adds long-lived service principals and untrusted
+email content to the existing organization boundary. Reports are especially
+useful when they demonstrate any of these failures:
+
+- Recovering an enrollment or credential secret from the database, API, logs,
+  audit rows, UI, CLI arguments, or MCP tool inputs
+- Reusing an enrollment, escalating a capability, bypassing expiry/revocation,
+  or accessing an inbox outside a credential's grants
+- Reading raw MIME or R2 attachments across an organization or inbox boundary
+- Replaying an idempotency key with changed input, duplicating a submission, or
+  automatically resending a provider call whose outcome is uncertain
+- Approving one draft and sending changed recipients, headers, body, or RFC
+  references
+- Regressing a terminal delivery state with a late provider event or bypassing
+  suppression, quota, workspace, domain, fleet, or environment switches
+- Exposing human-only enrollment, credential, approval, policy, entitlement, or
+  operator controls through agent credentials or MCP
+
+Use only inboxes, recipients, domains, provider accounts, and credentials you
+are authorized to test. Do not send unsolicited mail or trigger real complaints
+to prove a report. Redact bearer/enrollment secrets, addresses, message content,
+attachments, and provider payloads; stable request and resource IDs are usually
+enough to correlate evidence.
+
+Operators should keep `AGENT_OUTBOUND_ENABLED="false"` until every launch gate
+in [`docs/runbooks/agent-pilot.md`](docs/runbooks/agent-pilot.md) has dated
+evidence. An uncertain provider result is an incident state, not permission to
+retry.
+
 ## Self-Hosted Deployments
 
 SpinupMail is self-hosted, so some security issues belong to the deployment

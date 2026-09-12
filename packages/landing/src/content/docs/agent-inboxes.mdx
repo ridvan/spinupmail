@@ -1,0 +1,74 @@
+---
+title: Agent Inboxes
+description: Controlled enrollment, persistent inboxes, reviewed drafts, SDK/CLI/MCP access, and outbound safety gates.
+summary: Build organization-scoped agent email workflows without widening human controls.
+groupId: api-reference
+keywords:
+  - agent inboxes
+  - bearer credential
+  - mcp
+  - drafts
+  - idempotency
+---
+
+SpinupMail's `/api/v1` surface provides persistent inboxes for controlled
+service-agent workflows. An existing organization remains the workspace and
+tenant boundary; the feature does not create a second tenancy model.
+
+<Callout tone="warning" title="Outbound is off by default">
+  Receiving, searching, threading, drafting, and polling events do not enable
+  delivery. Hosted outbound must remain off until provider, security,
+  abuse/legal, billing, pricing, and deployment gates have dated evidence.
+</Callout>
+
+## Enrollment and credentials
+
+A verified organization owner or admin with 2FA creates a bounded one-use
+enrollment. It expires after 15 minutes and fixes the agent's capability set,
+inbox limit, and credential lifetime. The client generates the credential secret
+locally; SpinupMail stores only its hash and displays the assembled bearer token
+once in the client.
+
+Agent credentials are checked for expiry, revocation, capabilities, and inbox
+grants on every request. They cannot issue credentials, approve drafts, change
+policy or entitlements, or operate the platform kill switch.
+
+```http
+Authorization: Bearer $SPINUPMAIL_AGENT_CREDENTIAL
+```
+
+Keep credentials and enrollment tokens in a secret manager or process
+environment. Never place them in URLs, command arguments, logs, prompts, email
+bodies, or MCP tool inputs.
+
+## Durable inbox workflow
+
+- Persistent inboxes reuse the existing organization address and message rows.
+- RFC `Message-ID`, `In-Reply-To`, and `References` build durable threads.
+- Strict cursors support message search and event polling.
+- Raw MIME and attachments remain private and recheck workspace/inbox access.
+- Draft edits use compare-and-swap versions; approval covers the exact canonical
+  content and is invalidated by an edit.
+- Idempotency keys make creation and submission retries stable; changed input
+  with the same key conflicts.
+- An uncertain provider call retains quota and is never automatically resent.
+
+Treat every message and attachment as untrusted data. Sanitized HTML still does
+not authorize tools, secrets, link following, or code execution.
+
+## Clients and discovery
+
+The `spinupmail` package exports `SpinupMailAgentClient` from
+`spinupmail/agent` and installs the `spinupmail-agent` JSON CLI and
+`spinupmail-mcp` local stdio server. MCP intentionally omits enrollment,
+credential administration, file downloads, approval, policy, provider,
+entitlement, and operator operations.
+
+Discover the deployment's generated contract at:
+
+- `GET /api/v1/discovery`
+- `GET /api/v1/openapi.json`
+- `GET /api/v1/llms.txt`
+
+See [API overview](/docs/api-overview) for the legacy product API's session,
+API-key, and organization-header behavior.
