@@ -11,6 +11,17 @@ import type {
   AdminUserActionRequest,
   AdminUserDetailResponse,
   AddressIntegration,
+  AgentCapabilitiesResponse,
+  AgentCredentialListResponse,
+  AgentDraftListResponse,
+  AgentFleetControlResponse,
+  AgentInboxListResponse,
+  AgentPrincipalListResponse,
+  AgentSendingPolicyResponse,
+  AgentSubmissionListResponse,
+  AgentThreadListResponse,
+  AgentThreadResponse,
+  AgentUsageResponse,
   CreateIntegrationRequest,
   DeleteIntegrationResponse,
   IntegrationDispatch,
@@ -99,6 +110,26 @@ const apiFetch = async <T>(
     throw new Error(message || "Request failed");
   }
 
+  return (await response.json()) as T;
+};
+
+const agentApiFetch = async <T>(
+  path: string,
+  init?: RequestInit,
+  organizationId?: string | null
+) => {
+  const response = await fetch(resolveApiUrl(path), {
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      ...(organizationId ? { "X-Org-Id": organizationId } : {}),
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response));
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 };
 
@@ -888,3 +919,207 @@ export const downloadEmailAttachment = async (params: {
     objectUrlApi.revokeObjectURL(url);
   }, 100);
 };
+
+const generatedSecret = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+};
+
+export const getAgentCapabilities = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentCapabilitiesResponse>(
+    "/api/v1/capabilities",
+    { signal },
+    organizationId
+  );
+
+export const createAgentEnrollment = async (
+  input: {
+    name: string;
+    capabilities: string[];
+    inboxLimit: number;
+    credentialExpiresInDays: number;
+  },
+  organizationId: string
+) => {
+  const enrollmentId = crypto.randomUUID();
+  const enrollmentSecret = generatedSecret();
+  const response = await agentApiFetch<{
+    enrollment: { id: string; expiresAt: number };
+  }>(
+    "/api/v1/enrollments",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": `enrollment-${enrollmentId}` },
+      body: JSON.stringify({ enrollmentId, enrollmentSecret, ...input }),
+    },
+    organizationId
+  );
+  return {
+    ...response,
+    enrollmentToken: `smenr_v1_${enrollmentId}.${enrollmentSecret}`,
+  };
+};
+
+export const listAgentPrincipals = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentPrincipalListResponse>(
+    "/api/v1/agents",
+    { signal },
+    organizationId
+  );
+
+export const listAgentCredentials = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentCredentialListResponse>(
+    "/api/v1/credentials",
+    { signal },
+    organizationId
+  );
+
+export const revokeAgentPrincipal = (id: string, organizationId: string) =>
+  agentApiFetch<void>(
+    `/api/v1/agents/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+    organizationId
+  );
+
+export const revokeAgentCredential = (id: string, organizationId: string) =>
+  agentApiFetch<void>(
+    `/api/v1/credentials/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+    organizationId
+  );
+
+export const listAgentInboxes = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentInboxListResponse>(
+    "/api/v1/inboxes?limit=100",
+    { signal },
+    organizationId
+  );
+
+export const listAgentThreads = (
+  inboxId: string,
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentThreadListResponse>(
+    `/api/v1/threads?inboxId=${encodeURIComponent(inboxId)}&limit=100`,
+    { signal },
+    organizationId
+  );
+
+export const getAgentThread = (
+  threadId: string,
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentThreadResponse>(
+    `/api/v1/threads/${encodeURIComponent(threadId)}`,
+    { signal },
+    organizationId
+  );
+
+export const listAgentDrafts = (
+  inboxId: string,
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentDraftListResponse>(
+    `/api/v1/drafts?inboxId=${encodeURIComponent(inboxId)}&limit=100`,
+    { signal },
+    organizationId
+  );
+
+export const approveAgentDraft = (
+  draftId: string,
+  version: number,
+  organizationId: string
+) =>
+  agentApiFetch<{ draft: unknown }>(
+    `/api/v1/drafts/${encodeURIComponent(draftId)}/approve`,
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": `approve-${draftId}-${version}`,
+      },
+      body: JSON.stringify({ version }),
+    },
+    organizationId
+  );
+
+export const listAgentSubmissions = (
+  inboxId: string,
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentSubmissionListResponse>(
+    `/api/v1/submissions?inboxId=${encodeURIComponent(inboxId)}&limit=100`,
+    { signal },
+    organizationId
+  );
+
+export const getAgentSendingPolicy = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentSendingPolicyResponse>(
+    "/api/v1/sending-policy",
+    { signal },
+    organizationId
+  );
+
+export const updateAgentSendingPolicy = (
+  input: {
+    sendingEnabled: boolean;
+    recipientRules: Array<{ kind: "address" | "domain"; value: string }>;
+  },
+  organizationId: string
+) =>
+  agentApiFetch<{ ok: true }>(
+    "/api/v1/sending-policy",
+    { method: "PUT", body: JSON.stringify(input) },
+    organizationId
+  );
+
+export const getAgentUsage = (organizationId: string, signal?: AbortSignal) =>
+  agentApiFetch<AgentUsageResponse>(
+    "/api/v1/usage",
+    { signal },
+    organizationId
+  );
+
+export const getAgentFleetControl = (
+  organizationId: string,
+  signal?: AbortSignal
+) =>
+  agentApiFetch<AgentFleetControlResponse>(
+    "/api/v1/operator/fleet",
+    { signal },
+    organizationId
+  );
+
+export const updateAgentFleetControl = (
+  sendingEnabled: boolean,
+  organizationId: string
+) =>
+  agentApiFetch<AgentFleetControlResponse>(
+    "/api/v1/operator/fleet",
+    { method: "PUT", body: JSON.stringify({ sendingEnabled }) },
+    organizationId
+  );
