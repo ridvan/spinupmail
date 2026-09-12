@@ -28,7 +28,7 @@ describe("SpinupMailAgentClient", () => {
       .fn<typeof fetch>()
       .mockResolvedValue(json({ inbox }, { status: 201 }));
     const client = new SpinupMailAgentClient({
-      baseUrl: "https://api.spinupmail.test/",
+      baseUrl: "https://api.spinupmail.test////",
       credential: "smai_v1_test.secret",
       fetch: fetchMock,
     });

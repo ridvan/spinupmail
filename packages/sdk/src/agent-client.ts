@@ -71,7 +71,11 @@ export type EnrollAgentResult = {
 const env = (name: string) =>
   typeof process === "undefined" ? undefined : process.env[name];
 
-const trimBaseUrl = (value: string) => value.replace(/\/+$/, "");
+const trimBaseUrl = (value: string) => {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+};
 
 const secretToBase64Url = (bytes: Uint8Array) => {
   let binary = "";
