@@ -40,7 +40,6 @@ const MAX_RECEIVED_EMAILS_PER_ORGANIZATION_DEFAULT = 1_000;
 const MAX_RECEIVED_EMAILS_PER_ADDRESS_DEFAULT = 100;
 const MAX_INTEGRATIONS_PER_ORGANIZATION_DEFAULT = 3;
 const MAX_INTEGRATION_DISPATCHES_PER_ORGANIZATION_PER_DAY_DEFAULT = 100;
-const CLOUDFLARE_KV_MINIMUM_TTL_SECONDS = 60;
 const API_KEY_RATE_LIMIT_WINDOW_DEFAULT = 60;
 const API_KEY_RATE_LIMIT_MAX_DEFAULT = 120;
 const AUTH_RATE_LIMIT_WINDOW_DEFAULT = 60;
@@ -63,9 +62,6 @@ const firstNonBlank = (...values: Array<string | null | undefined>) => {
 
   return undefined;
 };
-
-const clampKvBackedRateLimitWindow = (windowSeconds: number) =>
-  Math.max(windowSeconds, CLOUDFLARE_KV_MINIMUM_TTL_SECONDS);
 
 export const getAllowedOrigins = (env: CloudflareBindings) => {
   const configured = env.CORS_ORIGIN?.split(",")
@@ -280,16 +276,14 @@ export const getAuthRateLimitConfig = (
     | "AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX"
   >
 ) => ({
-  window: clampKvBackedRateLimitWindow(
+  window:
     parsePositiveInteger(env?.AUTH_RATE_LIMIT_WINDOW?.trim()) ??
-      AUTH_RATE_LIMIT_WINDOW_DEFAULT
-  ),
+    AUTH_RATE_LIMIT_WINDOW_DEFAULT,
   max: parsePositiveInteger(env?.AUTH_RATE_LIMIT_MAX?.trim()),
   changeEmail: {
-    window: clampKvBackedRateLimitWindow(
+    window:
       parsePositiveInteger(env?.AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW?.trim()) ??
-        AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT
-    ),
+      AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW_DEFAULT,
     max:
       parsePositiveInteger(env?.AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX?.trim()) ??
       AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX_DEFAULT,
@@ -302,10 +296,9 @@ export const getApiKeyUsageRateLimitConfig = (
     "API_KEY_RATE_LIMIT_WINDOW" | "API_KEY_RATE_LIMIT_MAX"
   >
 ) => ({
-  window: clampKvBackedRateLimitWindow(
+  window:
     parsePositiveInteger(env?.API_KEY_RATE_LIMIT_WINDOW?.trim()) ??
-      API_KEY_RATE_LIMIT_WINDOW_DEFAULT
-  ),
+    API_KEY_RATE_LIMIT_WINDOW_DEFAULT,
   max:
     parsePositiveInteger(env?.API_KEY_RATE_LIMIT_MAX?.trim()) ??
     API_KEY_RATE_LIMIT_MAX_DEFAULT,

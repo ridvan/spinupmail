@@ -50,21 +50,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^10.8.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.1",
-    "globals": "^17.9.0",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
+    "globals": "^17.12.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
-    "lint-staged": "^17.3.0",
+    "lint-staged": "^17.5.1",
     "prettier": "^3.9.6",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.66.0",
-    "vitest": "^4.1.10"
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^4.1.11"
   },
   "lint-staged": {
     "packages/{backend,frontend,extension,sdk,lite-router}/**/*.{js,mjs,cjs,ts,tsx}": [
@@ -79,12 +79,5 @@
     "**/*.{js,mjs,cjs,ts,tsx,jsx,json,css,md,html}": [
       "prettier --write --ignore-unknown"
     ]
-  },
-  "pnpm": {
-    "overrides": {
-      "drizzle-orm": "^0.45.2",
-      "hono": "4.13.1",
-      "kysely": "0.29.4"
-    }
   }
 }

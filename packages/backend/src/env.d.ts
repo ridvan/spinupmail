@@ -7,6 +7,7 @@ declare global {
     AUTH_ALLOWED_EMAIL_DOMAIN?: string;
     AUTH_RATE_LIMIT_MAX?: string;
     AUTH_RATE_LIMIT_WINDOW?: string;
+    BETTER_AUTH_BASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
     CORS_ORIGIN?: string;
     DASHBOARD_BASE_URL?: string;
@@ -20,6 +21,9 @@ declare global {
     EMAIL_STORE_RAW_IN_DB?: string;
     EMAIL_STORE_RAW_IN_R2?: string;
     FORCED_MAIL_PREFIX?: string;
+    EXTENSION_REDIRECT_ORIGINS?: string;
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
     INTEGRATION_DISPATCH_QUEUE?: Queue<unknown>;
     INTEGRATION_QUEUE_BASE_DELAY_SECONDS?: string;
     INTEGRATION_QUEUE_JITTER_SECONDS?: string;
@@ -35,7 +39,9 @@ declare global {
     OPERATIONAL_EVENT_NOISY_RATE_LIMIT_MAX?: string;
     OPERATIONAL_EVENT_NOISY_RATE_LIMIT_WINDOW_SECONDS?: string;
     OPERATIONAL_EVENT_RETENTION_DAYS?: string;
+    RESEND_API_KEY?: string;
     RESEND_FROM_EMAIL?: string;
+    TURNSTILE_SECRET_KEY?: string;
   }
 }
 

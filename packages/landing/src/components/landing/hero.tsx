@@ -265,18 +265,6 @@ export function Hero() {
               </span>
             ))}
           </div>
-
-          <p className="mt-4 text-center font-mono text-[11px] text-muted-foreground/70">
-            scaffolded with{" "}
-            <a
-              href="https://github.com/zpg6/better-auth-cloudflare"
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-dotted underline-offset-3 hover:text-foreground"
-            >
-              better-auth-cloudflare
-            </a>
-          </p>
         </motion.div>
       </div>
     </section>

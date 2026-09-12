@@ -2,7 +2,6 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import mdx from "@mdx-js/rollup";
@@ -101,7 +100,6 @@ const config = defineConfig({
   plugins: [
     docsMarkdownPlugin(),
     cloudflare({ viteEnvironment: { name: "ssr" } }),
-    devtools(),
     tailwindcss(),
     mdxPlugin,
     tanstackStart(),

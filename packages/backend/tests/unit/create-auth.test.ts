@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const betterAuthMock = vi.fn((options: unknown) => options);
-const withCloudflareMock = vi.fn(
-  (_bindings: unknown, options: Record<string, unknown>) => options
-);
 const drizzleAdapterMock = vi.fn(() => ({ adapter: "drizzle" }));
 const apiKeyMock = vi.fn((configuration: unknown) => ({
   id: "api-key",
@@ -12,10 +9,6 @@ const apiKeyMock = vi.fn((configuration: unknown) => ({
 
 vi.mock("better-auth", () => ({
   betterAuth: betterAuthMock,
-}));
-
-vi.mock("better-auth-cloudflare", () => ({
-  withCloudflare: withCloudflareMock,
 }));
 
 vi.mock("better-auth/adapters/drizzle", () => ({
@@ -31,6 +24,7 @@ type AuthWithApiKeyPluginConfig = {
     id?: string;
   }>;
   rateLimit?: {
+    storage?: string;
     customRules?: {
       "/sign-in/email"?:
         | {
@@ -107,7 +101,6 @@ const assertApiKeyPluginConfig = (
   const apiKeyPluginConfiguration = apiKeyMock.mock.calls.at(-1)?.[0] as
     | {
         storage?: string;
-        fallbackToDatabase?: boolean;
         rateLimit?: {
           enabled?: boolean;
           timeWindow?: number;
@@ -122,8 +115,8 @@ const assertApiKeyPluginConfig = (
     timeWindow: expected.timeWindow,
     maxRequests: expected.maxRequests,
   });
-  expect(apiKeyPluginConfiguration?.storage).toBe("secondary-storage");
-  expect(apiKeyPluginConfiguration?.fallbackToDatabase).toBe(true);
+  expect(apiKeyPluginConfiguration?.storage).toBe("database");
+  expect(auth.rateLimit?.storage).toBe("database");
   expect(
     resolveRateLimitRule(auth.rateLimit?.customRules?.["/sign-in/email"], {
       window: 10,
@@ -158,7 +151,6 @@ describe("createAuth", () => {
   beforeEach(() => {
     vi.resetModules();
     betterAuthMock.mockClear();
-    withCloudflareMock.mockClear();
     drizzleAdapterMock.mockClear();
     apiKeyMock.mockClear();
   });
@@ -381,6 +373,72 @@ describe("createAuth", () => {
     expect(auth.rateLimit?.enabled).toBe(false);
   });
 
+  it("configures Cloudflare request metadata without secondary storage", async () => {
+    const { createAuth } = await import("@/platform/auth/create-auth");
+
+    const auth = createAuth(
+      {} as CloudflareBindings,
+      {
+        timezone: "Europe/Istanbul",
+        city: "Istanbul",
+        country: "TR",
+        region: "Istanbul",
+        regionCode: "34",
+        colo: "IST",
+        latitude: "41.0082",
+        longitude: "28.9784",
+      } as IncomingRequestCfProperties
+    ) as {
+      advanced?: {
+        ipAddress?: { ipAddressHeaders?: string[] };
+      };
+      session?: {
+        storeSessionInDatabase?: boolean;
+        additionalFields?: Record<string, unknown>;
+      };
+      databaseHooks?: {
+        session?: {
+          create?: {
+            before?: (session: Record<string, unknown>) => Promise<{
+              data: Record<string, unknown>;
+            }>;
+          };
+        };
+      };
+    };
+
+    expect(auth.advanced?.ipAddress?.ipAddressHeaders).toEqual([
+      "cf-connecting-ip",
+      "x-real-ip",
+    ]);
+    expect(auth.session?.storeSessionInDatabase).toBe(true);
+    expect(Object.keys(auth.session?.additionalFields ?? {})).toEqual([
+      "timezone",
+      "city",
+      "country",
+      "region",
+      "regionCode",
+      "colo",
+      "latitude",
+      "longitude",
+    ]);
+
+    const result = await auth.databaseHooks?.session?.create?.before?.({
+      id: "session-1",
+    });
+    expect(result?.data).toMatchObject({
+      id: "session-1",
+      timezone: "Europe/Istanbul",
+      city: "Istanbul",
+      country: "TR",
+      region: "Istanbul",
+      regionCode: "34",
+      colo: "IST",
+      latitude: "41.0082",
+      longitude: "28.9784",
+    });
+  });
+
   it("applies Better Auth rate limit overrides from env", async () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
 
@@ -471,7 +529,7 @@ describe("createAuth", () => {
     });
   });
 
-  it("clamps short KV-backed auth windows before passing them to Better Auth", async () => {
+  it("preserves short database-backed auth windows", async () => {
     const { createAuth } = await import("@/platform/auth/create-auth");
 
     const auth = createAuth({
@@ -519,14 +577,14 @@ describe("createAuth", () => {
       };
     };
 
-    expect(auth.rateLimit?.window).toBe(60);
+    expect(auth.rateLimit?.window).toBe(10);
     expect(
       resolveRateLimitRule(auth.rateLimit?.customRules?.["/sign-in/email"], {
         window: 10,
         max: 100,
       })
     ).toEqual({
-      window: 60,
+      window: 10,
       max: 100,
     });
     expect(
@@ -535,21 +593,21 @@ describe("createAuth", () => {
         max: 100,
       })
     ).toEqual({
-      window: 60,
+      window: 10,
       max: 100,
     });
     expect(auth.rateLimit?.customRules?.["/change-email"]).toEqual({
-      window: 60,
+      window: 30,
       max: 2,
     });
     expect(auth.rateLimit?.customRules?.["/get-session"]).toEqual({
-      window: 60,
+      window: 15,
       max: 120,
     });
     expect(
       auth.rateLimit?.customRules?.["/organization/get-full-organization"]
     ).toEqual({
-      window: 60,
+      window: 15,
       max: 120,
     });
   });

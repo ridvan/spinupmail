@@ -131,14 +131,13 @@ export const TwoFactorPanel = ({
         throw new Error(result.error.message || "Unable to start 2FA setup");
       }
 
-      const totpURI = result.data?.totpURI;
-      if (!totpURI) {
+      if (!result.data || result.data.method !== "totp") {
         throw new Error("Missing TOTP setup URI");
       }
 
       return {
-        totpURI,
-        backupCodes: result.data?.backupCodes ?? [],
+        totpURI: result.data.totpURI,
+        backupCodes: result.data.backupCodes,
       };
     },
     onSuccess: ({ backupCodes, totpURI }) => {

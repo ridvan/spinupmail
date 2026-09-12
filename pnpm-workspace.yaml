@@ -1,2 +1,14 @@
 packages:
   - "packages/*"
+overrides:
+  drizzle-orm: ^0.45.2
+  hono: 4.13.7
+  kysely: 0.29.4
+peerDependencyRules:
+  allowedVersions:
+    eslint: ^10.0.0
+allowBuilds:
+  esbuild: true
+  msw: false
+  prisma: false
+  workerd: true

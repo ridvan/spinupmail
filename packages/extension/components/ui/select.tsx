@@ -9,7 +9,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const Select = SelectPrimitive.Root;
 
 export function SelectValue(props: SelectPrimitive.Value.Props) {

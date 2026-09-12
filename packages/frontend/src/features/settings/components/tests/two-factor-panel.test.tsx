@@ -127,7 +127,7 @@ describe("TwoFactorPanel", () => {
 
     const { unmount } = renderTwoFactorPanel();
     expect(screen.getByText("Regenerate backup codes")).toBeTruthy();
-    expect(screen.getByText("Disable 2FA")).toBeTruthy();
+    expect(screen.getByText("Disable 2FA", { selector: "p" })).toBeTruthy();
 
     unmount();
 
@@ -143,6 +143,7 @@ describe("TwoFactorPanel", () => {
     mockedEnable.mockResolvedValue({
       error: null,
       data: {
+        method: "totp",
         totpURI: "otpauth://totp/Spinupmail:Jane?secret=ABCDEF",
         backupCodes: ["code-one", "code-two"],
       },

@@ -1,12 +1,10 @@
 import type {
   D1Database,
   IncomingRequestCfProperties,
-  KVNamespace,
 } from "@cloudflare/workers-types";
 import type { WorkerExecutionContext } from "@/shared/worker-context";
 import { betterAuth } from "better-auth";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
-import { withCloudflare } from "better-auth-cloudflare";
 import { apiKey } from "@better-auth/api-key";
 import { captcha, openAPI, testUtils } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
@@ -89,6 +87,17 @@ const verifyPasswordWithNodeCrypto = async ({
   }
 };
 
+const getCloudflareGeolocation = (cf?: IncomingRequestCfProperties) => ({
+  timezone: cf?.timezone,
+  city: cf?.city,
+  country: cf?.country,
+  region: cf?.region,
+  regionCode: cf?.regionCode,
+  colo: cf?.colo,
+  latitude: cf?.latitude,
+  longitude: cf?.longitude,
+});
+
 function createAuth(
   env?: CloudflareBindings,
   cf?: IncomingRequestCfProperties,
@@ -127,197 +136,203 @@ function createAuth(
   const sendResetPassword = enableE2ETestUtils
     ? async () => undefined
     : createResendResetPasswordEmailSender(env);
+  const database =
+    env && db
+      ? drizzleAdapter(db, {
+          provider: "sqlite",
+          usePlural: true,
+          debugLogs: false,
+        })
+      : drizzleAdapter({} as D1Database, {
+          provider: "sqlite",
+          usePlural: true,
+          debugLogs: false,
+        });
 
   return betterAuth({
     secret: env?.BETTER_AUTH_SECRET,
     baseURL: env?.BETTER_AUTH_BASE_URL,
-    ...withCloudflare(
-      {
-        autoDetectIpAddress: true,
-        geolocationTracking: true,
-        cf: cf || {},
-        d1:
-          env && db
-            ? {
-                db,
-                options: {
-                  usePlural: true,
-                  debugLogs: false,
-                },
-              }
-            : undefined,
-        kv: env?.SUM_KV as KVNamespace | undefined,
+    database,
+    appName: APP_NAME,
+    trustedOrigins:
+      trustedOrigins && trustedOrigins.length > 0
+        ? trustedOrigins
+        : ["http://localhost:5173", "http://127.0.0.1:5173"],
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+      customSyntheticUser: ({ coreFields, additionalFields, id }) => ({
+        ...coreFields,
+        role: "user",
+        banned: false,
+        banReason: null,
+        banExpires: null,
+        ...additionalFields,
+        id,
+      }),
+      sendResetPassword,
+      revokeSessionsOnPasswordReset: true,
+      password: {
+        hash: hashPasswordWithNodeCrypto,
+        verify: verifyPasswordWithNodeCrypto,
       },
-      {
-        appName: APP_NAME,
-        trustedOrigins:
-          trustedOrigins && trustedOrigins.length > 0
-            ? trustedOrigins
-            : ["http://localhost:5173", "http://127.0.0.1:5173"],
-        emailAndPassword: {
-          enabled: true,
-          requireEmailVerification: true,
-          customSyntheticUser: ({ coreFields, additionalFields, id }) => ({
-            ...coreFields,
-            role: "user",
-            banned: false,
-            banReason: null,
-            banExpires: null,
-            ...additionalFields,
-            id,
-          }),
-          sendResetPassword,
-          revokeSessionsOnPasswordReset: true,
-          password: {
-            hash: hashPasswordWithNodeCrypto,
-            verify: verifyPasswordWithNodeCrypto,
-          },
-        },
-        emailVerification: {
-          autoSignInAfterVerification: true,
-          sendVerificationEmail,
-          sendOnSignUp: true,
-          sendOnSignIn: false,
-        },
-        socialProviders: hasGoogleOAuth
-          ? {
-              google: {
-                clientId: googleClientId!,
-                clientSecret: googleClientSecret!,
-                prompt: "select_account",
-                accessType: "offline",
-                hd: authAllowedEmailDomain,
-                mapProfileToUser: profile => {
-                  if (typeof profile.email === "string") {
-                    assertAllowedAuthEmailDomain(profile.email, env);
-                  }
+    },
+    emailVerification: {
+      autoSignInAfterVerification: true,
+      sendVerificationEmail,
+      sendOnSignUp: true,
+      sendOnSignIn: false,
+    },
+    socialProviders: hasGoogleOAuth
+      ? {
+          google: {
+            clientId: googleClientId!,
+            clientSecret: googleClientSecret!,
+            prompt: "select_account",
+            accessType: "offline",
+            hd: authAllowedEmailDomain,
+            mapProfileToUser: profile => {
+              if (typeof profile.email === "string") {
+                assertAllowedAuthEmailDomain(profile.email, env);
+              }
 
-                  return {};
-                },
+              return {};
+            },
+          },
+        }
+      : undefined,
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip", "x-real-ip"],
+      },
+      ...(executionContext
+        ? {
+            backgroundTasks: {
+              handler: (promise: Promise<unknown>) => {
+                executionContext.waitUntil(promise);
               },
-            }
-          : undefined,
-        ...(executionContext
-          ? {
-              advanced: {
-                backgroundTasks: {
-                  handler: (promise: Promise<unknown>) => {
-                    executionContext.waitUntil(promise);
-                  },
-                },
-              },
-            }
-          : {}),
-        session: {
-          cookieCache: {
-            enabled: true,
-            maxAge: 60,
-          },
+            },
+          }
+        : {}),
+    },
+    session: {
+      storeSessionInDatabase: true,
+      cookieCache: {
+        enabled: true,
+        maxAge: 60,
+      },
+      additionalFields: {
+        timezone: { type: "string", required: false, input: false },
+        city: { type: "string", required: false, input: false },
+        country: { type: "string", required: false, input: false },
+        region: { type: "string", required: false, input: false },
+        regionCode: { type: "string", required: false, input: false },
+        colo: { type: "string", required: false, input: false },
+        latitude: { type: "string", required: false, input: false },
+        longitude: { type: "string", required: false, input: false },
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async session => ({
+            data: {
+              ...session,
+              ...getCloudflareGeolocation(cf),
+            },
+          }),
         },
-        user: {
-          changeEmail: {
-            enabled: true,
-          },
-          additionalFields: {
-            normalizedEmail: {
-              type: "string",
-              required: false,
-              unique: true,
-              input: false,
-              returned: false,
-            },
-            timezone: {
-              type: "string",
-              required: false,
-              input: true,
-              returned: true,
-            },
-          },
+      },
+    },
+    user: {
+      changeEmail: {
+        enabled: true,
+      },
+      additionalFields: {
+        normalizedEmail: {
+          type: "string",
+          required: false,
+          unique: true,
+          input: false,
+          returned: false,
         },
-        plugins: [
-          ...(enableE2ETestUtils ? [testUtils()] : []),
-          captcha({
-            provider: "cloudflare-turnstile",
-            secretKey: env?.TURNSTILE_SECRET_KEY ?? "",
-            endpoints: [
-              "/sign-in/email",
-              "/sign-up/email",
-              "/request-password-reset",
-            ],
-          }),
-          createEmailQualificationPlugin(env),
-          organization({
-            allowUserToCreateOrganization: true,
-            organizationLimit: 3,
-            membershipLimit: 10,
-            requireEmailVerificationOnInvitation: true,
-          }),
-          apiKey({
-            enableSessionForAPIKeys: true,
-            enableMetadata: true,
-            apiKeyHeaders: ["x-api-key"],
-            defaultPrefix: "spin_",
-            storage: "secondary-storage",
-            fallbackToDatabase: true,
-            rateLimit: {
-              enabled: true,
-              timeWindow: apiKeyRateLimit.window * 1000,
-              maxRequests: apiKeyRateLimit.max,
-            },
-          }),
-          twoFactor({
-            issuer: "Spinupmail",
-          }),
-          admin({
-            ac: adminAccessControl,
-            roles: platformAdminRoles,
-            defaultRole: "user",
-            adminRoles: ["admin"],
-          }),
-          openAPI(),
+        timezone: {
+          type: "string",
+          required: false,
+          input: true,
+          returned: true,
+        },
+      },
+    },
+    plugins: [
+      ...(enableE2ETestUtils ? [testUtils()] : []),
+      captcha({
+        provider: "cloudflare-turnstile",
+        secretKey: env?.TURNSTILE_SECRET_KEY ?? "",
+        endpoints: [
+          "/sign-in/email",
+          "/sign-up/email",
+          "/request-password-reset",
         ],
+      }),
+      createEmailQualificationPlugin(env),
+      organization({
+        allowUserToCreateOrganization: true,
+        organizationLimit: 3,
+        membershipLimit: 10,
+        requireEmailVerificationOnInvitation: true,
+      }),
+      apiKey({
+        enableSessionForAPIKeys: true,
+        enableMetadata: true,
+        apiKeyHeaders: ["x-api-key"],
+        defaultPrefix: "spin_",
+        storage: "database",
         rateLimit: {
-          // Playwright e2e flows seed auth state directly and can fan out
-          // `get-session` calls across workers, which makes production
-          // throttling introduce test-only sign-in redirects.
-          enabled: !enableE2ETestUtils,
-          window: authRateLimit.window,
-          ...(authRateLimit.max !== undefined
-            ? { max: authRateLimit.max }
-            : {}),
-          customRules: {
-            // Better Auth ships shorter built-in sign-in windows that cause
-            // Cloudflare KV TTL warnings unless they are explicitly raised.
-            "/sign-in/email": signInRateLimitRule,
-            "/sign-in/social": signInRateLimitRule,
-            // It's here to prevent abuse,
-            // you might not need this based on your service provider's limits.
-            "/change-email": {
-              window: authRateLimit.changeEmail.window,
-              max: authRateLimit.changeEmail.max,
-            },
-            "/get-session": {
-              window: apiKeyRateLimit.window,
-              max: apiKeyRateLimit.max,
-            },
-            "/organization/get-full-organization": {
-              window: apiKeyRateLimit.window,
-              max: apiKeyRateLimit.max,
-            },
-          },
+          enabled: true,
+          timeWindow: apiKeyRateLimit.window * 1000,
+          maxRequests: apiKeyRateLimit.max,
         },
-      }
-    ),
-    // Only add database adapter for CLI schema generation
-    ...(env
-      ? {}
-      : {
-          database: drizzleAdapter({} as D1Database, {
-            provider: "sqlite",
-            usePlural: true,
-            debugLogs: false,
-          }),
-        }),
+      }),
+      twoFactor({
+        issuer: "Spinupmail",
+      }),
+      admin({
+        ac: adminAccessControl,
+        roles: platformAdminRoles,
+        defaultRole: "user",
+        adminRoles: ["admin"],
+      }),
+      openAPI(),
+    ],
+    rateLimit: {
+      // Playwright e2e flows seed auth state directly and can fan out
+      // `get-session` calls across workers, which makes production
+      // throttling introduce test-only sign-in redirects.
+      enabled: !enableE2ETestUtils,
+      storage: "database",
+      window: authRateLimit.window,
+      ...(authRateLimit.max !== undefined ? { max: authRateLimit.max } : {}),
+      customRules: {
+        // Keep sign-in limits aligned with the configured auth window.
+        "/sign-in/email": signInRateLimitRule,
+        "/sign-in/social": signInRateLimitRule,
+        // It's here to prevent abuse,
+        // you might not need this based on your service provider's limits.
+        "/change-email": {
+          window: authRateLimit.changeEmail.window,
+          max: authRateLimit.changeEmail.max,
+        },
+        "/get-session": {
+          window: apiKeyRateLimit.window,
+          max: apiKeyRateLimit.max,
+        },
+        "/organization/get-full-organization": {
+          window: apiKeyRateLimit.window,
+          max: apiKeyRateLimit.max,
+        },
+      },
+    },
   });
 }
 

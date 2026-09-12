@@ -50,6 +50,8 @@ export const sessions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    activeOrganizationId: text("active_organization_id"),
+    impersonatedBy: text("impersonated_by"),
     timezone: text("timezone"),
     city: text("city"),
     country: text("country"),
@@ -58,8 +60,6 @@ export const sessions = sqliteTable(
     colo: text("colo"),
     latitude: text("latitude"),
     longitude: text("longitude"),
-    activeOrganizationId: text("active_organization_id"),
-    impersonatedBy: text("impersonated_by"),
   },
   table => [index("sessions_userId_idx").on(table.userId)]
 );
@@ -185,8 +185,8 @@ export const apikeys = sqliteTable(
     rateLimitEnabled: integer("rate_limit_enabled", {
       mode: "boolean",
     }).default(true),
-    rateLimitTimeWindow: integer("rate_limit_time_window").default(86400000),
-    rateLimitMax: integer("rate_limit_max").default(10),
+    rateLimitTimeWindow: integer("rate_limit_time_window").default(60000),
+    rateLimitMax: integer("rate_limit_max").default(120),
     requestCount: integer("request_count").default(0),
     remaining: integer("remaining"),
     lastRequest: integer("last_request", { mode: "timestamp_ms" }),
@@ -213,12 +213,21 @@ export const twoFactors = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     verified: integer("verified", { mode: "boolean" }).default(true),
+    failedVerificationCount: integer("failed_verification_count").default(0),
+    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
   },
   table => [
     index("twoFactors_secret_idx").on(table.secret),
     index("twoFactors_userId_idx").on(table.userId),
   ]
 );
+
+export const rateLimits = sqliteTable("rate_limits", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull(),
+});
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
