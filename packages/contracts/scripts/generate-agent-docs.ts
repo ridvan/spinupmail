@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { format } from "prettier";
 import {
   createAgentLlmsText,
   generateAgentOpenApiJson,
@@ -12,7 +13,10 @@ const root = path.resolve(
 );
 const output = path.join(root, "docs/api");
 const files = [
-  ["v1-openapi.json", generateAgentOpenApiJson()],
+  [
+    "v1-openapi.json",
+    await format(generateAgentOpenApiJson(), { parser: "json" }),
+  ],
   ["llms.txt", createAgentLlmsText()],
 ] as const;
 
