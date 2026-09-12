@@ -12,12 +12,36 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "bin": {
+    "spinupmail-agent": "./dist/cli.mjs",
+    "spinupmail-mcp": "./dist/mcp-server.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs",
       "default": "./dist/index.mjs"
+    },
+    "./agent": {
+      "types": "./dist/agent-client.d.mts",
+      "import": "./dist/agent-client.mjs",
+      "require": "./dist/agent-client.cjs"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.mts",
+      "import": "./dist/cli.mjs",
+      "require": "./dist/cli.cjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.mts",
+      "import": "./dist/mcp.mjs",
+      "require": "./dist/mcp.cjs"
+    },
+    "./mcp-server": {
+      "types": "./dist/mcp-server.d.mts",
+      "import": "./dist/mcp-server.mjs",
+      "require": "./dist/mcp-server.cjs"
     }
   },
   "publishConfig": {

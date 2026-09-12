@@ -35,6 +35,22 @@ describe("agent discovery", () => {
 
     expect(operation.security).toEqual([{ apiKeyAuth: [] }]);
   });
+
+  it("links the versioned agent API contract", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.test/");
+    const { createApiCatalog, createHomepageMarkdown, createOpenApiDocument } =
+      await loadAgentDiscovery();
+
+    expect(JSON.stringify(createApiCatalog())).toContain(
+      "https://api.example.test/api/v1/openapi.json"
+    );
+    expect(JSON.stringify(createOpenApiDocument())).toContain(
+      "https://api.example.test/api/v1/llms.txt"
+    );
+    expect(createHomepageMarkdown()).toContain(
+      "https://api.example.test/api/v1/discovery"
+    );
+  });
 });
 
 describe("acceptsMarkdown", () => {

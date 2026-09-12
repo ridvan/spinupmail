@@ -59,3 +59,17 @@ export {
   SpinupMailValidationError,
 } from "@/errors";
 export { SpinupMailFile } from "@/file";
+export {
+  SpinupMailAgentClient,
+  createAgentCredentialToken,
+  generateAgentSecret,
+} from "@/agent-client";
+export { callAgentMcpTool, createAgentMcpTools } from "@/mcp";
+export type {
+  AgentCallInput,
+  AgentIdempotentRequestOptions,
+  AgentRequestOptions,
+  CreateAgentClientOptions,
+  EnrollAgentInput,
+  EnrollAgentResult,
+} from "@/agent-client";

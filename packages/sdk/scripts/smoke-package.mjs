@@ -42,6 +42,19 @@ try {
 
   const extractedPackageRoot = path.join(extractionDir, "package");
   const extractedDistRoot = path.join(extractedPackageRoot, "dist");
+  const packedManifest = JSON.parse(
+    fs.readFileSync(path.join(extractedPackageRoot, "package.json"), "utf8")
+  );
+  for (const subpath of [".", "./agent", "./cli", "./mcp", "./mcp-server"]) {
+    if (!packedManifest.exports?.[subpath]) {
+      throw new Error(`Packed SDK is missing export ${subpath}.`);
+    }
+  }
+  for (const bin of ["spinupmail-agent", "spinupmail-mcp"]) {
+    if (!packedManifest.bin?.[bin]) {
+      throw new Error(`Packed SDK is missing binary ${bin}.`);
+    }
+  }
   const extractedNodeModules = path.join(extractedPackageRoot, "node_modules");
   fs.mkdirSync(extractedNodeModules, { recursive: true });
   fs.symlinkSync(
@@ -53,11 +66,14 @@ try {
   const esmCheckPath = path.join(packDestination, "esm-check.mjs");
   fs.writeFileSync(
     esmCheckPath,
-    `import { SpinupMail } from ${JSON.stringify(
+    `import { SpinupMail, SpinupMailAgentClient } from ${JSON.stringify(
       path.join(extractedDistRoot, "index.mjs")
     )};
 if (typeof SpinupMail !== "function") {
   throw new Error("ESM build did not export SpinupMail.");
+}
+if (typeof SpinupMailAgentClient !== "function") {
+  throw new Error("ESM build did not export SpinupMailAgentClient.");
 }
 `
   );
@@ -66,11 +82,14 @@ if (typeof SpinupMail !== "function") {
   const cjsCheckPath = path.join(packDestination, "cjs-check.cjs");
   fs.writeFileSync(
     cjsCheckPath,
-    `const { SpinupMail } = require(${JSON.stringify(
+    `const { SpinupMail, SpinupMailAgentClient } = require(${JSON.stringify(
       path.join(extractedDistRoot, "index.cjs")
     )});
 if (typeof SpinupMail !== "function") {
   throw new Error("CJS build did not export SpinupMail.");
+}
+if (typeof SpinupMailAgentClient !== "function") {
+  throw new Error("CJS build did not export SpinupMailAgentClient.");
 }
 `
   );
@@ -90,6 +109,8 @@ if (typeof SpinupMail !== "function") {
   fs.writeFileSync(
     path.join(tsConsumerDir, "index.ts"),
     `import { SpinupMail } from "spinupmail";
+import { SpinupMailAgentClient } from "spinupmail/agent";
+import { createAgentMcpTools } from "spinupmail/mcp";
 
 const spinupmail = new SpinupMail({
   apiKey: "spin_test",
@@ -97,6 +118,9 @@ const spinupmail = new SpinupMail({
 });
 
 void spinupmail.domains.get();
+const agent = new SpinupMailAgentClient({ credential: "configured-secret" });
+void agent.listInboxes();
+void createAgentMcpTools();
 `
   );
   fs.writeFileSync(
