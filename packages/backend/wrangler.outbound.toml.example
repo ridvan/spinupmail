@@ -1,0 +1,32 @@
+name = "spinupmail-agent-outbound"
+main = "src/outbound-worker.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[d1_databases]]
+binding = "SUM_DB"
+database_name = "SUM_DB"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[[send_email]]
+name = "EMAIL"
+
+[[queues.producers]]
+queue = "spinupmail-agent-outbound"
+binding = "AGENT_OUTBOUND_QUEUE"
+
+[[queues.consumers]]
+queue = "spinupmail-agent-outbound"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 2
+dead_letter_queue = "spinupmail-agent-outbound-dlq"
+
+[vars]
+# Keep false until the separate provider, policy, and operator launch gates pass.
+AGENT_OUTBOUND_ENABLED = "false"
+# Configure AGENT_PROVIDER_EVENT_SECRET with `wrangler secret put` on the API
+# Worker that accepts provider events; never store it in this file.

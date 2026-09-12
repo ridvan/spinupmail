@@ -371,11 +371,13 @@ const getRawSize = (raw: string) => RAW_TEXT_ENCODER.encode(raw).length;
 
 const ensureStarterSampleEmails = async ({
   db,
+  organizationId,
   addressId,
   address,
   organizationName,
 }: {
   db: ReturnType<typeof getDb>;
+  organizationId: string;
   addressId: string;
   address: string;
   organizationName: string;
@@ -399,6 +401,7 @@ const ensureStarterSampleEmails = async ({
     await insertInboundEmail(db, {
       id: emailId,
       addressId,
+      organizationId,
       messageId: `<${emailId}@spinupmail-sample.local>`,
       sender: SAMPLE_SENDER,
       from: SAMPLE_FROM,
@@ -522,6 +525,7 @@ export const seedStarterInbox = async ({
 
   const { seededSampleEmailCount } = await ensureStarterSampleEmails({
     db,
+    organizationId,
     addressId: starterAddress.id,
     address: starterAddress.address,
     organizationName,

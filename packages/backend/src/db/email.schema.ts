@@ -54,10 +54,20 @@ export const emails = sqliteTable(
   "emails",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     addressId: text("address_id")
       .notNull()
       .references(() => emailAddresses.id, { onDelete: "cascade" }),
     messageId: text("message_id"),
+    inReplyTo: text("in_reply_to"),
+    referencesJson: text("references_json"),
+    threadId: text("thread_id"),
+    direction: text("direction", { enum: ["inbound", "outbound"] })
+      .default("inbound")
+      .notNull(),
+    deliveryState: text("delivery_state").default("received").notNull(),
     sender: text("sender"),
     from: text("from").notNull(),
     to: text("to").notNull(),
@@ -82,6 +92,13 @@ export const emails = sqliteTable(
     uniqueIndex("emails_address_message_id_unique").on(
       table.addressId,
       table.messageId
+    ),
+    uniqueIndex("emails_org_id_uidx").on(table.organizationId, table.id),
+    index("emails_org_thread_received_idx").on(
+      table.organizationId,
+      table.threadId,
+      table.receivedAt,
+      table.id
     ),
   ]
 );

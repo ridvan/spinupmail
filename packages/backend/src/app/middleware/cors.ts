@@ -18,9 +18,16 @@ export const registerCorsMiddleware = (app: Hono<AppHonoEnv>) => {
         "X-API-Key",
         "X-Org-Id",
         "X-Captcha-Response",
+        "Idempotency-Key",
+        "X-Request-Id",
       ],
       allowMethods: ["POST", "GET", "OPTIONS", "DELETE", "PATCH"],
-      exposeHeaders: ["Content-Length", "Content-Disposition", "Content-Type"],
+      exposeHeaders: [
+        "Content-Length",
+        "Content-Disposition",
+        "Content-Type",
+        "X-Request-Id",
+      ],
       maxAge: 600,
       credentials: true,
     })

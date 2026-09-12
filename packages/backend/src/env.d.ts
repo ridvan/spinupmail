@@ -1,6 +1,11 @@
 declare global {
   interface CloudflareBindings {
     API_KEY_RATE_LIMIT_MAX?: string;
+    AGENT_OUTBOUND_ENABLED?: string;
+    AGENT_OUTBOUND_QUEUE?: Queue<
+      import("./modules/agent-api/sending").AgentOutboundQueueMessage
+    >;
+    AGENT_PROVIDER_EVENT_SECRET?: string;
     API_KEY_RATE_LIMIT_WINDOW?: string;
     AUTH_CHANGE_EMAIL_RATE_LIMIT_MAX?: string;
     AUTH_CHANGE_EMAIL_RATE_LIMIT_WINDOW?: string;
@@ -24,6 +29,9 @@ declare global {
     EXTENSION_REDIRECT_ORIGINS?: string;
     GOOGLE_CLIENT_ID?: string;
     GOOGLE_CLIENT_SECRET?: string;
+    AGENT_EVENT_QUEUE?: Queue<
+      import("./modules/agent-api/events").AgentEventQueueMessage
+    >;
     INTEGRATION_DISPATCH_QUEUE?: Queue<unknown>;
     INTEGRATION_QUEUE_BASE_DELAY_SECONDS?: string;
     INTEGRATION_QUEUE_JITTER_SECONDS?: string;

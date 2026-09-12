@@ -62,6 +62,31 @@ max_batch_timeout = 5
 max_retries = 2
 dead_letter_queue = "spinupmail-integration-dispatches-dlq"
 
+# Optional durable agent event publication. Polling remains authoritative.
+[[queues.producers]]
+queue = "spinupmail-agent-events"
+binding = "AGENT_EVENT_QUEUE"
+
+[[queues.consumers]]
+queue = "spinupmail-agent-events"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "spinupmail-agent-events-dlq"
+
+# Optional controlled-pilot outbound queue. The Worker also performs scheduled
+# recovery. Keep AGENT_OUTBOUND_ENABLED false until every pilot gate passes.
+[[queues.producers]]
+queue = "spinupmail-agent-outbound"
+binding = "AGENT_OUTBOUND_QUEUE"
+
+[[queues.consumers]]
+queue = "spinupmail-agent-outbound"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 2
+dead_letter_queue = "spinupmail-agent-outbound-dlq"
+
 [vars]
 EMAIL_DOMAINS = "example.com,example-test.com"
 FORCED_MAIL_PREFIX = "" # e.g. if set to "temp", all addresses will start with "temp-"
@@ -88,6 +113,9 @@ RESEND_FROM_EMAIL = "Spinupmail <verify@example.com>"
 # Configure secrets via `wrangler secret put`:
 # BETTER_AUTH_SECRET, BETTER_AUTH_BASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY, INTEGRATION_SECRET_ENCRYPTION_KEY
 # INTEGRATION_SECRET_ENCRYPTION_KEY must be a base64-encoded 32-byte AES-GCM key.
+# For an authorized provider-event pilot, configure AGENT_PROVIDER_EVENT_SECRET
+# with `wrangler secret put`; never store it in this file.
+AGENT_OUTBOUND_ENABLED = "false"
 EMAIL_FORWARD_TO = ""
 EMAIL_MAX_BYTES = "524288"
 # Max body text/html bytes persisted per email row (oversized bodies are dropped)
