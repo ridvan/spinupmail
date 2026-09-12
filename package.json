@@ -2,6 +2,7 @@
   "name": "@spinupmail/workspace",
   "private": true,
   "license": "MIT",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev:backend": "pnpm -C packages/backend dev",
     "build:backend": "pnpm -C packages/backend build",
